@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BottomNav } from '@/components/BottomNav';
+import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ArrowLeft, FileText, MapPin, Camera, Loader2, CheckCircle } from 'lucide-react';
+import { ArrowLeft, FileText, MapPin, Loader2, CheckCircle } from 'lucide-react';
 
 const categories = [
   'Road Repair',
@@ -123,83 +124,71 @@ const RequestService = () => {
         {/* Curved transition */}
         <div className="h-6 bg-background rounded-t-3xl -mt-6 relative z-10" />
 
-        {/* Form */}
+        {/* Form - Protected by AuthGuard */}
         <div className="px-4 -mt-2">
-          <Card variant="elevated" className="animate-slide-up">
-            <CardContent className="p-5">
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Category *</label>
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+          <AuthGuard fallback="message">
+            <Card variant="elevated" className="animate-slide-up">
+              <CardContent className="p-5">
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Category *</label>
+                    <Select value={category} onValueChange={setCategory}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Title *</label>
-                  <Input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Brief title for your request"
-                    maxLength={100}
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Title *</label>
+                    <Input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Brief title for your request"
+                      maxLength={100}
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Description *</label>
-                  <Textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Describe your request in detail..."
-                    rows={4}
-                    maxLength={1000}
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Description *</label>
+                    <Textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Describe your request in detail..."
+                      rows={4}
+                      maxLength={1000}
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium flex items-center gap-2">
-                    <MapPin className="h-4 w-4" /> Location (Optional)
-                  </label>
-                  <Input
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="e.g., Near Barangay Hall, Purok 1"
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <MapPin className="h-4 w-4" /> Location (Optional)
+                    </label>
+                    <Input
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="e.g., Near Barangay Hall, Purok 1"
+                    />
+                  </div>
 
-                <Button type="submit" size="lg" className="w-full" disabled={isSubmitting || authLoading}>
-                  {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    'Submit Request'
-                  )}
-                </Button>
-
-                {!user && (
-                  <p className="text-sm text-muted-foreground text-center">
-                    You need to{' '}
-                    <button
-                      type="button"
-                      onClick={() => navigate('/auth')}
-                      className="text-primary font-medium hover:underline"
-                    >
-                      sign in
-                    </button>{' '}
-                    to submit a request
-                  </p>
-                )}
-              </form>
-            </CardContent>
-          </Card>
+                  <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Submit Request'
+                    )}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </AuthGuard>
         </div>
       </div>
 
