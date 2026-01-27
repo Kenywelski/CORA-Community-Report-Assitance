@@ -108,7 +108,7 @@ const Admin = () => {
                   </div>
                   <p className="font-medium text-sm">{req.title}</p>
                   <div className="flex gap-2">
-                    {['pending', 'in_progress', 'completed', 'rejected'].map((s) => (
+                    {(['pending', 'in_progress', 'completed', 'rejected'] as const).map((s) => (
                       <Button key={s} size="sm" variant={req.status === s ? 'default' : 'outline'} onClick={() => updateStatus(req.id, s)} className="text-xs px-2 py-1 h-7">
                         {s.replace('_', ' ')}
                       </Button>
