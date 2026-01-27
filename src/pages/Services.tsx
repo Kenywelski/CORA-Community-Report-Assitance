@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { BottomNav } from '@/components/BottomNav';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 import { 
   FileText, 
   AlertCircle, 
@@ -23,7 +24,8 @@ const services = [
     description: "Submit requests for municipal services",
     color: "text-primary", 
     bgColor: "bg-secondary",
-    path: "/request-service"
+    path: "/request-service",
+    requiresAuth: true
   },
   { 
     icon: AlertCircle, 
@@ -31,7 +33,8 @@ const services = [
     description: "Report community issues or incidents",
     color: "text-accent", 
     bgColor: "bg-accent/10",
-    path: "/report-issue"
+    path: "/report-issue",
+    requiresAuth: true
   },
   { 
     icon: Calendar, 
@@ -39,7 +42,8 @@ const services = [
     description: "View upcoming municipal events",
     color: "text-success", 
     bgColor: "bg-success/10",
-    path: "/events"
+    path: "/events",
+    requiresAuth: false
   },
   { 
     icon: MessageSquare, 
@@ -47,7 +51,8 @@ const services = [
     description: "Share your feedback and suggestions",
     color: "text-warning", 
     bgColor: "bg-warning/10",
-    path: "/feedback"
+    path: "/feedback",
+    requiresAuth: true
   },
   { 
     icon: MapPin, 
@@ -55,7 +60,8 @@ const services = [
     description: "Find locations and contact info",
     color: "text-primary", 
     bgColor: "bg-primary/10",
-    path: "/directory"
+    path: "/directory",
+    requiresAuth: false
   },
   { 
     icon: Building2, 
@@ -63,7 +69,8 @@ const services = [
     description: "Municipal office information",
     color: "text-muted-foreground", 
     bgColor: "bg-muted",
-    path: "/offices"
+    path: "/offices",
+    requiresAuth: false
   },
   { 
     icon: Heart, 
@@ -71,7 +78,8 @@ const services = [
     description: "Social welfare programs",
     color: "text-emergency", 
     bgColor: "bg-emergency/10",
-    path: "/programs"
+    path: "/programs",
+    requiresAuth: false
   },
   { 
     icon: Wallet, 
@@ -79,12 +87,27 @@ const services = [
     description: "Pay fees and view transactions",
     color: "text-success", 
     bgColor: "bg-success/10",
-    path: "/payments"
+    path: "/payments",
+    requiresAuth: false
   },
 ];
 
 const Services = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const handleServiceClick = (service: typeof services[0]) => {
+    if (service.requiresAuth && !user) {
+      toast.error('You must be logged in to perform this action.', {
+        action: {
+          label: 'Sign In',
+          onClick: () => navigate('/auth'),
+        },
+      });
+      return;
+    }
+    navigate(service.path);
+  };
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -112,7 +135,7 @@ const Services = () => {
                 variant="elevated"
                 className="cursor-pointer animate-slide-up"
                 style={{ animationDelay: `${index * 50}ms` }}
-                onClick={() => navigate(service.path)}
+                onClick={() => handleServiceClick(service)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-center gap-4">

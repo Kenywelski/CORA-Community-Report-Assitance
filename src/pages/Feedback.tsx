@@ -4,8 +4,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { BottomNav } from '@/components/BottomNav';
+import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -18,31 +18,30 @@ const Feedback = () => {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [rating, setRating] = useState(0);
-  const [isAnonymous, setIsAnonymous] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!subject.trim() || !message.trim()) {
-      toast.error('Please fill in all required fields');
+    if (!user) {
+      toast.error('You must be logged in to perform this action.');
       return;
     }
 
-    if (!isAnonymous && !user) {
-      toast.error('Please sign in or submit anonymously');
+    if (!subject.trim() || !message.trim()) {
+      toast.error('Please fill in all required fields');
       return;
     }
 
     setIsSubmitting(true);
 
     const { error } = await supabase.from('feedback').insert({
-      user_id: isAnonymous ? null : user?.id,
+      user_id: user.id,
       subject: subject.trim(),
       message: message.trim(),
       rating: rating || null,
-      is_anonymous: isAnonymous,
+      is_anonymous: false,
     });
 
     if (error) {
@@ -104,76 +103,67 @@ const Feedback = () => {
         {/* Curved transition */}
         <div className="h-6 bg-background rounded-t-3xl -mt-6 relative z-10" />
 
-        {/* Form */}
+        {/* Form - Protected by AuthGuard */}
         <div className="px-4 -mt-2">
-          <Card variant="elevated" className="animate-slide-up">
-            <CardContent className="p-5">
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">How would you rate our services?</label>
-                  <div className="flex gap-2 justify-center py-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setRating(star)}
-                        className="p-1 transition-transform hover:scale-110"
-                      >
-                        <Star
-                          className={cn(
-                            "h-8 w-8 transition-colors",
-                            star <= rating
-                              ? "text-warning fill-warning"
-                              : "text-muted-foreground"
-                          )}
-                        />
-                      </button>
-                    ))}
+          <AuthGuard fallback="message">
+            <Card variant="elevated" className="animate-slide-up">
+              <CardContent className="p-5">
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">How would you rate our services?</label>
+                    <div className="flex gap-2 justify-center py-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setRating(star)}
+                          className="p-1 transition-transform hover:scale-110"
+                        >
+                          <Star
+                            className={cn(
+                              "h-8 w-8 transition-colors",
+                              star <= rating
+                                ? "text-warning fill-warning"
+                                : "text-muted-foreground"
+                            )}
+                          />
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Subject *</label>
-                  <Input
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    placeholder="What's your feedback about?"
-                    maxLength={100}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Message *</label>
-                  <Textarea
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Tell us more..."
-                    rows={4}
-                    maxLength={1000}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-muted rounded-xl">
-                  <div>
-                    <p className="text-sm font-medium">Submit Anonymously</p>
-                    <p className="text-xs text-muted-foreground">Your identity won't be revealed</p>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Subject *</label>
+                    <Input
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                      placeholder="What's your feedback about?"
+                      maxLength={100}
+                    />
                   </div>
-                  <Switch
-                    checked={isAnonymous}
-                    onCheckedChange={setIsAnonymous}
-                  />
-                </div>
 
-                <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    'Submit Feedback'
-                  )}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Message *</label>
+                    <Textarea
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder="Tell us more..."
+                      rows={4}
+                      maxLength={1000}
+                    />
+                  </div>
+
+                  <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Submit Feedback'
+                    )}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </AuthGuard>
         </div>
       </div>
 
