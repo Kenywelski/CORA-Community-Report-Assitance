@@ -206,6 +206,75 @@ export type Database = {
         }
         Relationships: []
       }
+      tourist_spots: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string
+          id: string
+          images: string[] | null
+          is_active: boolean | null
+          latitude: number | null
+          location: string | null
+          longitude: number | null
+          municipality: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description: string
+          id?: string
+          images?: string[] | null
+          is_active?: boolean | null
+          latitude?: number | null
+          location?: string | null
+          longitude?: number | null
+          municipality?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string
+          id?: string
+          images?: string[] | null
+          is_active?: boolean | null
+          latitude?: number | null
+          location?: string | null
+          longitude?: number | null
+          municipality?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      user_login_activity: {
+        Row: {
+          id: string
+          ip_address: string | null
+          login_at: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          ip_address?: string | null
+          login_at?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          id?: string
+          ip_address?: string | null
+          login_at?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
