@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,9 +10,16 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ArrowLeft, FileText, MapPin, Loader2, CheckCircle } from 'lucide-react';
+import { ArrowLeft, FileText, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { PhotoUpload } from '@/components/PhotoUpload';
+import { BarangaySelect } from '@/components/BarangaySelect';
+import { LocationPicker } from '@/components/LocationPicker';
+import { z } from 'zod';
 
 const categories = [
+  'Barangay Clearance',
+  'Business Permit',
+  'Community Tax Certificate',
   'Road Repair',
   'Street Lighting',
   'Water Supply',
@@ -21,20 +28,54 @@ const categories = [
   'Public Safety',
   'Health Services',
   'Social Welfare',
-  'Business Permit',
   'Civil Registry',
   'Other',
 ];
 
+// Validation schema
+const requestSchema = z.object({
+  category: z.string().min(1, 'Please select a category'),
+  title: z.string().min(5, 'Title must be at least 5 characters').max(100, 'Title too long'),
+  description: z.string().min(20, 'Please provide a detailed description (at least 20 characters)').max(1000, 'Description too long'),
+  barangay: z.string().min(1, 'Please select your barangay'),
+});
+
 const RequestService = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialCategory = searchParams.get('category') || '';
+  
   const { user, isLoading: authLoading } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState(initialCategory);
+  const [barangay, setBarangay] = useState('');
   const [location, setLocation] = useState('');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateForm = () => {
+    try {
+      requestSchema.parse({ category, title, description, barangay });
+      setErrors({});
+      return true;
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const newErrors: Record<string, string> = {};
+        error.errors.forEach(err => {
+          if (err.path[0]) {
+            newErrors[err.path[0] as string] = err.message;
+          }
+        });
+        setErrors(newErrors);
+      }
+      return false;
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,8 +86,8 @@ const RequestService = () => {
       return;
     }
 
-    if (!title.trim() || !description.trim() || !category) {
-      toast.error('Please fill in all required fields');
+    if (!validateForm()) {
+      toast.error('Please fix the errors in the form');
       return;
     }
 
@@ -57,7 +98,10 @@ const RequestService = () => {
       title: title.trim(),
       description: description.trim(),
       category,
-      location: location.trim() || null,
+      location: `${barangay}${location ? `, ${location}` : ''}`,
+      latitude,
+      longitude,
+      photo_url: photoUrl,
     });
 
     if (error) {
@@ -68,6 +112,11 @@ const RequestService = () => {
     }
 
     setIsSubmitting(false);
+  };
+
+  const handleLocationChange = (lat: number, lng: number) => {
+    setLatitude(lat);
+    setLongitude(lng);
   };
 
   if (isSuccess) {
@@ -132,8 +181,8 @@ const RequestService = () => {
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Category *</label>
-                    <Select value={category} onValueChange={setCategory}>
-                      <SelectTrigger>
+                    <Select value={category} onValueChange={(v) => { setCategory(v); setErrors(prev => ({ ...prev, category: '' })); }}>
+                      <SelectTrigger className={errors.category ? 'border-destructive' : ''}>
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
@@ -144,39 +193,67 @@ const RequestService = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                    {errors.category && (
+                      <p className="text-sm text-destructive flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" /> {errors.category}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Title *</label>
                     <Input
                       value={title}
-                      onChange={(e) => setTitle(e.target.value)}
+                      onChange={(e) => { setTitle(e.target.value); setErrors(prev => ({ ...prev, title: '' })); }}
                       placeholder="Brief title for your request"
                       maxLength={100}
+                      className={errors.title ? 'border-destructive' : ''}
                     />
+                    {errors.title && (
+                      <p className="text-sm text-destructive flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" /> {errors.title}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Description *</label>
                     <Textarea
                       value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Describe your request in detail..."
+                      onChange={(e) => { setDescription(e.target.value); setErrors(prev => ({ ...prev, description: '' })); }}
+                      placeholder="Describe your request in detail. Include all relevant information..."
                       rows={4}
                       maxLength={1000}
+                      className={errors.description ? 'border-destructive' : ''}
                     />
+                    <p className="text-xs text-muted-foreground text-right">{description.length}/1000</p>
+                    {errors.description && (
+                      <p className="text-sm text-destructive flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" /> {errors.description}
+                      </p>
+                    )}
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium flex items-center gap-2">
-                      <MapPin className="h-4 w-4" /> Location (Optional)
-                    </label>
-                    <Input
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      placeholder="e.g., Near Barangay Hall, Purok 1"
-                    />
-                  </div>
+                  <BarangaySelect
+                    value={barangay}
+                    onValueChange={(v) => { setBarangay(v); setErrors(prev => ({ ...prev, barangay: '' })); }}
+                    error={errors.barangay}
+                  />
+
+                  <LocationPicker
+                    latitude={latitude}
+                    longitude={longitude}
+                    onLocationChange={handleLocationChange}
+                    locationText={location}
+                    onLocationTextChange={setLocation}
+                  />
+
+                  <PhotoUpload
+                    label="Attach Photo (Optional)"
+                    onUpload={setPhotoUrl}
+                    currentUrl={photoUrl}
+                    onRemove={() => setPhotoUrl(null)}
+                  />
 
                   <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
                     {isSubmitting ? (

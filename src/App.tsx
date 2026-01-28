@@ -13,6 +13,9 @@ import RequestService from "./pages/RequestService";
 import MyRequests from "./pages/MyRequests";
 import Feedback from "./pages/Feedback";
 import Admin from "./pages/Admin";
+import AdminUsers from "./pages/AdminUsers";
+import AdminTouristSpots from "./pages/AdminTouristSpots";
+import TouristSpots from "./pages/TouristSpots";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +37,9 @@ const App = () => (
             <Route path="/my-requests" element={<MyRequests />} />
             <Route path="/feedback" element={<Feedback />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/tourist-spots" element={<AdminTouristSpots />} />
+            <Route path="/tourist-spots" element={<TouristSpots />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
