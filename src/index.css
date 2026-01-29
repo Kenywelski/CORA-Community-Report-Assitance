@@ -4,9 +4,19 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
-/* Leaflet map styles */
+/* Leaflet map styles - imported dynamically but needs base z-index */
 .leaflet-container {
   z-index: 1;
+  font-family: inherit;
+}
+
+.leaflet-pane {
+  z-index: 1;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 2;
 }
 
 @layer base {

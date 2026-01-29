@@ -1,18 +1,7 @@
-import { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MapPin, Crosshair, Loader2 } from 'lucide-react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-
-// Fix Leaflet default marker icon
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
 
 interface LocationPickerProps {
   latitude?: number | null;
@@ -24,33 +13,6 @@ interface LocationPickerProps {
 
 // Cortes, Surigao del Sur center coordinates
 const DEFAULT_CENTER: [number, number] = [8.3572, 126.1836];
-const DEFAULT_ZOOM = 13;
-
-const LocationMarker = ({ 
-  position, 
-  onPositionChange 
-}: { 
-  position: [number, number] | null;
-  onPositionChange: (lat: number, lng: number) => void;
-}) => {
-  useMapEvents({
-    click(e) {
-      onPositionChange(e.latlng.lat, e.latlng.lng);
-    },
-  });
-
-  return position ? <Marker position={position} /> : null;
-};
-
-const MapController = ({ center }: { center: [number, number] }) => {
-  const map = useMap();
-  
-  useEffect(() => {
-    map.setView(center, map.getZoom());
-  }, [center, map]);
-  
-  return null;
-};
 
 export const LocationPicker = ({
   latitude,
@@ -63,14 +25,48 @@ export const LocationPicker = ({
     latitude && longitude ? [latitude, longitude] : null
   );
   const [isLocating, setIsLocating] = useState(false);
-  const [mapCenter, setMapCenter] = useState<[number, number]>(
-    latitude && longitude ? [latitude, longitude] : DEFAULT_CENTER
-  );
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [MapComponents, setMapComponents] = useState<any>(null);
+  const mapRef = useState<any>(null);
 
-  const handlePositionChange = (lat: number, lng: number) => {
+  // Dynamically import Leaflet to avoid SSR issues
+  useEffect(() => {
+    const loadLeaflet = async () => {
+      try {
+        const L = await import('leaflet');
+        const RL = await import('react-leaflet');
+        
+        // Import CSS
+        await import('leaflet/dist/leaflet.css');
+        
+        // Fix Leaflet default marker icon
+        delete (L.Icon.Default.prototype as any)._getIconUrl;
+        L.Icon.Default.mergeOptions({
+          iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+          iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+        });
+        
+        setMapComponents({
+          MapContainer: RL.MapContainer,
+          TileLayer: RL.TileLayer,
+          Marker: RL.Marker,
+          useMapEvents: RL.useMapEvents,
+          useMap: RL.useMap,
+        });
+        setMapLoaded(true);
+      } catch (error) {
+        console.error('Failed to load Leaflet:', error);
+      }
+    };
+    
+    loadLeaflet();
+  }, []);
+
+  const handlePositionChange = useCallback((lat: number, lng: number) => {
     setPosition([lat, lng]);
     onLocationChange(lat, lng);
-  };
+  }, [onLocationChange]);
 
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -83,7 +79,6 @@ export const LocationPicker = ({
       (pos) => {
         const { latitude, longitude } = pos.coords;
         setPosition([latitude, longitude]);
-        setMapCenter([latitude, longitude]);
         onLocationChange(latitude, longitude);
         setIsLocating(false);
       },
@@ -95,6 +90,36 @@ export const LocationPicker = ({
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
+
+  // Map click handler component
+  const LocationMarker = ({ onPositionChange }: { onPositionChange: (lat: number, lng: number) => void }) => {
+    if (!MapComponents) return null;
+    
+    MapComponents.useMapEvents({
+      click(e: any) {
+        onPositionChange(e.latlng.lat, e.latlng.lng);
+      },
+    });
+
+    return position ? <MapComponents.Marker position={position} /> : null;
+  };
+
+  // Map center controller
+  const MapController = ({ center }: { center: [number, number] }) => {
+    if (!MapComponents) return null;
+    
+    const map = MapComponents.useMap();
+    
+    useEffect(() => {
+      if (map && center) {
+        map.setView(center, map.getZoom());
+      }
+    }, [center, map]);
+    
+    return null;
+  };
+
+  const mapCenter = position || DEFAULT_CENTER;
 
   return (
     <div className="space-y-3">
@@ -127,20 +152,26 @@ export const LocationPicker = ({
       </Button>
 
       {/* Map */}
-      <div className="h-64 rounded-xl overflow-hidden border border-border">
-        <MapContainer
-          center={mapCenter}
-          zoom={DEFAULT_ZOOM}
-          style={{ height: '100%', width: '100%' }}
-          scrollWheelZoom={true}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <MapController center={mapCenter} />
-          <LocationMarker position={position} onPositionChange={handlePositionChange} />
-        </MapContainer>
+      <div className="h-64 rounded-xl overflow-hidden border border-border bg-muted">
+        {mapLoaded && MapComponents ? (
+          <MapComponents.MapContainer
+            center={mapCenter}
+            zoom={13}
+            style={{ height: '100%', width: '100%' }}
+            scrollWheelZoom={true}
+          >
+            <MapComponents.TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            <MapController center={mapCenter} />
+            <LocationMarker onPositionChange={handlePositionChange} />
+          </MapComponents.MapContainer>
+        ) : (
+          <div className="h-full w-full flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        )}
       </div>
 
       <p className="text-xs text-muted-foreground">
