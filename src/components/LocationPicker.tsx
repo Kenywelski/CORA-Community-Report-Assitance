@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MapPin, Crosshair, Loader2 } from 'lucide-react';
@@ -14,6 +14,9 @@ interface LocationPickerProps {
 // Cortes, Surigao del Sur center coordinates
 const DEFAULT_CENTER: [number, number] = [8.3572, 126.1836];
 
+// Lazy load the map component
+const LeafletMap = lazy(() => import('./LeafletMap'));
+
 export const LocationPicker = ({
   latitude,
   longitude,
@@ -25,43 +28,6 @@ export const LocationPicker = ({
     latitude && longitude ? [latitude, longitude] : null
   );
   const [isLocating, setIsLocating] = useState(false);
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const [MapComponents, setMapComponents] = useState<any>(null);
-  const mapRef = useState<any>(null);
-
-  // Dynamically import Leaflet to avoid SSR issues
-  useEffect(() => {
-    const loadLeaflet = async () => {
-      try {
-        const L = await import('leaflet');
-        const RL = await import('react-leaflet');
-        
-        // Import CSS
-        await import('leaflet/dist/leaflet.css');
-        
-        // Fix Leaflet default marker icon
-        delete (L.Icon.Default.prototype as any)._getIconUrl;
-        L.Icon.Default.mergeOptions({
-          iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-          iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-        });
-        
-        setMapComponents({
-          MapContainer: RL.MapContainer,
-          TileLayer: RL.TileLayer,
-          Marker: RL.Marker,
-          useMapEvents: RL.useMapEvents,
-          useMap: RL.useMap,
-        });
-        setMapLoaded(true);
-      } catch (error) {
-        console.error('Failed to load Leaflet:', error);
-      }
-    };
-    
-    loadLeaflet();
-  }, []);
 
   const handlePositionChange = useCallback((lat: number, lng: number) => {
     setPosition([lat, lng]);
@@ -89,34 +55,6 @@ export const LocationPicker = ({
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
-  };
-
-  // Map click handler component
-  const LocationMarker = ({ onPositionChange }: { onPositionChange: (lat: number, lng: number) => void }) => {
-    if (!MapComponents) return null;
-    
-    MapComponents.useMapEvents({
-      click(e: any) {
-        onPositionChange(e.latlng.lat, e.latlng.lng);
-      },
-    });
-
-    return position ? <MapComponents.Marker position={position} /> : null;
-  };
-
-  // Map center controller
-  const MapController = ({ center }: { center: [number, number] }) => {
-    if (!MapComponents) return null;
-    
-    const map = MapComponents.useMap();
-    
-    useEffect(() => {
-      if (map && center) {
-        map.setView(center, map.getZoom());
-      }
-    }, [center, map]);
-    
-    return null;
   };
 
   const mapCenter = position || DEFAULT_CENTER;
@@ -153,25 +91,17 @@ export const LocationPicker = ({
 
       {/* Map */}
       <div className="h-64 rounded-xl overflow-hidden border border-border bg-muted">
-        {mapLoaded && MapComponents ? (
-          <MapComponents.MapContainer
-            center={mapCenter}
-            zoom={13}
-            style={{ height: '100%', width: '100%' }}
-            scrollWheelZoom={true}
-          >
-            <MapComponents.TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            <MapController center={mapCenter} />
-            <LocationMarker onPositionChange={handlePositionChange} />
-          </MapComponents.MapContainer>
-        ) : (
+        <Suspense fallback={
           <div className="h-full w-full flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        )}
+        }>
+          <LeafletMap 
+            center={mapCenter}
+            position={position}
+            onPositionChange={handlePositionChange}
+          />
+        </Suspense>
       </div>
 
       <p className="text-xs text-muted-foreground">
