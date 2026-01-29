@@ -20,8 +20,8 @@ import { cn } from '@/lib/utils';
 const services = [
   { 
     icon: FileText, 
-    label: "Request Service", 
-    description: "Submit requests for municipal services",
+    label: "Request Document/Service", 
+    description: "Request certificates, permits, IDs online",
     color: "text-primary", 
     bgColor: "bg-secondary",
     path: "/request-service",
@@ -29,20 +29,11 @@ const services = [
   },
   { 
     icon: AlertCircle, 
-    label: "Report Issue", 
-    description: "Report community issues or incidents",
+    label: "Report an Issue", 
+    description: "Report community problems (no login needed)",
     color: "text-accent", 
     bgColor: "bg-accent/10",
     path: "/report-issue",
-    requiresAuth: true
-  },
-  { 
-    icon: Calendar, 
-    label: "Events", 
-    description: "View upcoming municipal events",
-    color: "text-success", 
-    bgColor: "bg-success/10",
-    path: "/events",
     requiresAuth: false
   },
   { 
@@ -56,38 +47,11 @@ const services = [
   },
   { 
     icon: MapPin, 
-    label: "Directory", 
-    description: "Find locations and contact info",
-    color: "text-primary", 
-    bgColor: "bg-primary/10",
-    path: "/directory",
-    requiresAuth: false
-  },
-  { 
-    icon: Building2, 
-    label: "Offices", 
-    description: "Municipal office information",
-    color: "text-muted-foreground", 
-    bgColor: "bg-muted",
-    path: "/offices",
-    requiresAuth: false
-  },
-  { 
-    icon: Heart, 
-    label: "Programs", 
-    description: "Social welfare programs",
-    color: "text-emergency", 
-    bgColor: "bg-emergency/10",
-    path: "/programs",
-    requiresAuth: false
-  },
-  { 
-    icon: Wallet, 
-    label: "Payments", 
-    description: "Pay fees and view transactions",
+    label: "Tourist Spots", 
+    description: "Explore Surigao del Sur destinations",
     color: "text-success", 
     bgColor: "bg-success/10",
-    path: "/payments",
+    path: "/tourist-spots",
     requiresAuth: false
   },
 ];
