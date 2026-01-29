@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MapPin, Crosshair, Loader2 } from 'lucide-react';
+import { MapPin, Crosshair, Loader2, ExternalLink } from 'lucide-react';
 
 interface LocationPickerProps {
   latitude?: number | null;
@@ -12,7 +12,8 @@ interface LocationPickerProps {
 }
 
 // Cortes, Surigao del Sur center coordinates
-const DEFAULT_CENTER: [number, number] = [8.3572, 126.1836];
+const DEFAULT_LAT = 8.3572;
+const DEFAULT_LNG = 126.1836;
 
 export const LocationPicker = ({
   latitude,
@@ -21,33 +22,9 @@ export const LocationPicker = ({
   locationText = '',
   onLocationTextChange,
 }: LocationPickerProps) => {
-  const [position, setPosition] = useState<[number, number] | null>(
-    latitude && longitude ? [latitude, longitude] : null
-  );
+  const [lat, setLat] = useState<string>(latitude?.toString() || '');
+  const [lng, setLng] = useState<string>(longitude?.toString() || '');
   const [isLocating, setIsLocating] = useState(false);
-  const [MapComponent, setMapComponent] = useState<React.ComponentType<any> | null>(null);
-
-  // Dynamically import the map component
-  useEffect(() => {
-    let mounted = true;
-    
-    import('./LeafletMap').then((module) => {
-      if (mounted) {
-        setMapComponent(() => module.default);
-      }
-    }).catch((err) => {
-      console.error('Failed to load map:', err);
-    });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const handlePositionChange = useCallback((lat: number, lng: number) => {
-    setPosition([lat, lng]);
-    onLocationChange(lat, lng);
-  }, [onLocationChange]);
 
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -59,20 +36,42 @@ export const LocationPicker = ({
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        setPosition([latitude, longitude]);
+        setLat(latitude.toFixed(6));
+        setLng(longitude.toFixed(6));
         onLocationChange(latitude, longitude);
         setIsLocating(false);
       },
       (error) => {
         console.error('Geolocation error:', error);
-        alert('Unable to get your location');
+        alert('Unable to get your location. Please enter coordinates manually or try again.');
         setIsLocating(false);
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
-  const mapCenter = position || DEFAULT_CENTER;
+  const handleLatChange = (value: string) => {
+    setLat(value);
+    const numLat = parseFloat(value);
+    const numLng = parseFloat(lng);
+    if (!isNaN(numLat) && !isNaN(numLng)) {
+      onLocationChange(numLat, numLng);
+    }
+  };
+
+  const handleLngChange = (value: string) => {
+    setLng(value);
+    const numLat = parseFloat(lat);
+    const numLng = parseFloat(value);
+    if (!isNaN(numLat) && !isNaN(numLng)) {
+      onLocationChange(numLat, numLng);
+    }
+  };
+
+  const hasCoordinates = lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng));
+  const mapUrl = hasCoordinates 
+    ? `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=15/${lat}/${lng}`
+    : `https://www.openstreetmap.org/#map=13/${DEFAULT_LAT}/${DEFAULT_LNG}`;
 
   return (
     <div className="space-y-3">
@@ -80,7 +79,7 @@ export const LocationPicker = ({
         <MapPin className="h-4 w-4" /> Location
       </label>
 
-      {/* Address input */}
+      {/* Address/Landmark input */}
       <Input
         value={locationText}
         onChange={(e) => onLocationTextChange?.(e.target.value)}
@@ -104,28 +103,49 @@ export const LocationPicker = ({
         Use My Current Location
       </Button>
 
-      {/* Map */}
-      <div className="h-64 rounded-xl overflow-hidden border border-border bg-muted">
-        {MapComponent ? (
-          <MapComponent 
-            center={mapCenter}
-            position={position}
-            onPositionChange={handlePositionChange}
+      {/* Coordinate inputs */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Latitude</label>
+          <Input
+            type="number"
+            step="any"
+            value={lat}
+            onChange={(e) => handleLatChange(e.target.value)}
+            placeholder="e.g., 8.3572"
           />
-        ) : (
-          <div className="h-full w-full flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        )}
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Longitude</label>
+          <Input
+            type="number"
+            step="any"
+            value={lng}
+            onChange={(e) => handleLngChange(e.target.value)}
+            placeholder="e.g., 126.1836"
+          />
+        </div>
       </div>
 
+      {/* Map preview link */}
+      <a
+        href={mapUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-center gap-2 p-4 rounded-xl border border-border bg-muted/50 hover:bg-muted transition-colors text-sm text-muted-foreground hover:text-foreground"
+      >
+        <MapPin className="h-4 w-4" />
+        {hasCoordinates ? 'View location on map' : 'Open map to find coordinates'}
+        <ExternalLink className="h-3 w-3" />
+      </a>
+
       <p className="text-xs text-muted-foreground">
-        Tap on the map to mark the exact location, or use the button above to use your current location.
+        Use the "Current Location" button or enter coordinates manually. You can also open the map link to find your location.
       </p>
 
-      {position && (
+      {hasCoordinates && (
         <p className="text-xs text-primary">
-          📍 Location set: {position[0].toFixed(6)}, {position[1].toFixed(6)}
+          📍 Location set: {parseFloat(lat).toFixed(6)}, {parseFloat(lng).toFixed(6)}
         </p>
       )}
     </div>
