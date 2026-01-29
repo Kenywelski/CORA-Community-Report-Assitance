@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MapPin, Crosshair, Loader2 } from 'lucide-react';
@@ -14,9 +14,6 @@ interface LocationPickerProps {
 // Cortes, Surigao del Sur center coordinates
 const DEFAULT_CENTER: [number, number] = [8.3572, 126.1836];
 
-// Lazy load the map component
-const LeafletMap = lazy(() => import('./LeafletMap'));
-
 export const LocationPicker = ({
   latitude,
   longitude,
@@ -28,6 +25,24 @@ export const LocationPicker = ({
     latitude && longitude ? [latitude, longitude] : null
   );
   const [isLocating, setIsLocating] = useState(false);
+  const [MapComponent, setMapComponent] = useState<React.ComponentType<any> | null>(null);
+
+  // Dynamically import the map component
+  useEffect(() => {
+    let mounted = true;
+    
+    import('./LeafletMap').then((module) => {
+      if (mounted) {
+        setMapComponent(() => module.default);
+      }
+    }).catch((err) => {
+      console.error('Failed to load map:', err);
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handlePositionChange = useCallback((lat: number, lng: number) => {
     setPosition([lat, lng]);
@@ -91,17 +106,17 @@ export const LocationPicker = ({
 
       {/* Map */}
       <div className="h-64 rounded-xl overflow-hidden border border-border bg-muted">
-        <Suspense fallback={
-          <div className="h-full w-full flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        }>
-          <LeafletMap 
+        {MapComponent ? (
+          <MapComponent 
             center={mapCenter}
             position={position}
             onPositionChange={handlePositionChange}
           />
-        </Suspense>
+        ) : (
+          <div className="h-full w-full flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        )}
       </div>
 
       <p className="text-xs text-muted-foreground">
