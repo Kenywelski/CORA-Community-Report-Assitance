@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -13,9 +13,11 @@ import RequestService from "./pages/RequestService";
 import ReportIssue from "./pages/ReportIssue";
 import MyRequests from "./pages/MyRequests";
 import Feedback from "./pages/Feedback";
-import Admin from "./pages/Admin";
+import AdminDashboard from "./pages/AdminDashboard";
+import AdminRequests from "./pages/AdminRequests";
 import AdminUsers from "./pages/AdminUsers";
 import AdminTouristSpots from "./pages/AdminTouristSpots";
+import AdminFeedback from "./pages/AdminFeedback";
 import TouristSpots from "./pages/TouristSpots";
 import NotFound from "./pages/NotFound";
 
@@ -38,9 +40,11 @@ const App = () => (
             <Route path="/report-issue" element={<ReportIssue />} />
             <Route path="/my-requests" element={<MyRequests />} />
             <Route path="/feedback" element={<Feedback />} />
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/requests" element={<AdminRequests />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/tourist-spots" element={<AdminTouristSpots />} />
+            <Route path="/admin/feedback" element={<AdminFeedback />} />
             <Route path="/tourist-spots" element={<TouristSpots />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
