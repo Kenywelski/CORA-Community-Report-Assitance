@@ -1,13 +1,13 @@
 import { useNavigate } from 'react-router-dom';
-import { Home, FileText, Bell, User, MoreHorizontal } from "lucide-react";
+import { Home, FileText, Bell, User, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { icon: Home, label: "Home", path: "/" },
   { icon: FileText, label: "Services", path: "/services" },
+  { icon: Heart, label: "Feed", path: "/community" },
   { icon: Bell, label: "Updates", path: "/updates", badge: 3 },
   { icon: User, label: "Profile", path: "/profile" },
-  { icon: MoreHorizontal, label: "More", path: "/services" },
 ];
 
 interface BottomNavProps {

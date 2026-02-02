@@ -5,7 +5,7 @@ import {
   Users, 
   MapPin, 
   MessageSquare,
-  Settings,
+  Megaphone,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -21,6 +21,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
   { icon: ClipboardList, label: 'Requests', path: '/admin/requests' },
   { icon: Users, label: 'Users', path: '/admin/users' },
+  { icon: Megaphone, label: 'Announcements', path: '/admin/announcements' },
   { icon: MapPin, label: 'Tourist Spots', path: '/admin/tourist-spots' },
   { icon: MessageSquare, label: 'Feedback', path: '/admin/feedback' },
 ];
