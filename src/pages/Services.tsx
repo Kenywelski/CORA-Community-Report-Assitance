@@ -37,6 +37,15 @@ const services = [
     requiresAuth: false
   },
   { 
+    icon: Heart, 
+    label: "Community Feed", 
+    description: "View reports and support community issues",
+    color: "text-destructive", 
+    bgColor: "bg-destructive/10",
+    path: "/community",
+    requiresAuth: false
+  },
+  { 
     icon: MessageSquare, 
     label: "Feedback", 
     description: "Share your feedback and suggestions",
