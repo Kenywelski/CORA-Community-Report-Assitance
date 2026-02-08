@@ -19,8 +19,9 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminTouristSpots from "./pages/AdminTouristSpots";
 import AdminFeedback from "./pages/AdminFeedback";
 import AdminAnnouncements from "./pages/AdminAnnouncements";
+import AdminPosts from "./pages/AdminPosts";
 import TouristSpots from "./pages/TouristSpots";
-import CommunityFeed from "./pages/CommunityFeed";
+import CommunityWall from "./pages/CommunityWall";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,11 +43,12 @@ const App = () => (
             <Route path="/report-issue" element={<ReportIssue />} />
             <Route path="/my-requests" element={<MyRequests />} />
             <Route path="/feedback" element={<Feedback />} />
-            <Route path="/community" element={<CommunityFeed />} />
+            <Route path="/community" element={<CommunityWall />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/requests" element={<AdminRequests />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/announcements" element={<AdminAnnouncements />} />
+            <Route path="/admin/posts" element={<AdminPosts />} />
             <Route path="/admin/tourist-spots" element={<AdminTouristSpots />} />
             <Route path="/admin/feedback" element={<AdminFeedback />} />
             <Route path="/tourist-spots" element={<TouristSpots />} />

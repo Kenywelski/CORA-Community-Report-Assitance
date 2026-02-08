@@ -119,6 +119,77 @@ export type Database = {
         }
         Relationships: []
       }
+      post_likes: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          session_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          category: string | null
+          content: string
+          created_at: string
+          created_by: string | null
+          created_by_role: string | null
+          id: string
+          is_anonymous: boolean
+          post_type: Database["public"]["Enums"]["post_type"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          content: string
+          created_at?: string
+          created_by?: string | null
+          created_by_role?: string | null
+          id?: string
+          is_anonymous?: boolean
+          post_type?: Database["public"]["Enums"]["post_type"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          created_by_role?: string | null
+          id?: string
+          is_anonymous?: boolean
+          post_type?: Database["public"]["Enums"]["post_type"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           address: string | null
@@ -344,6 +415,7 @@ export type Database = {
     Enums: {
       announcement_type: "general" | "urgent" | "event"
       app_role: "admin" | "moderator" | "user"
+      post_type: "report" | "announcement" | "project"
       request_status: "pending" | "in_progress" | "completed" | "rejected"
     }
     CompositeTypes: {
@@ -474,6 +546,7 @@ export const Constants = {
     Enums: {
       announcement_type: ["general", "urgent", "event"],
       app_role: ["admin", "moderator", "user"],
+      post_type: ["report", "announcement", "project"],
       request_status: ["pending", "in_progress", "completed", "rejected"],
     },
   },
