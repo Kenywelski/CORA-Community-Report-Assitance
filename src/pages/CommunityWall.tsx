@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { BottomNav } from '@/components/BottomNav';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   ArrowLeft, 
   Heart, 
@@ -66,6 +67,8 @@ const categories = [
   'Other',
 ];
 
+type FilterTab = 'all' | 'reports' | 'government';
+
 const CommunityWall = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -74,6 +77,7 @@ const CommunityWall = () => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('');
+  const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
   
   const [sessionId] = useState(() => {
     let id = localStorage.getItem('wall_session_id');
@@ -95,6 +99,14 @@ const CommunityWall = () => {
       if (error) throw error;
       return data;
     },
+  });
+
+  // Filter posts based on active tab
+  const filteredPosts = posts?.filter((post) => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'reports') return post.post_type === 'report';
+    if (activeFilter === 'government') return post.post_type === 'announcement' || post.post_type === 'project';
+    return true;
   });
 
   // Fetch likes
@@ -286,18 +298,39 @@ const CommunityWall = () => {
           </div>
         </header>
 
+        {/* Filter Tabs */}
+        <div className="px-4 pt-3">
+          <Tabs value={activeFilter} onValueChange={(v) => setActiveFilter(v as FilterTab)}>
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="reports" className="gap-1">
+                <AlertCircle className="h-3.5 w-3.5" />
+                Reports
+              </TabsTrigger>
+              <TabsTrigger value="government" className="gap-1">
+                <Building2 className="h-3.5 w-3.5" />
+                Government
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
         {/* Content */}
         <main className="p-4 space-y-4">
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Loading posts...</div>
-          ) : posts?.length === 0 ? (
+          ) : filteredPosts?.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
-                No posts yet. Be the first to submit a report!
+                {activeFilter === 'all' 
+                  ? 'No posts yet. Be the first to submit a report!'
+                  : activeFilter === 'reports'
+                  ? 'No community reports yet.'
+                  : 'No government posts yet.'}
               </CardContent>
             </Card>
           ) : (
-            posts?.map((post) => {
+            filteredPosts?.map((post) => {
               const postType = post.post_type as string;
               const Icon = postTypeIcons[postType] || AlertCircle;
               const likesCount = getLikesCount(post.id);
