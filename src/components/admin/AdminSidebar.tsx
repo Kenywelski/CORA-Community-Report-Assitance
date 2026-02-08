@@ -6,6 +6,7 @@ import {
   MapPin, 
   MessageSquare,
   Megaphone,
+  Newspaper,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -20,6 +21,7 @@ import { toast } from 'sonner';
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
   { icon: ClipboardList, label: 'Requests', path: '/admin/requests' },
+  { icon: Newspaper, label: 'Community Posts', path: '/admin/posts' },
   { icon: Users, label: 'Users', path: '/admin/users' },
   { icon: Megaphone, label: 'Announcements', path: '/admin/announcements' },
   { icon: MapPin, label: 'Tourist Spots', path: '/admin/tourist-spots' },

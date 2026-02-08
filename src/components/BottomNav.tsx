@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Home, FileText, Bell, User, Heart } from "lucide-react";
+import { Home, FileText, Bell, User, Newspaper } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -36,7 +36,7 @@ export const BottomNav = ({ currentPath }: BottomNavProps) => {
   const navItems = [
     { icon: Home, label: "Home", path: "/" },
     { icon: FileText, label: "Services", path: "/services" },
-    { icon: Heart, label: "Feed", path: "/community" },
+    { icon: Newspaper, label: "Wall", path: "/community" },
     { icon: Bell, label: "Updates", path: "/updates", badge: announcementCount && announcementCount > 0 ? announcementCount : undefined },
     { icon: User, label: "Profile", path: "/profile" },
   ];
