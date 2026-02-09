@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { BottomNav } from '@/components/BottomNav';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PostDetailDialog } from '@/components/PostDetailDialog';
 import { 
   ArrowLeft, 
   Heart, 
@@ -13,7 +14,9 @@ import {
   Building2, 
   AlertCircle,
   User,
-  Plus
+  Plus,
+  Filter,
+  X
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,6 +30,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -38,6 +49,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+
+interface Post {
+  id: string;
+  title: string;
+  content: string;
+  category: string | null;
+  post_type: string;
+  is_anonymous: boolean;
+  created_by_role: string | null;
+  created_at: string;
+}
 
 const postTypeIcons: Record<string, React.ElementType> = {
   report: AlertCircle,
@@ -57,13 +79,30 @@ const postTypeLabels: Record<string, string> = {
   project: 'Municipal Project',
 };
 
-const categories = [
+const reportCategories = [
   'Road Damage',
   'Garbage',
   'Flooding',
   'Street Light',
   'Water Supply',
   'Public Safety',
+  'Other',
+];
+
+const allCategories = [
+  'Road Damage',
+  'Garbage',
+  'Flooding',
+  'Street Light',
+  'Water Supply',
+  'Public Safety',
+  'Infrastructure',
+  'Health',
+  'Education',
+  'Environment',
+  'Social Services',
+  'Events',
+  'General',
   'Other',
 ];
 
@@ -78,6 +117,9 @@ const CommunityWall = () => {
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   
   const [sessionId] = useState(() => {
     let id = localStorage.getItem('wall_session_id');
@@ -97,16 +139,27 @@ const CommunityWall = () => {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data;
+      return data as Post[];
     },
   });
 
-  // Filter posts based on active tab
+  // Get unique categories from posts for filter dropdown
+  const availableCategories = [...new Set(posts?.map(p => p.category).filter(Boolean) || [])];
+
+  // Filter posts based on active tab and category
   const filteredPosts = posts?.filter((post) => {
-    if (activeFilter === 'all') return true;
-    if (activeFilter === 'reports') return post.post_type === 'report';
-    if (activeFilter === 'government') return post.post_type === 'announcement' || post.post_type === 'project';
-    return true;
+    // First filter by tab
+    let passesTabFilter = true;
+    if (activeFilter === 'reports') {
+      passesTabFilter = post.post_type === 'report';
+    } else if (activeFilter === 'government') {
+      passesTabFilter = post.post_type === 'announcement' || post.post_type === 'project';
+    }
+
+    // Then filter by category if selected
+    const passesCategoryFilter = !selectedCategory || post.category === selectedCategory;
+
+    return passesTabFilter && passesCategoryFilter;
   });
 
   // Fetch likes
@@ -224,6 +277,15 @@ const CommunityWall = () => {
     createPostMutation.mutate({ title, content, category });
   };
 
+  const handlePostClick = (post: Post) => {
+    setSelectedPost(post);
+    setIsDetailOpen(true);
+  };
+
+  const clearCategoryFilter = () => {
+    setSelectedCategory(null);
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="app-container">
@@ -267,7 +329,7 @@ const CommunityWall = () => {
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map((cat) => (
+                        {reportCategories.map((cat) => (
                           <SelectItem key={cat} value={cat}>
                             {cat}
                           </SelectItem>
@@ -300,19 +362,82 @@ const CommunityWall = () => {
 
         {/* Filter Tabs */}
         <div className="px-4 pt-3">
-          <Tabs value={activeFilter} onValueChange={(v) => setActiveFilter(v as FilterTab)}>
-            <TabsList className="w-full grid grid-cols-3">
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="reports" className="gap-1">
-                <AlertCircle className="h-3.5 w-3.5" />
-                Reports
-              </TabsTrigger>
-              <TabsTrigger value="government" className="gap-1">
-                <Building2 className="h-3.5 w-3.5" />
-                Government
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="flex items-center gap-2">
+            <Tabs 
+              value={activeFilter} 
+              onValueChange={(v) => {
+                setActiveFilter(v as FilterTab);
+                setSelectedCategory(null); // Reset category when changing tabs
+              }}
+              className="flex-1"
+            >
+              <TabsList className="w-full grid grid-cols-3">
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="reports" className="gap-1">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  Reports
+                </TabsTrigger>
+                <TabsTrigger value="government" className="gap-1">
+                  <Building2 className="h-3.5 w-3.5" />
+                  Government
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {/* Category Filter Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant={selectedCategory ? "default" : "outline"} 
+                  size="icon"
+                  className="shrink-0"
+                >
+                  <Filter className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {selectedCategory && (
+                  <>
+                    <DropdownMenuItem onClick={clearCategoryFilter} className="text-destructive">
+                      <X className="h-4 w-4 mr-2" />
+                      Clear Filter
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                {availableCategories.length === 0 ? (
+                  <DropdownMenuItem disabled>No categories available</DropdownMenuItem>
+                ) : (
+                  availableCategories.map((cat) => (
+                    <DropdownMenuItem 
+                      key={cat} 
+                      onClick={() => setSelectedCategory(cat)}
+                      className={cn(selectedCategory === cat && "bg-accent")}
+                    >
+                      {cat}
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Active Category Badge */}
+          {selectedCategory && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Filtered by:</span>
+              <Badge 
+                variant="secondary" 
+                className="gap-1 cursor-pointer hover:bg-secondary/80"
+                onClick={clearCategoryFilter}
+              >
+                {selectedCategory}
+                <X className="h-3 w-3" />
+              </Badge>
+            </div>
+          )}
         </div>
 
         {/* Content */}
@@ -322,7 +447,9 @@ const CommunityWall = () => {
           ) : filteredPosts?.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
-                {activeFilter === 'all' 
+                {selectedCategory 
+                  ? `No posts found in "${selectedCategory}" category.`
+                  : activeFilter === 'all' 
                   ? 'No posts yet. Be the first to submit a report!'
                   : activeFilter === 'reports'
                   ? 'No community reports yet.'
@@ -341,9 +468,10 @@ const CommunityWall = () => {
                 <Card 
                   key={post.id} 
                   className={cn(
-                    "overflow-hidden transition-all",
+                    "overflow-hidden transition-all cursor-pointer hover:shadow-md",
                     isAdminPost && "border-primary/30 bg-primary/5"
                   )}
+                  onClick={() => handlePostClick(post)}
                 >
                   <CardHeader className="pb-2">
                     <div className="flex items-start gap-3">
@@ -395,7 +523,10 @@ const CommunityWall = () => {
                           'gap-1.5 text-muted-foreground hover:text-destructive',
                           liked && 'text-destructive'
                         )}
-                        onClick={() => handleLikeToggle(post.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleLikeToggle(post.id);
+                        }}
                         disabled={likeMutation.isPending || unlikeMutation.isPending}
                       >
                         <Heart className={cn('h-4 w-4', liked && 'fill-current')} />
@@ -409,6 +540,17 @@ const CommunityWall = () => {
           )}
         </main>
       </div>
+
+      {/* Post Detail Dialog */}
+      <PostDetailDialog
+        post={selectedPost}
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+        likesCount={selectedPost ? getLikesCount(selectedPost.id) : 0}
+        isLiked={selectedPost ? isLikedByUser(selectedPost.id) : false}
+        onLikeToggle={handleLikeToggle}
+        isLikeLoading={likeMutation.isPending || unlikeMutation.isPending}
+      />
 
       <BottomNav />
     </div>
