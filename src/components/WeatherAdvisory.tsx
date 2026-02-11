@@ -93,84 +93,62 @@ export const WeatherAdvisory = ({ onDismiss }: WeatherAdvisoryProps) => {
         ? "border-warning/50 bg-gradient-to-r from-warning/15 to-warning/5" 
         : "border-primary/30 bg-gradient-to-r from-primary/10 to-primary/5"
     )}>
-      <CardContent className="p-4">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-2">
-            {hasWarning ? (
-              <AlertTriangle className="h-5 w-5 text-warning" />
-            ) : (
-              <WeatherIcon className="h-5 w-5 text-primary" />
-            )}
-            <div>
-              <h3 className="font-semibold text-sm">Weather Advisory</h3>
-              <p className="text-xs text-muted-foreground">{weather.location}</p>
-            </div>
+      <CardContent className="px-3 py-2.5">
+        {/* Compact single-row layout */}
+        <div className="flex items-center gap-2">
+          {hasWarning ? (
+            <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
+          ) : (
+            <WeatherIcon className="h-4 w-4 text-primary shrink-0" />
+          )}
+
+          {/* Weather stats inline */}
+          <div className="flex items-center gap-3 flex-1 min-w-0 text-xs">
+            <span className="font-medium truncate">{weather.condition}</span>
+            <span className="flex items-center gap-0.5 shrink-0">
+              <Thermometer className="h-3 w-3 text-muted-foreground" />
+              {weather.temperature}
+            </span>
+            <span className="flex items-center gap-0.5 shrink-0">
+              <Droplets className="h-3 w-3 text-muted-foreground" />
+              {weather.humidity}
+            </span>
+            <span className="hidden sm:flex items-center gap-0.5 shrink-0">
+              <Wind className="h-3 w-3 text-muted-foreground" />
+              {weather.windSpeed}
+            </span>
           </div>
-          <div className="flex items-center gap-1">
+
+          {/* Actions */}
+          <div className="flex items-center gap-0.5 shrink-0">
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-6 w-6"
               onClick={() => refetch()}
               disabled={isFetching}
             >
-              <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+              <RefreshCw className={cn("h-3 w-3", isFetching && "animate-spin")} />
             </Button>
             {onDismiss && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
+                className="h-6 w-6"
                 onClick={onDismiss}
               >
-                <X className="h-4 w-4" />
+                <X className="h-3 w-3" />
               </Button>
             )}
           </div>
         </div>
 
-        {/* Advisory Message */}
-        <p className={cn(
-          "text-sm mb-3 p-2 rounded-lg",
-          hasWarning ? "bg-warning/10 text-warning-foreground" : "bg-primary/10"
-        )}>
-          {weather.advisory}
-        </p>
-
-        {/* Weather Stats */}
-        <div className="grid grid-cols-4 gap-2 text-center">
-          <div className="bg-background/50 rounded-lg p-2">
-            <Thermometer className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-            <p className="text-xs font-medium">{weather.temperature}</p>
-            <p className="text-[10px] text-muted-foreground">Temp</p>
-          </div>
-          <div className="bg-background/50 rounded-lg p-2">
-            <Droplets className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-            <p className="text-xs font-medium">{weather.humidity}</p>
-            <p className="text-[10px] text-muted-foreground">Humidity</p>
-          </div>
-          <div className="bg-background/50 rounded-lg p-2">
-            <Wind className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-            <p className="text-xs font-medium">{weather.windSpeed}</p>
-            <p className="text-[10px] text-muted-foreground">Wind</p>
-          </div>
-          <div className="bg-background/50 rounded-lg p-2">
-            <WeatherIcon className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-            <p className="text-xs font-medium truncate">{weather.condition}</p>
-            <p className="text-[10px] text-muted-foreground">Condition</p>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/50">
-          <Badge variant="outline" className="text-[10px]">
-            {weather.source}
-          </Badge>
-          <span className="text-[10px] text-muted-foreground">
-            Updated: {format(new Date(weather.lastUpdated), 'h:mm a')}
-          </span>
-        </div>
+        {/* Advisory text - only show if warning */}
+        {hasWarning && (
+          <p className="text-xs mt-1.5 p-1.5 rounded bg-warning/10 text-warning-foreground line-clamp-1">
+            {weather.advisory}
+          </p>
+        )}
       </CardContent>
     </Card>
   );
