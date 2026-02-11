@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BottomNav } from '@/components/BottomNav';
+import { AnnouncementDetailDialog } from '@/components/AnnouncementDetailDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Megaphone, AlertTriangle, Calendar, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -15,6 +16,7 @@ interface Announcement {
   excerpt: string | null;
   type: 'general' | 'urgent' | 'event';
   published_at: string;
+  image_url: string | null;
 }
 
 const typeConfig = {
@@ -28,6 +30,8 @@ const Updates = () => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'general' | 'urgent' | 'event'>('all');
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   useEffect(() => {
     fetchAnnouncements();
@@ -103,8 +107,12 @@ const Updates = () => {
                 <Card 
                   key={announcement.id} 
                   variant="elevated"
-                  className="animate-slide-up cursor-pointer"
+                  className="animate-slide-up cursor-pointer hover:shadow-md transition-shadow"
                   style={{ animationDelay: `${index * 50}ms` }}
+                  onClick={() => {
+                    setSelectedAnnouncement(announcement);
+                    setIsDetailOpen(true);
+                  }}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
@@ -120,6 +128,15 @@ const Updates = () => {
                             {format(new Date(announcement.published_at), 'MMM d, yyyy')}
                           </span>
                         </div>
+                        {announcement.image_url && (
+                          <div className="mt-2 mb-2 rounded-lg overflow-hidden">
+                            <img 
+                              src={announcement.image_url} 
+                              alt={announcement.title}
+                              className="w-full h-32 object-cover"
+                            />
+                          </div>
+                        )}
                         <h3 className="font-semibold mt-2">{announcement.title}</h3>
                         <p className="text-sm text-muted-foreground mt-1 line-clamp-3">
                           {announcement.excerpt || announcement.content}
@@ -133,6 +150,12 @@ const Updates = () => {
           )}
         </div>
       </div>
+
+      <AnnouncementDetailDialog
+        announcement={selectedAnnouncement}
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+      />
 
       <BottomNav currentPath="/updates" onNavigate={(path) => navigate(path)} />
     </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Pencil, Trash2, Megaphone, AlertTriangle, Calendar } from 'lucide-react';
+import { Plus, Pencil, Trash2, Megaphone, AlertTriangle, Calendar, ImagePlus, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
@@ -42,6 +42,10 @@ const AdminAnnouncements = () => {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<AnnouncementFormData>({
     resolver: zodResolver(announcementSchema),
@@ -66,9 +70,39 @@ const AdminAnnouncements = () => {
     },
   });
 
+  const uploadImage = async (file: File): Promise<string | null> => {
+    const ext = file.name.split('.').pop();
+    const fileName = `${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage
+      .from('announcement-images')
+      .upload(fileName, file);
+    if (error) throw error;
+    const { data: urlData } = supabase.storage
+      .from('announcement-images')
+      .getPublicUrl(fileName);
+    return urlData.publicUrl;
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const clearImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const createMutation = useMutation({
     mutationFn: async (data: AnnouncementFormData) => {
       const { data: user } = await supabase.auth.getUser();
+      let image_url: string | null = null;
+      if (imageFile) {
+        image_url = await uploadImage(imageFile);
+      }
       const { error } = await supabase.from('announcements').insert({
         title: data.title,
         excerpt: data.excerpt || null,
@@ -76,6 +110,7 @@ const AdminAnnouncements = () => {
         type: data.type,
         is_active: data.is_active,
         created_by: user.user?.id,
+        image_url,
       });
       if (error) throw error;
     },
@@ -89,15 +124,25 @@ const AdminAnnouncements = () => {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: AnnouncementFormData }) => {
+      let image_url: string | undefined = undefined;
+      if (imageFile) {
+        image_url = (await uploadImage(imageFile)) || undefined;
+      }
+      const updateData: Record<string, unknown> = {
+        title: data.title,
+        excerpt: data.excerpt || null,
+        content: data.content,
+        type: data.type,
+        is_active: data.is_active,
+      };
+      if (image_url !== undefined) updateData.image_url = image_url;
+      // If user cleared existing image
+      if (!imagePreview && editingAnnouncement?.image_url) {
+        updateData.image_url = null;
+      }
       const { error } = await supabase
         .from('announcements')
-        .update({
-          title: data.title,
-          excerpt: data.excerpt || null,
-          content: data.content,
-          type: data.type,
-          is_active: data.is_active,
-        })
+        .update(updateData)
         .eq('id', id);
       if (error) throw error;
     },
@@ -124,6 +169,7 @@ const AdminAnnouncements = () => {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingAnnouncement(null);
+    clearImage();
     form.reset({
       title: '',
       excerpt: '',
@@ -135,6 +181,8 @@ const AdminAnnouncements = () => {
 
   const handleEdit = (announcement: Announcement) => {
     setEditingAnnouncement(announcement);
+    setImagePreview(announcement.image_url || null);
+    setImageFile(null);
     form.reset({
       title: announcement.title,
       excerpt: announcement.excerpt || '',
@@ -232,7 +280,42 @@ const AdminAnnouncements = () => {
                         <FormMessage />
                       </FormItem>
                     )}
-                  />
+                   />
+                  {/* Image Upload */}
+                  <div className="space-y-2">
+                    <FormLabel>Image (Optional)</FormLabel>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageSelect}
+                    />
+                    {imagePreview ? (
+                      <div className="relative rounded-lg overflow-hidden border border-border">
+                        <img src={imagePreview} alt="Preview" className="w-full h-40 object-cover" />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 h-7 w-7"
+                          onClick={clearImage}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full gap-2"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <ImagePlus className="h-4 w-4" />
+                        Choose Image
+                      </Button>
+                    )}
+                  </div>
                   <FormField
                     control={form.control}
                     name="is_active"

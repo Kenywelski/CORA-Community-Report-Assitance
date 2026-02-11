@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -5,6 +6,7 @@ import { ChevronRight, Megaphone, AlertTriangle, Calendar, Loader2 } from "lucid
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { AnnouncementDetailDialog } from "@/components/AnnouncementDetailDialog";
 
 interface Announcement {
   id: string;
@@ -13,6 +15,7 @@ interface Announcement {
   content: string;
   type: "general" | "urgent" | "event";
   published_at: string;
+  image_url: string | null;
 }
 
 const typeConfig = {
@@ -23,7 +26,8 @@ const typeConfig = {
 
 export const AnnouncementsFeed = () => {
   const navigate = useNavigate();
-
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const { data: announcements, isLoading } = useQuery({
     queryKey: ['announcements-feed'],
     queryFn: async () => {
@@ -70,7 +74,10 @@ export const AnnouncementsFeed = () => {
                 variant="elevated"
                 className="animate-slide-up cursor-pointer"
                 style={{ animationDelay: `${index * 100}ms` }}
-                onClick={() => navigate('/updates')}
+                onClick={() => {
+                  setSelectedAnnouncement(announcement);
+                  setIsDetailOpen(true);
+                }}
               >
                 <CardHeader className="pb-2">
                   <div className="flex items-start gap-3">
@@ -95,6 +102,12 @@ export const AnnouncementsFeed = () => {
           })
         )}
       </div>
+
+      <AnnouncementDetailDialog
+        announcement={selectedAnnouncement}
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+      />
     </section>
   );
 };
