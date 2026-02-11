@@ -16,7 +16,8 @@ import {
   User,
   Plus,
   Filter,
-  X
+  X,
+  Search
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -120,6 +121,7 @@ const CommunityWall = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
   const [sessionId] = useState(() => {
     let id = localStorage.getItem('wall_session_id');
@@ -146,9 +148,8 @@ const CommunityWall = () => {
   // Get unique categories from posts for filter dropdown
   const availableCategories = [...new Set(posts?.map(p => p.category).filter(Boolean) || [])];
 
-  // Filter posts based on active tab and category
+  // Filter posts based on active tab, category, and search
   const filteredPosts = posts?.filter((post) => {
-    // First filter by tab
     let passesTabFilter = true;
     if (activeFilter === 'reports') {
       passesTabFilter = post.post_type === 'report';
@@ -156,10 +157,15 @@ const CommunityWall = () => {
       passesTabFilter = post.post_type === 'announcement' || post.post_type === 'project';
     }
 
-    // Then filter by category if selected
     const passesCategoryFilter = !selectedCategory || post.category === selectedCategory;
 
-    return passesTabFilter && passesCategoryFilter;
+    const q = searchQuery.toLowerCase().trim();
+    const passesSearch = !q || 
+      post.title.toLowerCase().includes(q) || 
+      post.content.toLowerCase().includes(q) ||
+      (post.category?.toLowerCase().includes(q) ?? false);
+
+    return passesTabFilter && passesCategoryFilter && passesSearch;
   });
 
   // Fetch likes
@@ -360,8 +366,31 @@ const CommunityWall = () => {
           </div>
         </header>
 
-        {/* Filter Tabs */}
+        {/* Search Bar */}
         <div className="px-4 pt-3">
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search posts..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-9 h-9"
+            />
+            {searchQuery && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                onClick={() => setSearchQuery('')}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="px-4">
           <div className="flex items-center gap-2">
             <Tabs 
               value={activeFilter} 
