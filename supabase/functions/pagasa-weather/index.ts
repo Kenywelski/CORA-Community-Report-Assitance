@@ -1,9 +1,22 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = [
+  "https://cortes-connect-hub.lovable.app",
+  "https://id-preview--040a4e84-b1fc-47c3-8fd1-5e2fe429eb2d.lovable.app",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  };
+}
+
+// Simple in-memory cache to prevent excessive external API calls
+let cachedResponse: { data: unknown; timestamp: number } | null = null;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 interface WeatherData {
   location: string;
@@ -18,14 +31,22 @@ interface WeatherData {
 }
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Return cached response if still valid
+    if (cachedResponse && Date.now() - cachedResponse.timestamp < CACHE_TTL) {
+      return new Response(JSON.stringify(cachedResponse.data), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Fetch weather data from PAG-ASA public files
-    // Using their public weather forecast data
     const pagasaUrl = "https://pubfiles.pagasa.dost.gov.ph/climps/weather/wfb.txt";
     
     let weatherData: WeatherData;
@@ -40,12 +61,10 @@ serve(async (req) => {
       if (response.ok) {
         const text = await response.text();
         
-        // Parse the weather bulletin text for relevant information
         const lines = text.split('\n');
         let advisory = '';
         let condition = 'Partly Cloudy';
         
-        // Extract advisory information from the bulletin
         for (const line of lines) {
           if (line.toLowerCase().includes('advisory') || 
               line.toLowerCase().includes('warning') ||
@@ -55,7 +74,6 @@ serve(async (req) => {
           }
         }
 
-        // Check for specific weather conditions
         if (text.toLowerCase().includes('thunderstorm')) {
           condition = 'Thunderstorms';
         } else if (text.toLowerCase().includes('rain')) {
@@ -81,8 +99,7 @@ serve(async (req) => {
     } catch (fetchError) {
       console.error('PAG-ASA fetch error:', fetchError);
       
-      // Fallback: Use Open-Meteo API for Philippines weather (free, no API key needed)
-      const lat = 8.9475; // Surigao del Sur coordinates
+      const lat = 8.9475;
       const lon = 126.0458;
       
       const meteoResponse = await fetch(
@@ -93,29 +110,14 @@ serve(async (req) => {
         const meteoData = await meteoResponse.json();
         const current = meteoData.current;
         
-        // Weather code to condition mapping
         const weatherCodes: Record<number, string> = {
-          0: 'Clear Sky',
-          1: 'Mainly Clear',
-          2: 'Partly Cloudy',
-          3: 'Overcast',
-          45: 'Foggy',
-          48: 'Depositing Rime Fog',
-          51: 'Light Drizzle',
-          53: 'Moderate Drizzle',
-          55: 'Dense Drizzle',
-          61: 'Slight Rain',
-          63: 'Moderate Rain',
-          65: 'Heavy Rain',
-          71: 'Slight Snow',
-          73: 'Moderate Snow',
-          75: 'Heavy Snow',
-          80: 'Slight Rain Showers',
-          81: 'Moderate Rain Showers',
-          82: 'Violent Rain Showers',
-          95: 'Thunderstorm',
-          96: 'Thunderstorm with Slight Hail',
-          99: 'Thunderstorm with Heavy Hail',
+          0: 'Clear Sky', 1: 'Mainly Clear', 2: 'Partly Cloudy', 3: 'Overcast',
+          45: 'Foggy', 48: 'Depositing Rime Fog',
+          51: 'Light Drizzle', 53: 'Moderate Drizzle', 55: 'Dense Drizzle',
+          61: 'Slight Rain', 63: 'Moderate Rain', 65: 'Heavy Rain',
+          71: 'Slight Snow', 73: 'Moderate Snow', 75: 'Heavy Snow',
+          80: 'Slight Rain Showers', 81: 'Moderate Rain Showers', 82: 'Violent Rain Showers',
+          95: 'Thunderstorm', 96: 'Thunderstorm with Slight Hail', 99: 'Thunderstorm with Heavy Hail',
         };
 
         const condition = weatherCodes[current.weather_code] || 'Unknown';
@@ -145,13 +147,15 @@ serve(async (req) => {
       }
     }
 
+    // Cache the response
+    cachedResponse = { data: weatherData, timestamp: Date.now() };
+
     return new Response(JSON.stringify(weatherData), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("Weather fetch error:", error);
     
-    // Return fallback data
     return new Response(
       JSON.stringify({
         location: "Surigao del Sur, Philippines",
