@@ -16,7 +16,7 @@ export const HeroHeader = () => {
         <div className="absolute inset-0 hero-gradient opacity-85" />
       </div>
 
-      <div className="relative z-10 px-4 pt-12 pb-8">
+      <div className="relative z-10 px-4 pt-12 pb-8 lg:pt-6 lg:pb-12 lg:px-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-xl overflow-hidden">
@@ -41,13 +41,13 @@ export const HeroHeader = () => {
           </div>
         </div>
 
-        <div className="mb-6">
+        <div className="mb-6 lg:max-w-lg">
           <p className="text-white/80 text-sm mb-1">Magandang hapon,</p>
-          <h2 className="text-white text-2xl font-bold mb-2">Welcome to myCortes!</h2>
-          <p className="text-white/70 text-sm leading-relaxed">Your digital gateway to municipal services</p>
+          <h2 className="text-white text-2xl lg:text-3xl font-bold mb-2">Welcome to myCortes!</h2>
+          <p className="text-white/70 text-sm lg:text-base leading-relaxed">Your digital gateway to municipal services</p>
         </div>
 
-        <Button variant="accent" size="lg" className="w-full" onClick={() => navigate('/request-service')}>
+        <Button variant="accent" size="lg" className="w-full lg:w-auto lg:px-8" onClick={() => navigate('/request-service')}>
           <span>Report an Issue</span>
         </Button>
       </div>

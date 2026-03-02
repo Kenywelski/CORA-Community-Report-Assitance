@@ -175,9 +175,27 @@
     box-shadow: var(--shadow-xl);
   }
 
-  /* Mobile-first container */
+  /* Responsive container */
   .app-container {
     @apply max-w-md mx-auto;
+  }
+
+  @media (min-width: 768px) {
+    .app-container {
+      @apply max-w-2xl;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .app-container {
+      @apply max-w-5xl;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .app-container {
+      @apply max-w-6xl;
+    }
   }
 
   .hero-gradient {

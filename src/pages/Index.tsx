@@ -10,8 +10,8 @@ const Index = () => {
   const [showWeather, setShowWeather] = useState(true);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="app-container pb-24">
+    <div className="min-h-screen bg-background lg:pt-14">
+      <div className="app-container pb-24 lg:pb-8">
         {/* Real-time Weather Advisory from PAG-ASA */}
         {showWeather && (
           <WeatherAdvisory onDismiss={() => setShowWeather(false)} />
@@ -25,15 +25,18 @@ const Index = () => {
           {/* Quick Services Grid */}
           <QuickServices />
 
-          {/* Request Status */}
-          <RequestStatusCard />
+          {/* Desktop: two-column layout for status + announcements */}
+          <div className="lg:grid lg:grid-cols-2 lg:gap-6 space-y-6 lg:space-y-0">
+            {/* Request Status */}
+            <RequestStatusCard />
 
-          {/* Announcements */}
-          <AnnouncementsFeed />
+            {/* Announcements */}
+            <AnnouncementsFeed />
+          </div>
         </main>
       </div>
 
-      {/* Bottom Navigation - Full width */}
+      {/* Navigation */}
       <BottomNav />
     </div>
   );

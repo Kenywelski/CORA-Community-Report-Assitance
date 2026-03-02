@@ -46,7 +46,7 @@ const TouristSpots = () => {
 
   if (selectedSpot) {
     return (
-      <div className="min-h-screen bg-background pb-24">
+      <div className="min-h-screen bg-background pb-24 lg:pb-8 lg:pt-14">
         <div className="app-container">
           {/* Header with image */}
           <div className="relative h-72">
@@ -127,13 +127,13 @@ const TouristSpots = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-24 lg:pb-8 lg:pt-14">
       <div className="app-container">
         {/* Header */}
         <div className="hero-gradient px-4 pt-12 pb-8">
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors"
+            className="flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors lg:hidden"
           >
             <ArrowLeft className="h-5 w-5" />
             <span className="text-sm font-medium">Back</span>
@@ -154,13 +154,13 @@ const TouristSpots = () => {
         <div className="h-6 bg-background rounded-t-3xl -mt-6 relative z-10" />
 
         {/* Content */}
-        <div className="px-4 -mt-2 space-y-4">
+        <div className="px-4 -mt-2 space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3">
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-12 md:col-span-full">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : spots.length === 0 ? (
-            <Card variant="elevated">
+            <Card variant="elevated" className="md:col-span-full">
               <CardContent className="p-8 text-center">
                 <ImageIcon className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
                 <p className="text-muted-foreground">No tourist spots available yet</p>

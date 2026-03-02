@@ -83,13 +83,13 @@ const Services = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-24 lg:pb-8 lg:pt-14">
       <div className="app-container">
         {/* Header */}
-        <div className="px-4 pt-12 pb-6">
+        <div className="px-4 pt-12 lg:pt-8 pb-6">
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4 transition-colors"
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4 transition-colors lg:hidden"
           >
             <ArrowLeft className="h-5 w-5" />
             <span className="text-sm font-medium">Back</span>
@@ -98,8 +98,8 @@ const Services = () => {
           <p className="text-muted-foreground text-sm mt-1">Access all municipal services</p>
         </div>
 
-        {/* Services List */}
-        <div className="px-4 space-y-3">
+        {/* Services List - grid on desktop */}
+        <div className="px-4 space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3">
           {services.map((service, index) => {
             const Icon = service.icon;
             return (
