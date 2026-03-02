@@ -164,13 +164,13 @@ const RequestService = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      <div className="app-container">
+    <div className="min-h-screen bg-background pb-24 lg:pb-8 lg:pt-14">
+      <div className="app-container lg:max-w-2xl">
         {/* Header */}
         <div className="hero-gradient px-4 pt-12 pb-8">
           <button
             onClick={() => navigate('/services')}
-            className="flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors"
+            className="flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors lg:hidden"
           >
             <ArrowLeft className="h-5 w-5" />
             <span className="text-sm font-medium">Back</span>

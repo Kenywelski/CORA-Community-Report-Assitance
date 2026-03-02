@@ -293,7 +293,7 @@ const CommunityWall = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-24 lg:pb-8 lg:pt-14">
       <div className="app-container">
         {/* Header */}
         <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border">
@@ -470,11 +470,11 @@ const CommunityWall = () => {
         </div>
 
         {/* Content */}
-        <main className="p-4 space-y-4">
+        <main className="p-4 space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3">
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading posts...</div>
+            <div className="text-center py-8 text-muted-foreground md:col-span-full">Loading posts...</div>
           ) : filteredPosts?.length === 0 ? (
-            <Card>
+            <Card className="md:col-span-full">
               <CardContent className="py-8 text-center text-muted-foreground">
                 {selectedCategory 
                   ? `No posts found in "${selectedCategory}" category.`

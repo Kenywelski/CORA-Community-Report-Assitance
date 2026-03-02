@@ -55,13 +55,13 @@ const Updates = () => {
     : announcements.filter(a => a.type === filter);
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-24 lg:pb-8 lg:pt-14">
       <div className="app-container">
         {/* Header */}
-        <div className="px-4 pt-12 pb-4">
+        <div className="px-4 pt-12 lg:pt-8 pb-4">
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4 transition-colors"
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4 transition-colors lg:hidden"
           >
             <ArrowLeft className="h-5 w-5" />
             <span className="text-sm font-medium">Back</span>
@@ -87,14 +87,14 @@ const Updates = () => {
           </div>
         </div>
 
-        {/* Announcements List */}
-        <div className="px-4 space-y-3">
+        {/* Announcements List - grid on desktop */}
+        <div className="px-4 space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3">
           {isLoading ? (
-            <div className="flex justify-center py-8">
+            <div className="flex justify-center py-8 md:col-span-full">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : filteredAnnouncements.length === 0 ? (
-            <Card variant="flat" className="p-8 text-center">
+            <Card variant="flat" className="p-8 text-center md:col-span-full">
               <Megaphone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No announcements yet</p>
             </Card>
@@ -133,7 +133,7 @@ const Updates = () => {
                             <img 
                               src={announcement.image_url} 
                               alt={announcement.title}
-                              className="w-full h-32 object-cover"
+                              className="w-full h-32 lg:h-40 object-cover"
                             />
                           </div>
                         )}
