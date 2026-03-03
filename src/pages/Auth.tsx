@@ -22,14 +22,14 @@ const Auth = () => {
   const [errors, setErrors] = useState<{ email?: string; password?: string; fullName?: string }>({});
   const [showConfirmation, setShowConfirmation] = useState(false);
 
-  const { user, signInWithGoogle, signInWithEmail, signUpWithEmail, isLoading } = useAuth();
+  const { user, isAdmin, signInWithGoogle, signInWithEmail, signUpWithEmail, isLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (user && !isLoading) {
-      navigate('/');
+      navigate(isAdmin ? '/admin' : '/');
     }
-  }, [user, isLoading, navigate]);
+  }, [user, isAdmin, isLoading, navigate]);
 
   const validateForm = () => {
     const newErrors: typeof errors = {};
@@ -71,7 +71,6 @@ const Auth = () => {
           }
         } else {
           toast.success('Welcome back!');
-          navigate('/');
         }
       } else {
         const { error } = await signUpWithEmail(email, password, fullName);
@@ -97,7 +96,12 @@ const Auth = () => {
     try {
       const { error } = await signInWithGoogle();
       if (error) {
-        toast.error(error.message);
+        const message = error.message || '';
+        if (message.toLowerCase().includes('invalid_client') || message.toLowerCase().includes('oauth')) {
+          toast.error('Google login is not configured correctly yet. Please use email/password for now.');
+        } else {
+          toast.error(message);
+        }
       }
     } catch (err: any) {
       toast.error('Google sign-in is currently unavailable.');
@@ -205,8 +209,8 @@ const Auth = () => {
         </div>
 
         {/* Right panel - Form */}
-        <div className="flex items-center justify-center px-4 lg:px-12 py-4 lg:py-8">
-          <div className="w-full max-w-md">
+        <div className="flex items-center justify-center px-4 lg:px-12 xl:px-16 py-4 lg:py-8">
+          <div className="w-full max-w-md lg:max-w-lg">
             {/* Desktop back button */}
             <button
               onClick={() => navigate('/')}
