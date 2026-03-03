@@ -3,20 +3,11 @@ import { QuickServices } from "@/components/QuickServices";
 import { RequestStatusCard } from "@/components/RequestStatusCard";
 import { AnnouncementsFeed } from "@/components/AnnouncementsFeed";
 import { BottomNav } from "@/components/BottomNav";
-import { WeatherAdvisory } from "@/components/WeatherAdvisory";
-import { useState } from "react";
 
 const Index = () => {
-  const [showWeather, setShowWeather] = useState(true);
-
   return (
     <div className="min-h-screen bg-background lg:pt-14">
       <div className="app-container pb-24 lg:pb-8">
-        {/* Real-time Weather Advisory from PAG-ASA */}
-        {showWeather && (
-          <WeatherAdvisory onDismiss={() => setShowWeather(false)} />
-        )}
-
         {/* Hero Header */}
         <HeroHeader />
 

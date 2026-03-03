@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, ScanSearch, CheckCircle, AlertTriangle, HelpCircle } from 'lucide-react';
+import { Loader2, ScanSearch, CheckCircle, AlertTriangle, HelpCircle, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface ImageAnalysisProps {
   imageUrl: string;
@@ -24,70 +26,29 @@ export const ImageAnalysis = ({ imageUrl, className }: ImageAnalysisProps) => {
     setResult(null);
 
     try {
-      // Call Lovable AI for image analysis
-      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: `Analyze this image and determine if it appears to be AI-generated or a real photograph. Consider:
-1. Unnatural details (extra fingers, distorted text, impossible shadows)
-2. Texture consistency and lighting
-3. Background coherence
-4. Edge artifacts and blending issues
-
-Respond in this exact JSON format:
-{
-  "isReal": true or false or null if uncertain,
-  "confidence": number from 0 to 100,
-  "analysis": "Brief 1-2 sentence explanation"
-}`
-                },
-                {
-                  type: 'image_url',
-                  image_url: { url: imageUrl }
-                }
-              ]
-            }
-          ],
-        }),
+      const { data, error } = await supabase.functions.invoke('analyze-image', {
+        body: { imageUrl },
       });
 
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || '';
-      
-      // Parse the JSON response
-      try {
-        const parsed = JSON.parse(content);
-        setResult({
-          isReal: parsed.isReal,
-          confidence: parsed.confidence || 50,
-          analysis: parsed.analysis || 'Unable to determine',
-        });
-      } catch {
-        // If parsing fails, try to extract meaning from text
-        const isReal = content.toLowerCase().includes('real') && !content.toLowerCase().includes('ai-generated');
-        setResult({
-          isReal: isReal ? true : content.toLowerCase().includes('ai') ? false : null,
-          confidence: 50,
-          analysis: content.slice(0, 200),
-        });
+      if (error) {
+        console.error('Analysis error:', error);
+        toast.error('Failed to analyze image');
+        return;
       }
+
+      if (data.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      setResult({
+        isReal: data.isReal,
+        confidence: data.confidence || 50,
+        analysis: data.analysis || 'Unable to determine',
+      });
     } catch (error) {
       console.error('Image analysis error:', error);
-      setResult({
-        isReal: null,
-        confidence: 0,
-        analysis: 'Failed to analyze image. Please try again.',
-      });
+      toast.error('Failed to analyze image. Please try again.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -101,44 +62,64 @@ Respond in this exact JSON format:
         size="sm"
         onClick={analyzeImage}
         disabled={isAnalyzing}
-        className="w-full"
+        className="w-full gap-2 border-primary/30 hover:bg-primary/5"
       >
         {isAnalyzing ? (
-          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
-          <ScanSearch className="h-4 w-4 mr-2" />
+          <ShieldCheck className="h-4 w-4 text-primary" />
         )}
-        {isAnalyzing ? 'Analyzing...' : 'Verify Image Authenticity'}
+        {isAnalyzing ? 'AI is analyzing image...' : 'Verify Image Authenticity'}
       </Button>
 
       {result && (
         <Card className={cn(
-          "border-2",
-          result.isReal === true && "border-success bg-success/5",
-          result.isReal === false && "border-warning bg-warning/5",
+          "border-2 transition-all animate-slide-up",
+          result.isReal === true && "border-success/50 bg-success/5",
+          result.isReal === false && "border-destructive/50 bg-destructive/5",
           result.isReal === null && "border-muted"
         )}>
-          <CardContent className="p-3">
+          <CardContent className="p-4">
             <div className="flex items-start gap-3">
               {result.isReal === true && (
-                <CheckCircle className="h-5 w-5 text-success shrink-0 mt-0.5" />
+                <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center shrink-0">
+                  <CheckCircle className="h-5 w-5 text-success" />
+                </div>
               )}
               {result.isReal === false && (
-                <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
+                <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                </div>
               )}
               {result.isReal === null && (
-                <HelpCircle className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                  <HelpCircle className="h-5 w-5 text-muted-foreground" />
+                </div>
               )}
-              <div>
-                <p className="font-medium text-sm">
-                  {result.isReal === true && 'Likely Authentic Photo'}
-                  {result.isReal === false && 'Possible AI-Generated Image'}
-                  {result.isReal === null && 'Unable to Determine'}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm">
+                  {result.isReal === true && '✅ Likely Authentic Photo'}
+                  {result.isReal === false && '⚠️ Possibly AI-Generated'}
+                  {result.isReal === null && '❓ Inconclusive'}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Confidence: {result.confidence}%
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <div className="mt-2">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-muted-foreground">Confidence</span>
+                    <span className="font-medium">{result.confidence}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all",
+                        result.isReal === true && "bg-success",
+                        result.isReal === false && "bg-destructive",
+                        result.isReal === null && "bg-muted-foreground"
+                      )}
+                      style={{ width: `${result.confidence}%` }}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
                   {result.analysis}
                 </p>
               </div>
