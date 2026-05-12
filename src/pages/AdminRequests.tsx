@@ -9,8 +9,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
   CheckCircle, Clock, XCircle, MapPin, 
-  MessageSquare, RefreshCw, Loader2
+  MessageSquare, RefreshCw, Loader2, Trash2
 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ImageAnalysis } from '@/components/ImageAnalysis';
@@ -66,6 +71,17 @@ const AdminRequests = () => {
       toast.error('Failed to update request');
     }
     setIsUpdating(false);
+  };
+
+  const deleteRequest = async (id: string) => {
+    const { error } = await supabase.from('service_requests').delete().eq('id', id);
+    if (error) {
+      toast.error('Failed to delete request');
+    } else {
+      toast.success('Request deleted');
+      setSelectedRequest(null);
+      fetchRequests();
+    }
   };
 
   const openRequestDetails = (req: ServiceRequest) => {
@@ -259,7 +275,30 @@ const AdminRequests = () => {
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-2">
+            {selectedRequest && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <Trash2 className="h-4 w-4 mr-1" /> Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this request?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => deleteRequest(selectedRequest.id)}>
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             <Button variant="outline" onClick={() => setSelectedRequest(null)}>
               Close
             </Button>
