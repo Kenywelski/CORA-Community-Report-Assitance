@@ -2,10 +2,16 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Users, Clock, Shield, UserCheck, Loader2 } from 'lucide-react';
+import { Users, Clock, Shield, UserCheck, Loader2, Trash2, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import type { Tables } from '@/integrations/supabase/types';
@@ -22,6 +28,7 @@ const AdminUsers = () => {
   const [loginActivity, setLoginActivity] = useState<LoginActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -77,6 +84,28 @@ const AdminUsers = () => {
     }
   };
 
+  const deleteUserProfile = async (userId: string) => {
+    const { error: roleErr } = await supabase.from('user_roles').delete().eq('user_id', userId);
+    const { error } = await supabase.from('profiles').delete().eq('user_id', userId);
+    if (error || roleErr) {
+      toast.error('Failed to remove user');
+    } else {
+      toast.success('User removed');
+      fetchData();
+    }
+  };
+
+  const filteredUsers = users.filter(u => {
+    const q = search.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (u.full_name || '').toLowerCase().includes(q) ||
+      (u.phone || '').toLowerCase().includes(q) ||
+      (u.barangay || '').toLowerCase().includes(q) ||
+      (u.role || '').toLowerCase().includes(q)
+    );
+  });
+
   if (isLoading) {
     return (
       <AdminLayout title="User Management" subtitle="Manage users and roles">
@@ -102,14 +131,26 @@ const AdminUsers = () => {
         </TabsList>
 
         <TabsContent value="users">
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, phone, barangay, role..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {users.map((u) => (
+            {filteredUsers.map((u) => (
               <Card key={u.id} variant="elevated">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="font-medium">{u.full_name || 'No name'}</p>
                       <p className="text-sm text-muted-foreground">{u.phone || 'No phone'}</p>
+                      {u.barangay && (
+                        <p className="text-xs text-muted-foreground">{u.barangay}</p>
+                      )}
                       <p className="text-xs text-muted-foreground mt-1">
                         Joined {format(new Date(u.created_at), 'MMM d, yyyy')}
                       </p>
@@ -120,23 +161,54 @@ const AdminUsers = () => {
                     </Badge>
                   </div>
                   {u.user_id !== currentUserId && (
-                    <div className="flex gap-2 mt-3">
-                      <Button
-                        size="sm"
-                        variant={u.role === 'admin' ? 'default' : 'outline'}
-                        className="flex-1 text-xs"
-                        onClick={() => updateUserRole(u.user_id, 'admin')}
-                      >
-                        Admin
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={u.role === 'user' ? 'default' : 'outline'}
-                        className="flex-1 text-xs"
-                        onClick={() => updateUserRole(u.user_id, 'user')}
-                      >
-                        User
-                      </Button>
+                    <div className="space-y-2 mt-3">
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button
+                          size="sm"
+                          variant={u.role === 'admin' ? 'default' : 'outline'}
+                          className="text-xs"
+                          onClick={() => updateUserRole(u.user_id, 'admin')}
+                        >
+                          Admin
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={u.role === 'moderator' ? 'default' : 'outline'}
+                          className="text-xs"
+                          onClick={() => updateUserRole(u.user_id, 'moderator')}
+                        >
+                          Mod
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={u.role === 'user' ? 'default' : 'outline'}
+                          className="text-xs"
+                          onClick={() => updateUserRole(u.user_id, 'user')}
+                        >
+                          User
+                        </Button>
+                      </div>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="ghost" className="w-full text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4 mr-1" /> Remove
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Remove this user?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This deletes their profile and role assignment. This cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteUserProfile(u.user_id)}>
+                              Remove
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   )}
                 </CardContent>
