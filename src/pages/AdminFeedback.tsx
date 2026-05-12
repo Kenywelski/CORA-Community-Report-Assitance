@@ -2,9 +2,16 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { Star, Loader2, MessageSquare } from 'lucide-react';
+import { Star, Loader2, MessageSquare, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { AdminLayout } from '@/components/admin/AdminLayout';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import type { Tables } from '@/integrations/supabase/types';
 
 type Feedback = Tables<'feedback'>;
@@ -24,6 +31,16 @@ const AdminFeedback = () => {
       .order('created_at', { ascending: false });
     if (data) setFeedback(data);
     setIsLoading(false);
+  };
+
+  const deleteFeedback = async (id: string) => {
+    const { error } = await supabase.from('feedback').delete().eq('id', id);
+    if (error) {
+      toast.error('Failed to delete feedback');
+    } else {
+      toast.success('Feedback deleted');
+      fetchFeedback();
+    }
   };
 
   const averageRating = feedback.length > 0
@@ -105,6 +122,27 @@ const AdminFeedback = () => {
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground">{item.message}</p>
+                <div className="flex justify-end mt-3">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                        <Trash2 className="h-4 w-4 mr-1" /> Delete
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete this feedback?</AlertDialogTitle>
+                        <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => deleteFeedback(item.id)}>
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </CardContent>
             </Card>
           ))
