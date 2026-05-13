@@ -463,18 +463,50 @@ const CommunityWall = () => {
 
         {/* Content */}
         <main className="p-4 space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3">
-          {isLoading ? (
+          {activeFilter === 'announcements' ? (
+            !filteredAnnouncements || filteredAnnouncements.length === 0 ? (
+              <Card className="md:col-span-full">
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  No announcements yet. Check back soon.
+                </CardContent>
+              </Card>
+            ) : (
+              filteredAnnouncements.map((a) => (
+                <Card
+                  key={a.id}
+                  className="overflow-hidden cursor-pointer hover:shadow-md border-primary/30 bg-primary/5"
+                  onClick={() => navigate('/updates')}
+                >
+                  {a.image_url && <img src={a.image_url} alt={a.title} className="w-full h-32 object-cover" />}
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-xl bg-primary/20">
+                        <Megaphone className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm line-clamp-1">{a.title}</h3>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(a.published_at), 'MMM d, yyyy')}
+                        </span>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <p className="text-sm text-muted-foreground line-clamp-3">{a.excerpt || a.content}</p>
+                  </CardContent>
+                </Card>
+              ))
+            )
+          ) : isLoading ? (
             <div className="text-center py-8 text-muted-foreground md:col-span-full">Loading posts...</div>
           ) : filteredPosts?.length === 0 ? (
             <Card className="md:col-span-full">
               <CardContent className="py-8 text-center text-muted-foreground">
-                {selectedCategory 
+                {selectedCategory
                   ? `No posts found in "${selectedCategory}" category.`
-                  : activeFilter === 'all' 
+                  : activeFilter === 'all'
                   ? 'No posts yet. Be the first to submit a report!'
-                  : activeFilter === 'reports'
-                  ? 'No community reports yet.'
-                  : 'No government posts yet.'}
+                  : 'No community reports yet.'}
               </CardContent>
             </Card>
           ) : (
