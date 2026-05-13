@@ -20,6 +20,10 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ImageAnalysis } from '@/components/ImageAnalysis';
 import { AdminLayout } from '@/components/admin/AdminLayout';
+import { MediaGallery, MediaItem } from '@/components/MediaUpload';
+import { LocationPicker } from '@/components/LocationPicker';
+import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
 import type { Tables } from '@/integrations/supabase/types';
 
 type ServiceRequest = Tables<'service_requests'>;
@@ -38,9 +42,15 @@ const AdminRequests = () => {
   const [adminNotes, setAdminNotes] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     fetchRequests();
+    const channel = supabase
+      .channel('admin-requests-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_requests' }, () => fetchRequests())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const fetchRequests = async () => {
@@ -96,9 +106,18 @@ const AdminRequests = () => {
     completed: requests.filter(r => r.status === 'completed').length,
   };
 
-  const filteredRequests = activeTab === 'all' 
-    ? requests 
-    : requests.filter(r => r.status === activeTab);
+  const filteredRequests = requests
+    .filter(r => activeTab === 'all' || r.status === activeTab)
+    .filter(r => {
+      const q = search.toLowerCase().trim();
+      if (!q) return true;
+      return (
+        r.title.toLowerCase().includes(q) ||
+        r.description.toLowerCase().includes(q) ||
+        r.category.toLowerCase().includes(q) ||
+        (r.location?.toLowerCase().includes(q) ?? false)
+      );
+    });
 
   if (isLoading) {
     return (
