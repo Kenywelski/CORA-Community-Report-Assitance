@@ -107,7 +107,7 @@ const allCategories = [
   'Other',
 ];
 
-type FilterTab = 'all' | 'reports' | 'government';
+type FilterTab = 'all' | 'reports' | 'announcements';
 
 const CommunityWall = () => {
   const navigate = useNavigate();
@@ -122,7 +122,7 @@ const CommunityWall = () => {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   const [sessionId] = useState(() => {
     let id = localStorage.getItem('wall_session_id');
     if (!id) {
@@ -131,6 +131,23 @@ const CommunityWall = () => {
     }
     return id;
   });
+
+  // Realtime: refetch on changes
+  useEffect(() => {
+    const ch = supabase
+      .channel('wall-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['community-posts'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['wall-announcements'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['post-likes'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [queryClient]);
 
   // Fetch all posts
   const { data: posts, isLoading } = useQuery({
@@ -142,6 +159,20 @@ const CommunityWall = () => {
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data as Post[];
+    },
+  });
+
+  // Read-only mirror of announcements (managed in Updates / Admin Announcements)
+  const { data: announcements } = useQuery({
+    queryKey: ['wall-announcements'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('announcements')
+        .select('*')
+        .eq('is_active', true)
+        .order('published_at', { ascending: false });
+      if (error) throw error;
+      return data;
     },
   });
 
