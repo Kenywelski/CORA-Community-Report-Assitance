@@ -272,6 +272,8 @@ export type Database = {
           latitude: number | null
           location: string | null
           longitude: number | null
+          media_types: string[] | null
+          media_urls: string[] | null
           photo_url: string | null
           status: Database["public"]["Enums"]["request_status"]
           title: string
@@ -288,6 +290,8 @@ export type Database = {
           latitude?: number | null
           location?: string | null
           longitude?: number | null
+          media_types?: string[] | null
+          media_urls?: string[] | null
           photo_url?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           title: string
@@ -304,6 +308,8 @@ export type Database = {
           latitude?: number | null
           location?: string | null
           longitude?: number | null
+          media_types?: string[] | null
+          media_urls?: string[] | null
           photo_url?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           title?: string
