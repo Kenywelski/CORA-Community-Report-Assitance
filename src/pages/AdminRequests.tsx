@@ -20,6 +20,10 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ImageAnalysis } from '@/components/ImageAnalysis';
 import { AdminLayout } from '@/components/admin/AdminLayout';
+import { MediaGallery, MediaItem } from '@/components/MediaUpload';
+import { LocationPicker } from '@/components/LocationPicker';
+import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
 import type { Tables } from '@/integrations/supabase/types';
 
 type ServiceRequest = Tables<'service_requests'>;
@@ -38,9 +42,15 @@ const AdminRequests = () => {
   const [adminNotes, setAdminNotes] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     fetchRequests();
+    const channel = supabase
+      .channel('admin-requests-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_requests' }, () => fetchRequests())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const fetchRequests = async () => {
@@ -96,9 +106,18 @@ const AdminRequests = () => {
     completed: requests.filter(r => r.status === 'completed').length,
   };
 
-  const filteredRequests = activeTab === 'all' 
-    ? requests 
-    : requests.filter(r => r.status === activeTab);
+  const filteredRequests = requests
+    .filter(r => activeTab === 'all' || r.status === activeTab)
+    .filter(r => {
+      const q = search.toLowerCase().trim();
+      if (!q) return true;
+      return (
+        r.title.toLowerCase().includes(q) ||
+        r.description.toLowerCase().includes(q) ||
+        r.category.toLowerCase().includes(q) ||
+        (r.location?.toLowerCase().includes(q) ?? false)
+      );
+    });
 
   if (isLoading) {
     return (
@@ -127,6 +146,17 @@ const AdminRequests = () => {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by title, description, category, location..."
+          className="pl-9"
+        />
       </div>
 
       {/* Tabs and Requests */}
@@ -196,16 +226,28 @@ const AdminRequests = () => {
           
           {selectedRequest && (
             <div className="space-y-4">
-              {selectedRequest.photo_url && (
-                <div className="space-y-2">
-                  <img 
-                    src={selectedRequest.photo_url} 
-                    alt="Request" 
-                    className="w-full h-48 object-cover rounded-xl"
-                  />
-                  <ImageAnalysis imageUrl={selectedRequest.photo_url} />
-                </div>
-              )}
+              {(() => {
+                const items: MediaItem[] = (selectedRequest.media_urls && selectedRequest.media_urls.length > 0)
+                  ? selectedRequest.media_urls.map((url, i) => ({
+                      url,
+                      type: ((selectedRequest.media_types?.[i] as 'image' | 'video') || (url.match(/\.(mp4|webm|mov)$/i) ? 'video' : 'image')),
+                    }))
+                  : selectedRequest.photo_url
+                    ? [{ url: selectedRequest.photo_url, type: 'image' as const }]
+                    : [];
+                const firstImage = items.find((i) => i.type === 'image')?.url;
+                return (
+                  <>
+                    {items.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">Attached Media ({items.length})</p>
+                        <MediaGallery items={items} />
+                        {firstImage && <ImageAnalysis imageUrl={firstImage} />}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               <div className="space-y-3">
                 <div>
@@ -227,6 +269,17 @@ const AdminRequests = () => {
                       <MapPin className="h-4 w-4 text-primary" />
                       {selectedRequest.location}
                     </p>
+                  </div>
+                )}
+                {selectedRequest.latitude != null && selectedRequest.longitude != null && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">Pinned Map Location</p>
+                    <LocationPicker
+                      readOnly
+                      value={{ lat: Number(selectedRequest.latitude), lng: Number(selectedRequest.longitude) }}
+                      onChange={() => {}}
+                      height="220px"
+                    />
                   </div>
                 )}
                 <div>

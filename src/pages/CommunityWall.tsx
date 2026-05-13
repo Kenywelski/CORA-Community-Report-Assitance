@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -107,7 +107,7 @@ const allCategories = [
   'Other',
 ];
 
-type FilterTab = 'all' | 'reports' | 'government';
+type FilterTab = 'all' | 'reports' | 'announcements';
 
 const CommunityWall = () => {
   const navigate = useNavigate();
@@ -122,7 +122,7 @@ const CommunityWall = () => {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   const [sessionId] = useState(() => {
     let id = localStorage.getItem('wall_session_id');
     if (!id) {
@@ -131,6 +131,23 @@ const CommunityWall = () => {
     }
     return id;
   });
+
+  // Realtime: refetch on changes
+  useEffect(() => {
+    const ch = supabase
+      .channel('wall-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['community-posts'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['wall-announcements'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['post-likes'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [queryClient]);
 
   // Fetch all posts
   const { data: posts, isLoading } = useQuery({
@@ -145,27 +162,54 @@ const CommunityWall = () => {
     },
   });
 
+  // Read-only mirror of announcements (managed in Updates / Admin Announcements)
+  const { data: announcements } = useQuery({
+    queryKey: ['wall-announcements'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('announcements')
+        .select('*')
+        .eq('is_active', true)
+        .order('published_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Get unique categories from posts for filter dropdown
   const availableCategories = [...new Set(posts?.map(p => p.category).filter(Boolean) || [])];
 
-  // Filter posts based on active tab, category, and search
+  // When the Announcements tab is active, render announcements only (read-only mirror).
+  // For 'all' and 'reports' tabs we filter the posts feed and exclude post_type 'announcement'
+  // (since announcements live in their own section now).
   const filteredPosts = posts?.filter((post) => {
+    if (activeFilter === 'announcements') return false;
     let passesTabFilter = true;
     if (activeFilter === 'reports') {
       passesTabFilter = post.post_type === 'report';
-    } else if (activeFilter === 'government') {
-      passesTabFilter = post.post_type === 'announcement' || post.post_type === 'project';
+    } else {
+      passesTabFilter = post.post_type !== 'announcement';
     }
 
     const passesCategoryFilter = !selectedCategory || post.category === selectedCategory;
 
     const q = searchQuery.toLowerCase().trim();
-    const passesSearch = !q || 
-      post.title.toLowerCase().includes(q) || 
+    const passesSearch = !q ||
+      post.title.toLowerCase().includes(q) ||
       post.content.toLowerCase().includes(q) ||
       (post.category?.toLowerCase().includes(q) ?? false);
 
     return passesTabFilter && passesCategoryFilter && passesSearch;
+  });
+
+  const filteredAnnouncements = announcements?.filter((a) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      a.title.toLowerCase().includes(q) ||
+      a.content.toLowerCase().includes(q) ||
+      (a.excerpt?.toLowerCase().includes(q) ?? false)
+    );
   });
 
   // Fetch likes
@@ -307,62 +351,10 @@ const CommunityWall = () => {
                 <p className="text-xs text-muted-foreground">Reports, announcements & projects</p>
               </div>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gap-1">
-                  <Plus className="h-4 w-4" />
-                  Report
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Submit Anonymous Report</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmitReport} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Title</Label>
-                    <Input
-                      id="title"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="Brief title of the issue"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
-                    <Select value={category} onValueChange={setCategory}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {reportCategories.map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="content">Description</Label>
-                    <Textarea
-                      id="content"
-                      value={content}
-                      onChange={(e) => setContent(e.target.value)}
-                      placeholder="Describe the issue in detail..."
-                      rows={4}
-                    />
-                  </div>
-                  <Button 
-                    type="submit" 
-                    className="w-full"
-                    disabled={createPostMutation.isPending}
-                  >
-                    {createPostMutation.isPending ? 'Submitting...' : 'Submit Report'}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Button size="sm" className="gap-1" onClick={() => navigate('/report-issue')}>
+              <Plus className="h-4 w-4" />
+              Report
+            </Button>
           </div>
         </header>
 
@@ -406,9 +398,9 @@ const CommunityWall = () => {
                   <AlertCircle className="h-3.5 w-3.5" />
                   Reports
                 </TabsTrigger>
-                <TabsTrigger value="government" className="gap-1">
-                  <Building2 className="h-3.5 w-3.5" />
-                  Government
+                <TabsTrigger value="announcements" className="gap-1">
+                  <Megaphone className="h-3.5 w-3.5" />
+                  Announcements
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -471,18 +463,50 @@ const CommunityWall = () => {
 
         {/* Content */}
         <main className="p-4 space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3">
-          {isLoading ? (
+          {activeFilter === 'announcements' ? (
+            !filteredAnnouncements || filteredAnnouncements.length === 0 ? (
+              <Card className="md:col-span-full">
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  No announcements yet. Check back soon.
+                </CardContent>
+              </Card>
+            ) : (
+              filteredAnnouncements.map((a) => (
+                <Card
+                  key={a.id}
+                  className="overflow-hidden cursor-pointer hover:shadow-md border-primary/30 bg-primary/5"
+                  onClick={() => navigate('/updates')}
+                >
+                  {a.image_url && <img src={a.image_url} alt={a.title} className="w-full h-32 object-cover" />}
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-xl bg-primary/20">
+                        <Megaphone className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm line-clamp-1">{a.title}</h3>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(a.published_at), 'MMM d, yyyy')}
+                        </span>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <p className="text-sm text-muted-foreground line-clamp-3">{a.excerpt || a.content}</p>
+                  </CardContent>
+                </Card>
+              ))
+            )
+          ) : isLoading ? (
             <div className="text-center py-8 text-muted-foreground md:col-span-full">Loading posts...</div>
           ) : filteredPosts?.length === 0 ? (
             <Card className="md:col-span-full">
               <CardContent className="py-8 text-center text-muted-foreground">
-                {selectedCategory 
+                {selectedCategory
                   ? `No posts found in "${selectedCategory}" category.`
-                  : activeFilter === 'all' 
+                  : activeFilter === 'all'
                   ? 'No posts yet. Be the first to submit a report!'
-                  : activeFilter === 'reports'
-                  ? 'No community reports yet.'
-                  : 'No government posts yet.'}
+                  : 'No community reports yet.'}
               </CardContent>
             </Card>
           ) : (

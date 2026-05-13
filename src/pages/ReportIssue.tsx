@@ -9,29 +9,28 @@ import { BottomNav } from '@/components/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ArrowLeft, AlertTriangle, Loader2, CheckCircle, AlertCircle, MapPin } from 'lucide-react';
-import { PhotoUpload } from '@/components/PhotoUpload';
+import { MediaUpload, MediaItem } from '@/components/MediaUpload';
+import { LocationPicker } from '@/components/LocationPicker';
 import { BarangaySelect } from '@/components/BarangaySelect';
 import { z } from 'zod';
 
-// Report categories
 const reportCategories = [
-  { value: 'road_damage', label: 'Road Damage', description: 'Potholes, cracks, flooding' },
-  { value: 'street_light', label: 'Street Light Issue', description: 'Broken or not working' },
-  { value: 'garbage', label: 'Garbage/Waste Problem', description: 'Uncollected garbage, illegal dumping' },
-  { value: 'drainage', label: 'Drainage/Canal Issue', description: 'Clogged or damaged drainage' },
-  { value: 'water_supply', label: 'Water Supply Problem', description: 'No water, low pressure, leaks' },
-  { value: 'public_safety', label: 'Public Safety Concern', description: 'Hazards, security issues' },
-  { value: 'noise', label: 'Noise Complaint', description: 'Excessive noise disturbance' },
-  { value: 'stray_animals', label: 'Stray Animals', description: 'Stray dogs, cats, livestock' },
-  { value: 'illegal_activity', label: 'Illegal Activity', description: 'Report suspicious activities' },
-  { value: 'environmental', label: 'Environmental Issue', description: 'Pollution, tree cutting' },
-  { value: 'other', label: 'Other Issue', description: 'Other community concerns' },
+  { value: 'road_damage', label: 'Road Damage' },
+  { value: 'street_light', label: 'Street Light Issue' },
+  { value: 'garbage', label: 'Garbage/Waste Problem' },
+  { value: 'drainage', label: 'Drainage/Canal Issue' },
+  { value: 'water_supply', label: 'Water Supply Problem' },
+  { value: 'public_safety', label: 'Public Safety Concern' },
+  { value: 'noise', label: 'Noise Complaint' },
+  { value: 'stray_animals', label: 'Stray Animals' },
+  { value: 'illegal_activity', label: 'Illegal Activity' },
+  { value: 'environmental', label: 'Environmental Issue' },
+  { value: 'other', label: 'Other Issue' },
 ];
 
-// Validation schema - less strict since reports can be anonymous
 const reportSchema = z.object({
   category: z.string().min(1, 'Please select a category'),
-  description: z.string().min(20, 'Please provide more details (at least 20 characters)').max(1000, 'Description too long'),
+  description: z.string().min(20, 'Please provide more details (at least 20 characters)').max(1000),
   barangay: z.string().min(1, 'Please select the barangay'),
 });
 
@@ -43,25 +42,22 @@ const ReportIssue = () => {
   const [locationDetails, setLocationDetails] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactNumber, setContactNumber] = useState('');
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [media, setMedia] = useState<MediaItem[]>([]);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const validateForm = () => {
+  const validate = () => {
     try {
       reportSchema.parse({ category, description, barangay });
       setErrors({});
       return true;
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const newErrors: Record<string, string> = {};
-        error.errors.forEach(err => {
-          if (err.path[0]) {
-            newErrors[err.path[0] as string] = err.message;
-          }
-        });
-        setErrors(newErrors);
+    } catch (e) {
+      if (e instanceof z.ZodError) {
+        const ne: Record<string, string> = {};
+        e.errors.forEach((er) => er.path[0] && (ne[er.path[0] as string] = er.message));
+        setErrors(ne);
       }
       return false;
     }
@@ -69,36 +65,34 @@ const ReportIssue = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!validateForm()) {
+    if (!validate()) {
       toast.error('Please fix the errors in the form');
       return;
     }
-
     setIsSubmitting(true);
-
-    const selectedCategory = reportCategories.find(c => c.value === category);
-    
-    // Get current user if logged in, otherwise submit as anonymous
+    const selected = reportCategories.find((c) => c.value === category);
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     const { error } = await supabase.from('service_requests').insert({
       user_id: user?.id || null,
-      title: `[REPORT] ${selectedCategory?.label || category}`,
+      title: `[REPORT] ${selected?.label || category}`,
       description: `${description}\n\n${contactName ? `Reporter: ${contactName}` : 'Anonymous Report'}\n${contactNumber ? `Contact: ${contactNumber}` : ''}\n${locationDetails ? `Location Details: ${locationDetails}` : ''}`,
-      category: `Report: ${selectedCategory?.label || category}`,
+      category: `Report: ${selected?.label || category}`,
       location: barangay + (locationDetails ? `, ${locationDetails}` : ''),
-      photo_url: photoUrl,
+      latitude: coords?.lat ?? null,
+      longitude: coords?.lng ?? null,
+      photo_url: media.find((m) => m.type === 'image')?.url ?? null,
+      media_urls: media.map((m) => m.url),
+      media_types: media.map((m) => m.type),
     });
 
     if (error) {
-      console.error('Report submission error:', error);
+      console.error(error);
       toast.error('Failed to submit report');
     } else {
       setIsSuccess(true);
       toast.success('Report submitted successfully!');
     }
-
     setIsSubmitting(false);
   };
 
@@ -112,23 +106,19 @@ const ReportIssue = () => {
             </div>
             <h1 className="text-2xl font-bold text-center mb-2">Report Submitted!</h1>
             <p className="text-muted-foreground text-center mb-8">
-              Thank you for your report. The municipal office will review and take action.
+              Thank you. The municipal office will review and take action.
             </p>
             <div className="flex gap-3">
-              <Button variant="outline" onClick={() => navigate('/')}>
-                Go Home
-              </Button>
-              <Button onClick={() => {
-                setIsSuccess(false);
-                setCategory('');
-                setDescription('');
-                setBarangay('');
-                setLocationDetails('');
-                setContactName('');
-                setContactNumber('');
-                setPhotoUrl(null);
-              }}>
-                Submit Another Report
+              <Button variant="outline" onClick={() => navigate('/')}>Go Home</Button>
+              <Button
+                onClick={() => {
+                  setIsSuccess(false);
+                  setCategory(''); setDescription(''); setBarangay('');
+                  setLocationDetails(''); setContactName(''); setContactNumber('');
+                  setMedia([]); setCoords(null);
+                }}
+              >
+                Submit Another
               </Button>
             </div>
           </div>
@@ -141,7 +131,6 @@ const ReportIssue = () => {
   return (
     <div className="min-h-screen bg-background pb-24 lg:pb-8 lg:pt-14">
       <div className="app-container lg:max-w-2xl">
-        {/* Header */}
         <div className="bg-gradient-to-b from-accent to-accent/80 px-4 pt-12 pb-8">
           <button
             onClick={() => navigate('/services')}
@@ -150,7 +139,6 @@ const ReportIssue = () => {
             <ArrowLeft className="h-5 w-5" />
             <span className="text-sm font-medium">Back</span>
           </button>
-
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
               <AlertTriangle className="h-6 w-6 text-white" />
@@ -162,26 +150,21 @@ const ReportIssue = () => {
           </div>
         </div>
 
-        {/* Curved transition */}
         <div className="h-6 bg-background rounded-t-3xl -mt-6 relative z-10" />
 
-        {/* Form - No Auth Required */}
         <div className="px-4 -mt-2">
           <Card variant="elevated" className="animate-slide-up">
             <CardContent className="p-5">
               <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Issue Type */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Type of Issue *</label>
-                  <Select value={category} onValueChange={(v) => { setCategory(v); setErrors(prev => ({ ...prev, category: '' })); }}>
+                  <Select value={category} onValueChange={(v) => { setCategory(v); setErrors((p) => ({ ...p, category: '' })); }}>
                     <SelectTrigger className={errors.category ? 'border-destructive' : ''}>
                       <SelectValue placeholder="What are you reporting?" />
                     </SelectTrigger>
                     <SelectContent>
-                      {reportCategories.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </SelectItem>
+                      {reportCategories.map((c) => (
+                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -192,13 +175,12 @@ const ReportIssue = () => {
                   )}
                 </div>
 
-                {/* Description */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Describe the Issue *</label>
                   <Textarea
                     value={description}
-                    onChange={(e) => { setDescription(e.target.value); setErrors(prev => ({ ...prev, description: '' })); }}
-                    placeholder="Please describe the issue in detail. What did you observe? When did it happen?"
+                    onChange={(e) => { setDescription(e.target.value); setErrors((p) => ({ ...p, description: '' })); }}
+                    placeholder="What did you observe? When did it happen?"
                     rows={4}
                     maxLength={1000}
                     className={errors.description ? 'border-destructive' : ''}
@@ -211,14 +193,12 @@ const ReportIssue = () => {
                   )}
                 </div>
 
-                {/* Barangay */}
                 <BarangaySelect
                   value={barangay}
-                  onValueChange={(v) => { setBarangay(v); setErrors(prev => ({ ...prev, barangay: '' })); }}
+                  onValueChange={(v) => { setBarangay(v); setErrors((p) => ({ ...p, barangay: '' })); }}
                   error={errors.barangay}
                 />
 
-                {/* Location Details */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium flex items-center gap-2">
                     <MapPin className="h-4 w-4" /> Specific Location (Optional)
@@ -231,50 +211,34 @@ const ReportIssue = () => {
                   />
                 </div>
 
-                {/* Photo Upload */}
-                <PhotoUpload
-                  label="Photo Evidence (Recommended)"
-                  onUpload={setPhotoUrl}
-                  currentUrl={photoUrl}
-                  onRemove={() => setPhotoUrl(null)}
+                <LocationPicker value={coords} onChange={setCoords} />
+
+                <MediaUpload
+                  folder="reports"
+                  value={media}
+                  onChange={setMedia}
+                  label="Photo / Video Evidence (Recommended)"
                 />
 
-                {/* Contact Info (Optional) */}
                 <div className="p-4 rounded-xl bg-muted/50 space-y-3">
                   <p className="text-sm font-medium">Contact Information (Optional)</p>
                   <p className="text-xs text-muted-foreground">
-                    Provide your contact details if you want updates on this report. Otherwise, submit anonymously.
+                    Provide your contact if you want updates. Otherwise submit anonymously.
                   </p>
                   <div className="grid grid-cols-2 gap-3">
-                    <Input
-                      value={contactName}
-                      onChange={(e) => setContactName(e.target.value)}
-                      placeholder="Your name"
-                      maxLength={100}
-                    />
-                    <Input
-                      type="tel"
-                      value={contactNumber}
-                      onChange={(e) => setContactNumber(e.target.value)}
-                      placeholder="Contact number"
-                      maxLength={15}
-                    />
+                    <Input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Your name" maxLength={100} />
+                    <Input type="tel" value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} placeholder="Contact number" maxLength={15} />
                   </div>
                 </div>
 
                 <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    'Submit Report'
-                  )}
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit Report'}
                 </Button>
               </form>
             </CardContent>
           </Card>
         </div>
       </div>
-
       <BottomNav currentPath="/services" />
     </div>
   );

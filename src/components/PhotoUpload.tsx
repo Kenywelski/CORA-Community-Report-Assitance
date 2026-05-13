@@ -48,20 +48,19 @@ export const PhotoUpload = ({
       reader.onload = (e) => setPreview(e.target?.result as string);
       reader.readAsDataURL(file);
 
-      // Upload to Supabase storage
+      // Upload to Supabase storage (public bucket)
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `service-requests/${fileName}`;
+      const filePath = `reports/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('uploads')
-        .upload(filePath, file);
+        .from('public-media')
+        .upload(filePath, file, { contentType: file.type });
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('uploads')
+        .from('public-media')
         .getPublicUrl(filePath);
 
       onUpload(publicUrl);
