@@ -148,6 +148,17 @@ const AdminRequests = () => {
         ))}
       </div>
 
+      {/* Search */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by title, description, category, location..."
+          className="pl-9"
+        />
+      </div>
+
       {/* Tabs and Requests */}
       <Card variant="elevated">
         <CardContent className="p-4">
@@ -215,16 +226,28 @@ const AdminRequests = () => {
           
           {selectedRequest && (
             <div className="space-y-4">
-              {selectedRequest.photo_url && (
-                <div className="space-y-2">
-                  <img 
-                    src={selectedRequest.photo_url} 
-                    alt="Request" 
-                    className="w-full h-48 object-cover rounded-xl"
-                  />
-                  <ImageAnalysis imageUrl={selectedRequest.photo_url} />
-                </div>
-              )}
+              {(() => {
+                const items: MediaItem[] = (selectedRequest.media_urls && selectedRequest.media_urls.length > 0)
+                  ? selectedRequest.media_urls.map((url, i) => ({
+                      url,
+                      type: ((selectedRequest.media_types?.[i] as 'image' | 'video') || (url.match(/\.(mp4|webm|mov)$/i) ? 'video' : 'image')),
+                    }))
+                  : selectedRequest.photo_url
+                    ? [{ url: selectedRequest.photo_url, type: 'image' as const }]
+                    : [];
+                const firstImage = items.find((i) => i.type === 'image')?.url;
+                return (
+                  <>
+                    {items.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">Attached Media ({items.length})</p>
+                        <MediaGallery items={items} />
+                        {firstImage && <ImageAnalysis imageUrl={firstImage} />}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               <div className="space-y-3">
                 <div>
