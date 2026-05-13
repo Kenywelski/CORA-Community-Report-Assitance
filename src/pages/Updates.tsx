@@ -35,6 +35,11 @@ const Updates = () => {
 
   useEffect(() => {
     fetchAnnouncements();
+    const ch = supabase
+      .channel('updates-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => fetchAnnouncements())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
   }, []);
 
   const fetchAnnouncements = async () => {
