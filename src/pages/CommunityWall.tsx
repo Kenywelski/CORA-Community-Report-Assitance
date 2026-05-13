@@ -179,24 +179,37 @@ const CommunityWall = () => {
   // Get unique categories from posts for filter dropdown
   const availableCategories = [...new Set(posts?.map(p => p.category).filter(Boolean) || [])];
 
-  // Filter posts based on active tab, category, and search
+  // When the Announcements tab is active, render announcements only (read-only mirror).
+  // For 'all' and 'reports' tabs we filter the posts feed and exclude post_type 'announcement'
+  // (since announcements live in their own section now).
   const filteredPosts = posts?.filter((post) => {
+    if (activeFilter === 'announcements') return false;
     let passesTabFilter = true;
     if (activeFilter === 'reports') {
       passesTabFilter = post.post_type === 'report';
-    } else if (activeFilter === 'government') {
-      passesTabFilter = post.post_type === 'announcement' || post.post_type === 'project';
+    } else {
+      passesTabFilter = post.post_type !== 'announcement';
     }
 
     const passesCategoryFilter = !selectedCategory || post.category === selectedCategory;
 
     const q = searchQuery.toLowerCase().trim();
-    const passesSearch = !q || 
-      post.title.toLowerCase().includes(q) || 
+    const passesSearch = !q ||
+      post.title.toLowerCase().includes(q) ||
       post.content.toLowerCase().includes(q) ||
       (post.category?.toLowerCase().includes(q) ?? false);
 
     return passesTabFilter && passesCategoryFilter && passesSearch;
+  });
+
+  const filteredAnnouncements = announcements?.filter((a) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      a.title.toLowerCase().includes(q) ||
+      a.content.toLowerCase().includes(q) ||
+      (a.excerpt?.toLowerCase().includes(q) ?? false)
+    );
   });
 
   // Fetch likes
