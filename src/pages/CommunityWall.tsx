@@ -351,62 +351,10 @@ const CommunityWall = () => {
                 <p className="text-xs text-muted-foreground">Reports, announcements & projects</p>
               </div>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gap-1">
-                  <Plus className="h-4 w-4" />
-                  Report
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Submit Anonymous Report</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmitReport} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Title</Label>
-                    <Input
-                      id="title"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="Brief title of the issue"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
-                    <Select value={category} onValueChange={setCategory}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {reportCategories.map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="content">Description</Label>
-                    <Textarea
-                      id="content"
-                      value={content}
-                      onChange={(e) => setContent(e.target.value)}
-                      placeholder="Describe the issue in detail..."
-                      rows={4}
-                    />
-                  </div>
-                  <Button 
-                    type="submit" 
-                    className="w-full"
-                    disabled={createPostMutation.isPending}
-                  >
-                    {createPostMutation.isPending ? 'Submitting...' : 'Submit Report'}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Button size="sm" className="gap-1" onClick={() => navigate('/report-issue')}>
+              <Plus className="h-4 w-4" />
+              Report
+            </Button>
           </div>
         </header>
 
@@ -450,9 +398,9 @@ const CommunityWall = () => {
                   <AlertCircle className="h-3.5 w-3.5" />
                   Reports
                 </TabsTrigger>
-                <TabsTrigger value="government" className="gap-1">
-                  <Building2 className="h-3.5 w-3.5" />
-                  Government
+                <TabsTrigger value="announcements" className="gap-1">
+                  <Megaphone className="h-3.5 w-3.5" />
+                  Announcements
                 </TabsTrigger>
               </TabsList>
             </Tabs>
