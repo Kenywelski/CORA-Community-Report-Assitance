@@ -271,6 +271,17 @@ const AdminRequests = () => {
                     </p>
                   </div>
                 )}
+                {selectedRequest.latitude != null && selectedRequest.longitude != null && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">Pinned Map Location</p>
+                    <LocationPicker
+                      readOnly
+                      value={{ lat: Number(selectedRequest.latitude), lng: Number(selectedRequest.longitude) }}
+                      onChange={() => {}}
+                      height="220px"
+                    />
+                  </div>
+                )}
                 <div>
                   <p className="text-xs text-muted-foreground">Current Status</p>
                   <Badge className={cn("mt-1", statusConfig[selectedRequest.status].color)}>
