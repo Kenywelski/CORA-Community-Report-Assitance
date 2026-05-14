@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 
 const services = [
   { icon: FileText, label: "Request Service", color: "text-primary", bgColor: "bg-secondary", path: "/request-service", requiresAuth: true },
-  { icon: AlertCircle, label: "Report Issue", color: "text-accent", bgColor: "bg-accent/10", path: "/request-service?category=Other", requiresAuth: true },
+  { icon: AlertCircle, label: "Report Issue", color: "text-accent", bgColor: "bg-accent/10", path: "/report-issue", requiresAuth: false },
   { icon: Calendar, label: "Events", color: "text-success", bgColor: "bg-success/10", path: "/updates", requiresAuth: false },
   { icon: MessageSquare, label: "Feedback", color: "text-warning", bgColor: "bg-warning/10", path: "/feedback", requiresAuth: true },
   { icon: MapPin, label: "Directory", color: "text-primary", bgColor: "bg-primary/10", path: "/services", requiresAuth: false },
