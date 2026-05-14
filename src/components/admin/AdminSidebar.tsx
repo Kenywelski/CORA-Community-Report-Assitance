@@ -1,16 +1,18 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  ClipboardList, 
-  Users, 
-  MapPin, 
+import {
+  LayoutDashboard,
+  ClipboardList,
+  Users,
+  MapPin,
   MessageSquare,
   Megaphone,
   Newspaper,
+  CalendarDays,
+  Siren,
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Menu
+  Menu,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -24,6 +26,8 @@ const menuItems = [
   { icon: Newspaper, label: 'Community Posts', path: '/admin/posts' },
   { icon: Users, label: 'Users', path: '/admin/users' },
   { icon: Megaphone, label: 'Announcements', path: '/admin/announcements' },
+  { icon: CalendarDays, label: 'Events', path: '/admin/events' },
+  { icon: Siren, label: 'Emergency Contacts', path: '/admin/emergency-contacts' },
   { icon: MapPin, label: 'Tourist Spots', path: '/admin/tourist-spots' },
   { icon: MessageSquare, label: 'Feedback', path: '/admin/feedback' },
 ];
