@@ -56,6 +56,48 @@ export type Database = {
         }
         Relationships: []
       }
+      emergency_contacts: {
+        Row: {
+          address: string | null
+          availability: string
+          contact_number: string
+          created_at: string
+          created_by: string | null
+          department_name: string
+          id: string
+          is_active: boolean
+          service_type: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          availability?: string
+          contact_number: string
+          created_at?: string
+          created_by?: string | null
+          department_name: string
+          id?: string
+          is_active?: boolean
+          service_type: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          availability?: string
+          contact_number?: string
+          created_at?: string
+          created_by?: string | null
+          department_name?: string
+          id?: string
+          is_active?: boolean
+          service_type?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       events: {
         Row: {
           created_at: string
@@ -66,6 +108,13 @@ export type Database = {
           id: string
           is_active: boolean
           location: string | null
+          objective: string | null
+          organizer_contact: string | null
+          organizer_name: string | null
+          purpose: string | null
+          schedule_details: string | null
+          status: string
+          target_participants: string | null
           title: string
         }
         Insert: {
@@ -77,6 +126,13 @@ export type Database = {
           id?: string
           is_active?: boolean
           location?: string | null
+          objective?: string | null
+          organizer_contact?: string | null
+          organizer_name?: string | null
+          purpose?: string | null
+          schedule_details?: string | null
+          status?: string
+          target_participants?: string | null
           title: string
         }
         Update: {
@@ -88,6 +144,13 @@ export type Database = {
           id?: string
           is_active?: boolean
           location?: string | null
+          objective?: string | null
+          organizer_contact?: string | null
+          organizer_name?: string | null
+          purpose?: string | null
+          schedule_details?: string | null
+          status?: string
+          target_participants?: string | null
           title?: string
         }
         Relationships: []

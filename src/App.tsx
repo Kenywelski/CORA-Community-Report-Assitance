@@ -22,6 +22,10 @@ import AdminAnnouncements from "./pages/AdminAnnouncements";
 import AdminPosts from "./pages/AdminPosts";
 import TouristSpots from "./pages/TouristSpots";
 import CommunityWall from "./pages/CommunityWall";
+import Events from "./pages/Events";
+import EmergencyContacts from "./pages/EmergencyContacts";
+import AdminEvents from "./pages/AdminEvents";
+import AdminEmergencyContacts from "./pages/AdminEmergencyContacts";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +56,10 @@ const App = () => (
             <Route path="/admin/tourist-spots" element={<AdminTouristSpots />} />
             <Route path="/admin/feedback" element={<AdminFeedback />} />
             <Route path="/tourist-spots" element={<TouristSpots />} />
+            <Route path="/events" element={<Events />} />
+            <Route path="/emergency" element={<EmergencyContacts />} />
+            <Route path="/admin/events" element={<AdminEvents />} />
+            <Route path="/admin/emergency-contacts" element={<AdminEmergencyContacts />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

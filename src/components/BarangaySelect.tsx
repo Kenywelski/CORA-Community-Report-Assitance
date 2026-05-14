@@ -1,31 +1,19 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MapPin } from 'lucide-react';
 
-// Complete list of barangays in Cortes Municipality, Surigao del Sur
+// Official list of barangays in the Municipality of Cortes, Surigao del Sur
 const CORTES_BARANGAYS = [
-  'Balibadon',
   'Burgos',
   'Capandan',
-  'Capiñahan',
-  'Consolacion',
-  'Diatagon',
-  'Fatima',
-  'Mabini',
-  'Mercedes',
-  'Osmeña',
+  'Mabahin',
+  'Madreliño',
+  'Manlico',
+  'Matho',
   'Poblacion',
-  'Quezon',
-  'Rizal',
-  'Roxas',
-  'San Isidro',
-  'San Juan',
-  'San Roque',
-  'San Vicente',
-  'Santa Cruz',
-  'Santo Niño',
-  'Tagbayani',
-  'Tigabong',
+  'Tag-Anongan',
+  'Tigao',
   'Tuboran',
+  'Uba',
 ];
 
 interface BarangaySelectProps {

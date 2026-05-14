@@ -3,15 +3,17 @@ import { Card, CardContent } from '@/components/ui/card';
 import { BottomNav } from '@/components/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { 
-  FileText, 
-  AlertCircle, 
-  Calendar, 
-  MessageSquare, 
-  MapPin, 
+import {
+  FileText,
+  AlertCircle,
+  Calendar,
+  MessageSquare,
+  MapPin,
   Building2,
   Heart,
   Wallet,
+  Siren,
+  CalendarDays,
   ArrowLeft,
   ChevronRight
 } from 'lucide-react';
@@ -54,11 +56,29 @@ const services = [
     path: "/feedback",
     requiresAuth: true
   },
-  { 
-    icon: MapPin, 
-    label: "Tourist Spots", 
+  {
+    icon: CalendarDays,
+    label: "Events",
+    description: "Municipal events, schedules, and activities",
+    color: "text-accent",
+    bgColor: "bg-accent/10",
+    path: "/events",
+    requiresAuth: false
+  },
+  {
+    icon: Siren,
+    label: "Emergency Contacts",
+    description: "Police, Fire, Rescue, Health hotlines for Cortes",
+    color: "text-destructive",
+    bgColor: "bg-destructive/10",
+    path: "/emergency",
+    requiresAuth: false
+  },
+  {
+    icon: MapPin,
+    label: "Tourist Spots",
     description: "Explore Surigao del Sur destinations",
-    color: "text-success", 
+    color: "text-success",
     bgColor: "bg-success/10",
     path: "/tourist-spots",
     requiresAuth: false
