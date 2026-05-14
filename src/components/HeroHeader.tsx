@@ -47,7 +47,7 @@ export const HeroHeader = () => {
           <p className="text-white/70 text-sm lg:text-base leading-relaxed">Your digital gateway to municipal services</p>
         </div>
 
-        <Button variant="accent" size="lg" className="w-full lg:w-auto lg:px-8" onClick={() => navigate('/request-service')}>
+        <Button variant="accent" size="lg" className="w-full lg:w-auto lg:px-8" onClick={() => navigate('/report-issue')}>
           <span>Report an Issue</span>
         </Button>
       </div>
