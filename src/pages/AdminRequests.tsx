@@ -9,7 +9,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
   CheckCircle, Clock, XCircle, MapPin, 
-  MessageSquare, RefreshCw, Loader2, Trash2
+  MessageSquare, RefreshCw, Loader2, Trash2,
+  User, FileText, Calendar, Hash, Phone, Home, Cake, Users as UsersIcon, Briefcase, Save, X
 } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
