@@ -59,6 +59,8 @@ const App = () => (
             <Route path="/admin/feedback" element={<AdminFeedback />} />
             <Route path="/tourist-spots" element={<TouristSpots />} />
             <Route path="/events" element={<Events />} />
+            <Route path="/programs" element={<Programs />} />
+            <Route path="/directory" element={<Directory />} />
             <Route path="/emergency" element={<EmergencyContacts />} />
             <Route path="/admin/events" element={<AdminEvents />} />
             <Route path="/admin/emergency-contacts" element={<AdminEmergencyContacts />} />
