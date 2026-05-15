@@ -290,147 +290,293 @@ const AdminRequests = () => {
         </CardContent>
       </Card>
 
-      {/* Request Details Dialog */}
-      <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Request Details</DialogTitle>
-          </DialogHeader>
-          
-          {selectedRequest && (
-            <div className="space-y-4">
-              {(() => {
-                const items: MediaItem[] = (selectedRequest.media_urls && selectedRequest.media_urls.length > 0)
-                  ? selectedRequest.media_urls.map((url, i) => ({
-                      url,
-                      type: ((selectedRequest.media_types?.[i] as 'image' | 'video') || (url.match(/\.(mp4|webm|mov)$/i) ? 'video' : 'image')),
-                    }))
-                  : selectedRequest.photo_url
-                    ? [{ url: selectedRequest.photo_url, type: 'image' as const }]
-                    : [];
-                const firstImage = items.find((i) => i.type === 'image')?.url;
-                return (
-                  <>
-                    {items.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground">Attached Media ({items.length})</p>
-                        <MediaGallery items={items} />
-                        {firstImage && <ImageAnalysis imageUrl={firstImage} />}
+      {/* Request Details Dialog — redesigned */}
+      <Dialog open={!!selectedRequest} onOpenChange={(o) => !o && setSelectedRequest(null)}>
+        <DialogContent className="max-w-3xl max-h-[92vh] p-0 gap-0 overflow-hidden">
+          {selectedRequest && (() => {
+            const req = selectedRequest;
+            const cfg = statusConfig[req.status];
+            const StatusIcon = cfg.icon;
+            const refNum = `REQ-${req.id.slice(0, 8).toUpperCase()}`;
+            const { fields, extras } = parseDescription(req.description || '');
+            const items: MediaItem[] = (req.media_urls && req.media_urls.length > 0)
+              ? req.media_urls.map((url, i) => ({
+                  url,
+                  type: ((req.media_types?.[i] as 'image' | 'video') || (url.match(/\.(mp4|webm|mov)$/i) ? 'video' : 'image')),
+                }))
+              : req.photo_url ? [{ url: req.photo_url, type: 'image' as const }] : [];
+            const firstImage = items.find((i) => i.type === 'image')?.url;
+
+            const InfoRow = ({ icon: Icon, label, value }: any) => (
+              <div className="flex items-start gap-3 py-2">
+                <div className="mt-0.5 p-2 rounded-lg bg-muted">
+                  <Icon className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                  <p className="text-sm font-medium break-words">{value || '—'}</p>
+                </div>
+              </div>
+            );
+
+            const SectionCard = ({ title, icon: Icon, children }: any) => (
+              <div className="rounded-xl border bg-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-semibold">{title}</h3>
+                </div>
+                {children}
+              </div>
+            );
+
+            return (
+              <>
+                {/* Sticky Header */}
+                <DialogHeader className="px-6 pt-6 pb-4 border-b bg-gradient-to-br from-primary/5 to-transparent">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                          <Hash className="h-3 w-3" /> {refNum}
+                        </span>
+                        <Badge variant="secondary" className="text-[11px]">{req.category}</Badge>
+                        <Badge className={cn("text-[11px]", cfg.color)}>
+                          <StatusIcon className="h-3 w-3 mr-1" />
+                          {cfg.label}
+                        </Badge>
                       </div>
+                      <DialogTitle className="text-lg leading-tight">
+                        {fields.fullName || req.title}
+                      </DialogTitle>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Submitted {format(new Date(req.created_at), "MMM d, yyyy 'at' h:mm a")}
+                      </p>
+                    </div>
+                  </div>
+                </DialogHeader>
+
+                {/* Scrollable body */}
+                <div className="overflow-y-auto px-6 py-5 space-y-4" style={{ maxHeight: 'calc(92vh - 200px)' }}>
+                  {/* Status timeline */}
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    {(['pending', 'in_progress', 'completed'] as const).map((s, idx) => {
+                      const order = { pending: 0, in_progress: 1, completed: 2, rejected: -1 };
+                      const current = order[req.status];
+                      const isDone = req.status !== 'rejected' && idx <= current;
+                      const cfg2 = statusConfig[s];
+                      return (
+                        <div key={s} className="flex items-center gap-1 sm:gap-2 flex-1">
+                          <div className={cn(
+                            "h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-semibold transition-colors",
+                            isDone ? cfg2.color : 'bg-muted text-muted-foreground'
+                          )}>
+                            {idx + 1}
+                          </div>
+                          <span className={cn("text-[11px] font-medium hidden sm:inline", isDone ? 'text-foreground' : 'text-muted-foreground')}>
+                            {cfg2.label}
+                          </span>
+                          {idx < 2 && <div className={cn("flex-1 h-0.5 rounded", isDone && idx < current ? 'bg-success' : 'bg-muted')} />}
+                        </div>
+                      );
+                    })}
+                    {req.status === 'rejected' && (
+                      <Badge className={cn("ml-2", statusConfig.rejected.color)}>Rejected</Badge>
                     )}
-                  </>
-                );
-              })()}
-
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Category</p>
-                  <p className="font-medium">{selectedRequest.category}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Title</p>
-                  <p className="font-medium">{selectedRequest.title}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Description</p>
-                  <p className="text-sm">{selectedRequest.description}</p>
-                </div>
-                {selectedRequest.location && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">Location</p>
-                    <p className="text-sm flex items-center gap-1">
-                      <MapPin className="h-4 w-4 text-primary" />
-                      {selectedRequest.location}
-                    </p>
                   </div>
-                )}
-                {selectedRequest.latitude != null && selectedRequest.longitude != null && (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-2">Pinned Map Location</p>
-                    <LocationPicker
-                      readOnly
-                      value={{ lat: Number(selectedRequest.latitude), lng: Number(selectedRequest.longitude) }}
-                      onChange={() => {}}
-                      height="220px"
+
+                  {/* Two-column grid */}
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {/* Applicant Info */}
+                    <SectionCard title="Applicant Information" icon={User}>
+                      <div className="divide-y">
+                        <InfoRow icon={User} label="Full Name" value={fields.fullName} />
+                        <InfoRow icon={Cake} label="Birth Date" value={fields.birthDate} />
+                        <InfoRow icon={Cake} label="Age" value={fields.age} />
+                        <InfoRow icon={UsersIcon} label="Gender" value={fields.gender} />
+                        <InfoRow icon={UsersIcon} label="Civil Status" value={fields.civilStatus} />
+                        <InfoRow icon={Phone} label="Contact Number" value={fields.contact} />
+                        <InfoRow icon={Home} label="Address / Barangay" value={fields.address || req.location} />
+                      </div>
+                    </SectionCard>
+
+                    {/* Request Info */}
+                    <SectionCard title="Request Information" icon={FileText}>
+                      <div className="divide-y">
+                        <InfoRow icon={FileText} label="Request Type" value={req.category} />
+                        <InfoRow icon={FileText} label="Title" value={req.title} />
+                        <InfoRow icon={FileText} label="Purpose" value={fields.purpose} />
+                        <InfoRow icon={Briefcase} label="Occupation" value={fields.occupation} />
+                        <InfoRow icon={Calendar} label="Submitted" value={format(new Date(req.created_at), 'MMM d, yyyy h:mm a')} />
+                        <InfoRow icon={MapPin} label="Location" value={req.location} />
+                      </div>
+                    </SectionCard>
+                  </div>
+
+                  {/* Extras / raw description */}
+                  {extras.length > 0 && (
+                    <SectionCard title="Additional Details" icon={FileText}>
+                      <ul className="text-sm space-y-1 text-muted-foreground">
+                        {extras.map((e, i) => <li key={i} className="break-words">• {e}</li>)}
+                      </ul>
+                    </SectionCard>
+                  )}
+
+                  {/* Media */}
+                  {items.length > 0 && (
+                    <SectionCard title={`Attached Media (${items.length})`} icon={FileText}>
+                      <MediaGallery items={items} />
+                      {firstImage && <div className="mt-3"><ImageAnalysis imageUrl={firstImage} /></div>}
+                    </SectionCard>
+                  )}
+
+                  {/* Map */}
+                  {req.latitude != null && req.longitude != null && (
+                    <SectionCard title="Pinned Location" icon={MapPin}>
+                      <LocationPicker
+                        readOnly
+                        value={{ lat: Number(req.latitude), lng: Number(req.longitude) }}
+                        onChange={() => {}}
+                        height="220px"
+                      />
+                    </SectionCard>
+                  )}
+
+                  {/* Status update */}
+                  <SectionCard title="Update Status" icon={RefreshCw}>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {(['pending', 'in_progress', 'completed', 'rejected'] as const).map((status) => {
+                        const c = statusConfig[status];
+                        const Icon = c.icon;
+                        const active = req.status === status;
+                        return (
+                          <button
+                            key={status}
+                            disabled={isUpdating || active}
+                            onClick={() => setPendingStatus(status)}
+                            className={cn(
+                              "relative flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed",
+                              active ? `${c.color} border-transparent shadow-md` : 'border-border bg-card hover:border-primary/40'
+                            )}
+                          >
+                            <Icon className={cn("h-5 w-5", active ? '' : 'text-muted-foreground')} />
+                            <span className="text-xs font-semibold">{c.label}</span>
+                            {active && <span className="absolute top-1 right-1 text-[9px]">●</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </SectionCard>
+
+                  {/* Admin Remarks */}
+                  <SectionCard title="Admin Remarks" icon={MessageSquare}>
+                    <Textarea
+                      value={adminNotes}
+                      onChange={(e) => setAdminNotes(e.target.value)}
+                      placeholder="Write notes, instructions, or rejection reason for this request..."
+                      rows={4}
+                      className="resize-none"
                     />
-                  </div>
-                )}
-                <div>
-                  <p className="text-xs text-muted-foreground">Current Status</p>
-                  <Badge className={cn("mt-1", statusConfig[selectedRequest.status].color)}>
-                    {statusConfig[selectedRequest.status].label}
-                  </Badge>
+                    {req.admin_notes && req.admin_notes !== adminNotes && (
+                      <p className="text-[11px] text-muted-foreground mt-2">
+                        Previous: <span className="italic">"{req.admin_notes}"</span>
+                      </p>
+                    )}
+                  </SectionCard>
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4" />
-                  Admin Remarks
-                </label>
-                <Textarea
-                  value={adminNotes}
-                  onChange={(e) => setAdminNotes(e.target.value)}
-                  placeholder="Add notes or remarks for this request..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Update Status</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['pending', 'in_progress', 'completed', 'rejected'] as const).map((status) => {
-                    const config = statusConfig[status];
-                    const StatusIcon = config.icon;
-                    return (
-                      <Button
-                        key={status}
-                        variant={selectedRequest.status === status ? 'default' : 'outline'}
-                        size="sm"
-                        className={selectedRequest.status === status ? config.color : ''}
-                        onClick={() => updateStatus(selectedRequest.id, status, adminNotes)}
-                        disabled={isUpdating}
-                      >
-                        <StatusIcon className="h-4 w-4 mr-1" />
-                        {config.label}
+                {/* Sticky Action Bar */}
+                <div className="border-t bg-card/95 backdrop-blur px-4 sm:px-6 py-3 flex flex-wrap items-center gap-2 justify-end">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive mr-auto">
+                        <Trash2 className="h-4 w-4 mr-1" /> Delete
                       </Button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete this request?</AlertDialogTitle>
+                        <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => deleteRequest(req.id)}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
 
-          <DialogFooter className="gap-2 sm:gap-2">
-            {selectedRequest && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm">
-                    <Trash2 className="h-4 w-4 mr-1" /> Delete
+                  <Button variant="outline" size="sm" onClick={() => setSelectedRequest(null)}>
+                    <X className="h-4 w-4 mr-1" /> Close
                   </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete this request?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => deleteRequest(selectedRequest.id)}>
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-            <Button variant="outline" onClick={() => setSelectedRequest(null)}>
-              Close
-            </Button>
-          </DialogFooter>
+                  <Button variant="secondary" size="sm" onClick={saveRemarksOnly} disabled={isUpdating}>
+                    {isUpdating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                    Save Remarks
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => setPendingStatus('rejected')}
+                    disabled={isUpdating || req.status === 'rejected'}
+                  >
+                    <XCircle className="h-4 w-4 mr-1" /> Reject
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-success hover:bg-success/90 text-success-foreground"
+                    onClick={() => setPendingStatus('completed')}
+                    disabled={isUpdating || req.status === 'completed'}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-1" /> Approve
+                  </Button>
+                </div>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
+
+      {/* Status change confirmation */}
+      <AlertDialog open={!!pendingStatus} onOpenChange={(o) => { if (!o) { setPendingStatus(null); setRejectReason(''); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingStatus === 'completed' && 'Approve this request?'}
+              {pendingStatus === 'rejected' && 'Reject this request?'}
+              {pendingStatus === 'in_progress' && 'Mark as processing?'}
+              {pendingStatus === 'pending' && 'Set status to pending?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingStatus === 'completed' && 'The applicant will be notified that their request has been approved. A reference number will be generated.'}
+              {pendingStatus === 'rejected' && 'Please provide a reason. This will be saved as the admin remark and visible to the applicant.'}
+              {(pendingStatus === 'pending' || pendingStatus === 'in_progress') && 'The status of this request will be updated immediately.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {pendingStatus === 'rejected' && (
+            <Textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Reason for rejection (required)..."
+              rows={3}
+              className="mt-2"
+            />
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUpdating}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isUpdating || (pendingStatus === 'rejected' && !rejectReason.trim())}
+              onClick={() => {
+                if (!selectedRequest || !pendingStatus) return;
+                const notes = pendingStatus === 'rejected'
+                  ? (adminNotes ? `${adminNotes}\n\nRejection reason: ${rejectReason}` : `Rejection reason: ${rejectReason}`)
+                  : adminNotes;
+                if (pendingStatus === 'rejected') setAdminNotes(notes);
+                updateStatus(selectedRequest.id, pendingStatus, notes, true);
+              }}
+            >
+              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 };
