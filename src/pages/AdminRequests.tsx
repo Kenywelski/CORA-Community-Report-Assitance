@@ -114,7 +114,7 @@ const AdminRequests = () => {
     setIsLoading(false);
   };
 
-  const updateStatus = async (id: string, status: 'pending' | 'in_progress' | 'completed' | 'rejected', notes?: string) => {
+  const updateStatus = async (id: string, status: 'pending' | 'in_progress' | 'completed' | 'rejected', notes?: string, keepOpen = false) => {
     setIsUpdating(true);
     const updateData: any = { status };
     if (notes !== undefined) updateData.admin_notes = notes;
@@ -125,13 +125,34 @@ const AdminRequests = () => {
       .eq('id', id);
 
     if (!error) {
-      toast.success('Request updated successfully');
-      fetchRequests();
-      setSelectedRequest(null);
-      setAdminNotes('');
+      const refNum = `REQ-${id.slice(0, 8).toUpperCase()}`;
+      if (status === 'completed') toast.success(`Request approved • Ref ${refNum}`);
+      else if (status === 'rejected') toast.success('Request rejected');
+      else toast.success('Request updated successfully');
+      await fetchRequests();
+      if (!keepOpen) {
+        setSelectedRequest(null);
+        setAdminNotes('');
+      } else {
+        setSelectedRequest((prev) => prev ? { ...prev, status, admin_notes: notes ?? prev.admin_notes } : prev);
+      }
     } else {
       toast.error('Failed to update request');
     }
+    setIsUpdating(false);
+    setPendingStatus(null);
+    setRejectReason('');
+  };
+
+  const saveRemarksOnly = async () => {
+    if (!selectedRequest) return;
+    setIsUpdating(true);
+    const { error } = await supabase
+      .from('service_requests')
+      .update({ admin_notes: adminNotes })
+      .eq('id', selectedRequest.id);
+    if (error) toast.error('Failed to save remarks');
+    else toast.success('Remarks saved');
     setIsUpdating(false);
   };
 
