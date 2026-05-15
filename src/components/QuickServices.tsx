@@ -10,11 +10,11 @@ import { toast } from 'sonner';
 const services = [
   { icon: FileText, label: "Request Service", color: "text-primary", bgColor: "bg-secondary", path: "/request-service", requiresAuth: true },
   { icon: AlertCircle, label: "Report Issue", color: "text-accent", bgColor: "bg-accent/10", path: "/report-issue", requiresAuth: false },
-  { icon: Calendar, label: "Events", color: "text-success", bgColor: "bg-success/10", path: "/updates", requiresAuth: false },
+  { icon: Calendar, label: "Events", color: "text-success", bgColor: "bg-success/10", path: "/events", requiresAuth: false },
   { icon: MessageSquare, label: "Feedback", color: "text-warning", bgColor: "bg-warning/10", path: "/feedback", requiresAuth: true },
-  { icon: MapPin, label: "Directory", color: "text-primary", bgColor: "bg-primary/10", path: "/services", requiresAuth: false },
+  { icon: MapPin, label: "Directory", color: "text-primary", bgColor: "bg-primary/10", path: "/directory", requiresAuth: false },
   { icon: Siren, label: "Emergency", color: "text-destructive", bgColor: "bg-destructive/10", path: "/emergency", requiresAuth: false },
-  { icon: Heart, label: "Programs", color: "text-emergency", bgColor: "bg-emergency/10", path: "/services", requiresAuth: false },
+  { icon: Heart, label: "Programs", color: "text-emergency", bgColor: "bg-emergency/10", path: "/programs", requiresAuth: false },
   { icon: Compass, label: "Tourism", color: "text-accent", bgColor: "bg-accent/10", path: "/tourist-spots", requiresAuth: false },
 ];
 
