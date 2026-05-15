@@ -26,6 +26,8 @@ import Events from "./pages/Events";
 import EmergencyContacts from "./pages/EmergencyContacts";
 import AdminEvents from "./pages/AdminEvents";
 import AdminEmergencyContacts from "./pages/AdminEmergencyContacts";
+import Programs from "./pages/Programs";
+import Directory from "./pages/Directory";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
