@@ -36,6 +36,55 @@ const statusConfig = {
   rejected: { label: 'Rejected', color: 'bg-destructive text-destructive-foreground', icon: XCircle },
 };
 
+// Parse "Label: value" description blocks (mixed Tagalog/English)
+const FIELD_MAP: Record<string, { key: string; icon: any }> = {
+  'buong pangalan': { key: 'fullName', icon: User },
+  'full name': { key: 'fullName', icon: User },
+  'petsa ng kapanganakan': { key: 'birthDate', icon: Cake },
+  'date of birth': { key: 'birthDate', icon: Cake },
+  'edad': { key: 'age', icon: Cake },
+  'age': { key: 'age', icon: Cake },
+  'kasarian': { key: 'gender', icon: UsersIcon },
+  'gender': { key: 'gender', icon: UsersIcon },
+  'katayuang sibil': { key: 'civilStatus', icon: UsersIcon },
+  'civil status': { key: 'civilStatus', icon: UsersIcon },
+  'tirahan': { key: 'address', icon: Home },
+  'address': { key: 'address', icon: Home },
+  'trabaho': { key: 'occupation', icon: Briefcase },
+  'occupation': { key: 'occupation', icon: Briefcase },
+  'contact number': { key: 'contact', icon: Phone },
+  'contact': { key: 'contact', icon: Phone },
+  'layunin': { key: 'purpose', icon: FileText },
+  'purpose': { key: 'purpose', icon: FileText },
+  'taunang kita': { key: 'income', icon: Briefcase },
+};
+
+function parseDescription(desc: string) {
+  const fields: Record<string, string> = {};
+  const extras: string[] = [];
+  if (!desc) return { fields, extras };
+  // Split on newlines, fall back to splitting on " <Label>:" pattern
+  const lines = desc.includes('\n') ? desc.split('\n') : desc.split(/(?=\s[A-ZÀ-ÿ][a-zà-ÿ ]+:\s)/);
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    const m = line.match(/^([^:]+):\s*(.+)$/);
+    if (m) {
+      const label = m[1].trim().toLowerCase();
+      const value = m[2].trim();
+      const mapped = FIELD_MAP[label];
+      if (mapped && !fields[mapped.key]) {
+        fields[mapped.key] = value;
+        continue;
+      }
+      extras.push(`${m[1].trim()}: ${value}`);
+    } else {
+      extras.push(line);
+    }
+  }
+  return { fields, extras };
+}
+
 const AdminRequests = () => {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,6 +93,8 @@ const AdminRequests = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
+  const [pendingStatus, setPendingStatus] = useState<null | 'pending' | 'in_progress' | 'completed' | 'rejected'>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   useEffect(() => {
     fetchRequests();
