@@ -1,16 +1,13 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Search, User } from "lucide-react";
+import { Bell, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { GlobalSearch } from "@/components/GlobalSearch";
 import heroImage from "@/assets/hero-coastal.jpg";
 import logoIcon from "@/assets/mycortes-logo.png";
 
 export const HeroHeader = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [searchOpen, setSearchOpen] = useState(false);
 
   return (
     <header className="relative overflow-hidden">
@@ -31,9 +28,6 @@ export const HeroHeader = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" onClick={() => setSearchOpen(true)} aria-label="Search">
-              <Search className="h-5 w-5" />
-            </Button>
             <Button variant="ghost" size="icon" className="text-white hover:bg-white/20 relative" onClick={() => navigate('/updates')}>
               <Bell className="h-5 w-5" />
               <span className="absolute top-2 right-2 h-2 w-2 bg-accent rounded-full" />
@@ -56,7 +50,6 @@ export const HeroHeader = () => {
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 h-6 bg-background rounded-t-3xl" />
-      <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
     </header>
   );
 };
