@@ -234,6 +234,22 @@ const ReportIssue = () => {
                   </div>
                 </div>
 
+                <label className="flex items-start gap-3 p-3 rounded-xl border bg-card cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isPublic}
+                    onChange={(e) => setIsPublic(e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-input accent-primary"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Post to Community Wall</p>
+                    <p className="text-xs text-muted-foreground">
+                      Share this report publicly so other residents can track progress. Uncheck to keep it private to the municipality.
+                    </p>
+                  </div>
+                </label>
+
+
                 <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit Report'}
                 </Button>
