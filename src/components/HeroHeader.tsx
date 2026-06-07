@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { Bell, User } from "lucide-react";
+import { User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { NotificationBell } from "@/components/NotificationBell";
 import heroImage from "@/assets/hero-coastal.jpg";
 import logoIcon from "@/assets/mycortes-logo.png";
 
