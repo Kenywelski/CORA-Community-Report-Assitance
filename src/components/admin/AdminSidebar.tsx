@@ -24,6 +24,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
   { icon: ClipboardList, label: 'Requests', path: '/admin/requests' },
   { icon: Newspaper, label: 'Community Posts', path: '/admin/posts' },
+  { icon: MessageSquare, label: 'Staff Chat', path: '/admin/chat' },
   { icon: Users, label: 'Users', path: '/admin/users' },
   { icon: Megaphone, label: 'Announcements', path: '/admin/announcements' },
   { icon: CalendarDays, label: 'Events', path: '/admin/events' },
