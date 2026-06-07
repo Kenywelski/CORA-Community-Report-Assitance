@@ -28,7 +28,9 @@ import AdminEvents from "./pages/AdminEvents";
 import AdminEmergencyContacts from "./pages/AdminEmergencyContacts";
 import Programs from "./pages/Programs";
 import Directory from "./pages/Directory";
+import AdminChat from "./pages/AdminChat";
 import NotFound from "./pages/NotFound";
+import { ChatbotLauncher } from "./components/ChatbotLauncher";
 
 const queryClient = new QueryClient();
 
