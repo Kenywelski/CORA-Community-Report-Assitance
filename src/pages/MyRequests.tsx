@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BottomNav } from '@/components/BottomNav';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, ClipboardList, Clock, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Clock, CheckCircle2, XCircle, Loader2, ListChecks, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -20,46 +21,56 @@ interface ServiceRequest {
 }
 
 const statusConfig = {
-  pending: { icon: ClipboardList, color: 'bg-warning/10 text-warning', label: 'Pending' },
-  in_progress: { icon: Clock, color: 'bg-primary/10 text-primary', label: 'In Progress' },
-  completed: { icon: CheckCircle2, color: 'bg-success/10 text-success', label: 'Completed' },
+  pending: { icon: ClipboardList, color: 'bg-orange-500/15 text-orange-600 dark:text-orange-400', label: 'Pending' },
+  in_progress: { icon: Clock, color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400', label: 'In Progress' },
+  completed: { icon: CheckCircle2, color: 'bg-green-500/15 text-green-600 dark:text-green-400', label: 'Completed' },
   rejected: { icon: XCircle, color: 'bg-destructive/10 text-destructive', label: 'Rejected' },
 };
 
 const MyRequests = () => {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
-  const [requests, setRequests] = useState<ServiceRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
+  const { data: requests = [], isLoading, error } = useQuery({
+    queryKey: ['my-requests', user?.id],
+    queryFn: async (): Promise<ServiceRequest[]> => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from('service_requests')
+        .select('id,title,category,status,created_at,location')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data || []) as ServiceRequest[];
+    },
+    enabled: !!user,
+  });
+
+  // Realtime subscription
   useEffect(() => {
-    if (user) {
-      fetchRequests();
-    } else if (!authLoading) {
-      setIsLoading(false);
-    }
-  }, [user, authLoading]);
-
-  const fetchRequests = async () => {
     if (!user) return;
-
-    const { data, error } = await supabase
-      .from('service_requests')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (!error && data) {
-      setRequests(data);
-    }
-    setIsLoading(false);
-  };
+    const channel = supabase
+      .channel(`my-requests-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'service_requests', filter: `user_id=eq.${user.id}` },
+        () => queryClient.invalidateQueries({ queryKey: ['my-requests', user.id] })
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, queryClient]);
 
   const stats = {
+    total: requests.length,
     pending: requests.filter(r => r.status === 'pending').length,
     in_progress: requests.filter(r => r.status === 'in_progress').length,
     completed: requests.filter(r => r.status === 'completed').length,
   };
+
+  const recentRequests = requests.slice(0, 5);
 
   if (authLoading) {
     return (
@@ -82,34 +93,62 @@ const MyRequests = () => {
             <span className="text-sm font-medium">Back</span>
           </button>
           <h1 className="text-2xl font-bold">My Requests</h1>
-          <p className="text-muted-foreground text-sm mt-1">Track your service requests</p>
+          <p className="text-muted-foreground text-sm mt-1">Track your service requests in real time</p>
         </div>
 
-        {/* Content - Protected by AuthGuard */}
         <AuthGuard fallback="message">
-          {/* Stats */}
+          {/* Stats Grid */}
           <div className="px-4 mb-6">
-            <Card variant="elevated">
-              <CardContent className="p-0">
-                <div className="grid grid-cols-3 divide-x divide-border">
-                  {[
-                    { label: 'Pending', value: stats.pending, color: 'text-warning' },
-                    { label: 'In Progress', value: stats.in_progress, color: 'text-primary' },
-                    { label: 'Completed', value: stats.completed, color: 'text-success' },
-                  ].map((stat) => (
-                    <div key={stat.label} className="flex flex-col items-center py-4">
-                      <span className={cn("text-2xl font-bold", stat.color)}>{stat.value}</span>
-                      <span className="text-xs text-muted-foreground">{stat.label}</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: 'Total', value: stats.total, color: 'text-foreground', bg: 'bg-muted', Icon: ListChecks },
+                { label: 'Pending', value: stats.pending, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-500/10', Icon: ClipboardList },
+                { label: 'In Progress', value: stats.in_progress, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10', Icon: Clock },
+                { label: 'Completed', value: stats.completed, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-500/10', Icon: CheckCircle2 },
+              ].map((stat) => (
+                <Card key={stat.label} variant="elevated">
+                  <CardContent className="p-4">
+                    <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center mb-2', stat.bg)}>
+                      <stat.Icon className={cn('h-5 w-5', stat.color)} />
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                    {isLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    ) : (
+                      <div className={cn('text-2xl font-bold', stat.color)}>{stat.value}</div>
+                    )}
+                    <div className="text-xs text-muted-foreground mt-0.5">{stat.label}</div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
 
-          {/* Requests List */}
+          {/* Error */}
+          {error && (
+            <div className="px-4 mb-4">
+              <Card variant="flat" className="p-4 border-destructive/30 bg-destructive/5">
+                <div className="flex items-center gap-2 text-destructive">
+                  <AlertCircle className="h-5 w-5" />
+                  <p className="text-sm font-medium">Failed to load requests. Please try again.</p>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* Recent Requests */}
+          <div className="px-4 mb-3 flex items-center justify-between">
+            <h2 className="text-base font-semibold">Recent Requests</h2>
+            {requests.length > 5 && (
+              <span className="text-xs text-muted-foreground">Showing 5 of {requests.length}</span>
+            )}
+          </div>
+
           <div className="px-4 space-y-3">
-            {requests.length === 0 ? (
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : recentRequests.length === 0 ? (
               <Card variant="flat" className="p-8 text-center">
                 <ClipboardList className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground">No requests yet</p>
@@ -121,13 +160,13 @@ const MyRequests = () => {
                 </button>
               </Card>
             ) : (
-              requests.map((request, index) => {
+              recentRequests.map((request, index) => {
                 const config = statusConfig[request.status];
                 const Icon = config.icon;
 
                 return (
-                  <Card 
-                    key={request.id} 
+                  <Card
+                    key={request.id}
                     variant="elevated"
                     className="animate-slide-up"
                     style={{ animationDelay: `${index * 50}ms` }}
@@ -137,7 +176,7 @@ const MyRequests = () => {
                         <Badge variant="secondary" className="text-xs">
                           {request.category}
                         </Badge>
-                        <Badge className={cn("text-xs", config.color)}>
+                        <Badge className={cn('text-xs', config.color)}>
                           <Icon className="h-3 w-3 mr-1" />
                           {config.label}
                         </Badge>
