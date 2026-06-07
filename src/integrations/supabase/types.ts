@@ -56,6 +56,71 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          sender_id: string | null
+          thread_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          sender_id?: string | null
+          thread_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          sender_id?: string | null
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_threads: {
+        Row: {
+          created_at: string
+          id: string
+          last_message_at: string
+          mode: string
+          status: string
+          title: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          mode: string
+          status?: string
+          title?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          mode?: string
+          status?: string
+          title?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       emergency_contacts: {
         Row: {
           address: string | null
@@ -185,6 +250,39 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          link: string | null
+          read_at: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          link?: string | null
+          read_at?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          link?: string | null
+          read_at?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       post_likes: {
         Row: {
           created_at: string
@@ -292,6 +390,57 @@ export type Database = {
         }
         Relationships: []
       }
+      report_comments: {
+        Row: {
+          author_name: string | null
+          content: string
+          created_at: string
+          id: string
+          is_official: boolean
+          report_id: string
+          user_id: string | null
+        }
+        Insert: {
+          author_name?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          is_official?: boolean
+          report_id: string
+          user_id?: string | null
+        }
+        Update: {
+          author_name?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          is_official?: boolean
+          report_id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      report_follows: {
+        Row: {
+          created_at: string
+          id: string
+          report_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          report_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          report_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       report_likes: {
         Row: {
           created_at: string
@@ -327,17 +476,22 @@ export type Database = {
       service_requests: {
         Row: {
           admin_notes: string | null
+          assigned_department: string | null
           assigned_to: string | null
           category: string
           created_at: string
           description: string
           id: string
+          is_public: boolean
           latitude: number | null
           location: string | null
           longitude: number | null
           media_types: string[] | null
           media_urls: string[] | null
           photo_url: string | null
+          reporter_name: string | null
+          resolved_at: string | null
+          response_at: string | null
           status: Database["public"]["Enums"]["request_status"]
           title: string
           updated_at: string
@@ -345,17 +499,22 @@ export type Database = {
         }
         Insert: {
           admin_notes?: string | null
+          assigned_department?: string | null
           assigned_to?: string | null
           category: string
           created_at?: string
           description: string
           id?: string
+          is_public?: boolean
           latitude?: number | null
           location?: string | null
           longitude?: number | null
           media_types?: string[] | null
           media_urls?: string[] | null
           photo_url?: string | null
+          reporter_name?: string | null
+          resolved_at?: string | null
+          response_at?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           title: string
           updated_at?: string
@@ -363,17 +522,22 @@ export type Database = {
         }
         Update: {
           admin_notes?: string | null
+          assigned_department?: string | null
           assigned_to?: string | null
           category?: string
           created_at?: string
           description?: string
           id?: string
+          is_public?: boolean
           latitude?: number | null
           location?: string | null
           longitude?: number | null
           media_types?: string[] | null
           media_urls?: string[] | null
           photo_url?: string | null
+          reporter_name?: string | null
+          resolved_at?: string | null
+          response_at?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           title?: string
           updated_at?: string
@@ -488,7 +652,14 @@ export type Database = {
       announcement_type: "general" | "urgent" | "event"
       app_role: "admin" | "moderator" | "user"
       post_type: "report" | "announcement" | "project"
-      request_status: "pending" | "in_progress" | "completed" | "rejected"
+      request_status:
+        | "pending"
+        | "in_progress"
+        | "completed"
+        | "rejected"
+        | "under_review"
+        | "assigned"
+        | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -619,7 +790,15 @@ export const Constants = {
       announcement_type: ["general", "urgent", "event"],
       app_role: ["admin", "moderator", "user"],
       post_type: ["report", "announcement", "project"],
-      request_status: ["pending", "in_progress", "completed", "rejected"],
+      request_status: [
+        "pending",
+        "in_progress",
+        "completed",
+        "rejected",
+        "under_review",
+        "assigned",
+        "closed",
+      ],
     },
   },
 } as const

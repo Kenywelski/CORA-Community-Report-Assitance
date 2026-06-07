@@ -28,7 +28,9 @@ import AdminEvents from "./pages/AdminEvents";
 import AdminEmergencyContacts from "./pages/AdminEmergencyContacts";
 import Programs from "./pages/Programs";
 import Directory from "./pages/Directory";
+import AdminChat from "./pages/AdminChat";
 import NotFound from "./pages/NotFound";
+import { ChatbotLauncher } from "./components/ChatbotLauncher";
 
 const queryClient = new QueryClient();
 
@@ -64,8 +66,10 @@ const App = () => (
             <Route path="/emergency" element={<EmergencyContacts />} />
             <Route path="/admin/events" element={<AdminEvents />} />
             <Route path="/admin/emergency-contacts" element={<AdminEmergencyContacts />} />
+            <Route path="/admin/chat" element={<AdminChat />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <ChatbotLauncher />
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

@@ -46,6 +46,7 @@ const ReportIssue = () => {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isPublic, setIsPublic] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validate = () => {
@@ -84,6 +85,8 @@ const ReportIssue = () => {
       photo_url: media.find((m) => m.type === 'image')?.url ?? null,
       media_urls: media.map((m) => m.url),
       media_types: media.map((m) => m.type),
+      reporter_name: contactName.trim() || null,
+      is_public: isPublic,
     });
 
     if (error) {
@@ -230,6 +233,22 @@ const ReportIssue = () => {
                     <Input type="tel" value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} placeholder="Contact number" maxLength={15} />
                   </div>
                 </div>
+
+                <label className="flex items-start gap-3 p-3 rounded-xl border bg-card cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isPublic}
+                    onChange={(e) => setIsPublic(e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-input accent-primary"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Post to Community Wall</p>
+                    <p className="text-xs text-muted-foreground">
+                      Share this report publicly so other residents can track progress. Uncheck to keep it private to the municipality.
+                    </p>
+                  </div>
+                </label>
+
 
                 <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit Report'}

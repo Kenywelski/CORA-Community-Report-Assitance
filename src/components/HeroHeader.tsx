@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { Bell, User } from "lucide-react";
+import { User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { NotificationBell } from "@/components/NotificationBell";
 import heroImage from "@/assets/hero-coastal.jpg";
 import logoIcon from "@/assets/mycortes-logo.png";
 
@@ -27,11 +28,8 @@ export const HeroHeader = () => {
               <h1 className="text-white text-lg font-bold tracking-tight">Cortes</h1>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20 relative" onClick={() => navigate('/updates')}>
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-2 right-2 h-2 w-2 bg-accent rounded-full" />
-            </Button>
+          <div className="flex items-center gap-1">
+            <NotificationBell iconClassName="text-white" buttonClassName="text-white hover:bg-white/20" />
             <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" onClick={() => navigate(user ? '/profile' : '/auth')}>
               <User className="h-5 w-5" />
             </Button>

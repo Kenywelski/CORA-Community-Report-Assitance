@@ -1,169 +1,59 @@
 import { useEffect, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { BottomNav } from '@/components/BottomNav';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PostDetailDialog } from '@/components/PostDetailDialog';
-import { 
-  ArrowLeft, 
-  Heart, 
-  Clock, 
-  Megaphone, 
-  Building2, 
-  AlertCircle,
-  User,
-  Plus,
-  Filter,
-  X,
-  Search
-} from 'lucide-react';
+import { ReportDetailDialog, statusMeta, type PublicReport } from '@/components/ReportDetailDialog';
+import { PerformanceDashboard } from '@/components/PerformanceDashboard';
+import { ActivityFeed } from '@/components/ActivityFeed';
+import { ArrowLeft, Clock, Megaphone, AlertCircle, MapPin, Plus, X, Search, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { toast } from 'sonner';
-
-interface Post {
-  id: string;
-  title: string;
-  content: string;
-  category: string | null;
-  post_type: string;
-  is_anonymous: boolean;
-  created_by_role: string | null;
-  created_at: string;
-}
-
-const postTypeIcons: Record<string, React.ElementType> = {
-  report: AlertCircle,
-  announcement: Megaphone,
-  project: Building2,
-};
-
-const postTypeColors: Record<string, string> = {
-  report: 'bg-warning/10 text-warning border-warning/20',
-  announcement: 'bg-primary/10 text-primary border-primary/20',
-  project: 'bg-success/10 text-success border-success/20',
-};
-
-const postTypeLabels: Record<string, string> = {
-  report: 'Community Report',
-  announcement: 'Announcement',
-  project: 'Municipal Project',
-};
-
-const reportCategories = [
-  'Road Damage',
-  'Garbage',
-  'Flooding',
-  'Street Light',
-  'Water Supply',
-  'Public Safety',
-  'Other',
-];
-
-const allCategories = [
-  'Road Damage',
-  'Garbage',
-  'Flooding',
-  'Street Light',
-  'Water Supply',
-  'Public Safety',
-  'Infrastructure',
-  'Health',
-  'Education',
-  'Environment',
-  'Social Services',
-  'Events',
-  'General',
-  'Other',
-];
 
 type FilterTab = 'all' | 'reports' | 'announcements';
 
 const CommunityWall = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [category, setCategory] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedReport, setSelectedReport] = useState<PublicReport | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
-  const [sessionId] = useState(() => {
-    let id = localStorage.getItem('wall_session_id');
-    if (!id) {
-      id = crypto.randomUUID();
-      localStorage.setItem('wall_session_id', id);
-    }
-    return id;
-  });
-
-  // Realtime: refetch on changes
+  // Realtime: subscribe to changes
   useEffect(() => {
     const ch = supabase
-      .channel('wall-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['community-posts'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['wall-announcements'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['post-likes'] });
-      })
+      .channel('community-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_requests' }, () =>
+        queryClient.invalidateQueries({ queryKey: ['public-reports'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () =>
+        queryClient.invalidateQueries({ queryKey: ['wall-announcements'] }))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [queryClient]);
 
-  // Fetch all posts
-  const { data: posts, isLoading } = useQuery({
-    queryKey: ['community-posts'],
-    queryFn: async () => {
+  // Public reports from service_requests
+  const { data: reports = [], isLoading } = useQuery({
+    queryKey: ['public-reports'],
+    queryFn: async (): Promise<PublicReport[]> => {
       const { data, error } = await supabase
-        .from('posts')
+        .from('service_requests')
         .select('*')
-        .order('created_at', { ascending: false });
+        .ilike('category', 'Report:%')
+        .eq('is_public', true)
+        .order('created_at', { ascending: false })
+        .limit(200);
       if (error) throw error;
-      return data as Post[];
+      return (data || []) as PublicReport[];
     },
   });
 
-  // Read-only mirror of announcements (managed in Updates / Admin Announcements)
-  const { data: announcements } = useQuery({
+  const { data: announcements = [] } = useQuery({
     queryKey: ['wall-announcements'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -172,183 +62,44 @@ const CommunityWall = () => {
         .eq('is_active', true)
         .order('published_at', { ascending: false });
       if (error) throw error;
-      return data;
+      return data || [];
     },
   });
 
-  // Get unique categories from posts for filter dropdown
-  const availableCategories = [...new Set(posts?.map(p => p.category).filter(Boolean) || [])];
-
-  // When the Announcements tab is active, render announcements only (read-only mirror).
-  // For 'all' and 'reports' tabs we filter the posts feed and exclude post_type 'announcement'
-  // (since announcements live in their own section now).
-  const filteredPosts = posts?.filter((post) => {
-    if (activeFilter === 'announcements') return false;
-    let passesTabFilter = true;
-    if (activeFilter === 'reports') {
-      passesTabFilter = post.post_type === 'report';
-    } else {
-      passesTabFilter = post.post_type !== 'announcement';
-    }
-
-    const passesCategoryFilter = !selectedCategory || post.category === selectedCategory;
-
-    const q = searchQuery.toLowerCase().trim();
-    const passesSearch = !q ||
-      post.title.toLowerCase().includes(q) ||
-      post.content.toLowerCase().includes(q) ||
-      (post.category?.toLowerCase().includes(q) ?? false);
-
-    return passesTabFilter && passesCategoryFilter && passesSearch;
-  });
-
-  const filteredAnnouncements = announcements?.filter((a) => {
-    const q = searchQuery.toLowerCase().trim();
+  const q = searchQuery.toLowerCase().trim();
+  const filteredReports = reports.filter((r) => {
     if (!q) return true;
     return (
-      a.title.toLowerCase().includes(q) ||
-      a.content.toLowerCase().includes(q) ||
-      (a.excerpt?.toLowerCase().includes(q) ?? false)
+      r.title.toLowerCase().includes(q) ||
+      r.description.toLowerCase().includes(q) ||
+      r.category.toLowerCase().includes(q) ||
+      (r.location?.toLowerCase().includes(q) ?? false)
     );
   });
 
-  // Fetch likes
-  const { data: likesData } = useQuery({
-    queryKey: ['post-likes'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('post_likes')
-        .select('post_id, user_id, session_id');
-      if (error) throw error;
-      return data;
-    },
+  const filteredAnnouncements = announcements.filter((a) => {
+    if (!q) return true;
+    return a.title.toLowerCase().includes(q) || a.content.toLowerCase().includes(q);
   });
 
-  // Create post mutation
-  const createPostMutation = useMutation({
-    mutationFn: async (postData: { title: string; content: string; category: string }) => {
-      const { error } = await supabase
-        .from('posts')
-        .insert({
-          title: postData.title,
-          content: postData.content,
-          category: postData.category,
-          post_type: 'report',
-          is_anonymous: true,
-          created_by: user?.id || null,
-          created_by_role: 'user',
-        });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['community-posts'] });
-      setIsDialogOpen(false);
-      setTitle('');
-      setContent('');
-      setCategory('');
-      toast.success('Report submitted successfully!');
-    },
-    onError: (error) => {
-      toast.error('Failed to submit report');
-      console.error(error);
-    },
-  });
-
-  // Like mutation
-  const likeMutation = useMutation({
-    mutationFn: async (postId: string) => {
-      if (user) {
-        const { error } = await supabase
-          .from('post_likes')
-          .insert({ post_id: postId, user_id: user.id });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('post_likes')
-          .insert({ post_id: postId, session_id: sessionId });
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['post-likes'] });
-    },
-  });
-
-  // Unlike mutation
-  const unlikeMutation = useMutation({
-    mutationFn: async (postId: string) => {
-      if (user) {
-        const { error } = await supabase
-          .from('post_likes')
-          .delete()
-          .eq('post_id', postId)
-          .eq('user_id', user.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('post_likes')
-          .delete()
-          .eq('post_id', postId)
-          .eq('session_id', sessionId);
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['post-likes'] });
-    },
-  });
-
-  const getLikesCount = (postId: string) => {
-    return likesData?.filter((like) => like.post_id === postId).length || 0;
-  };
-
-  const isLikedByUser = (postId: string) => {
-    if (!likesData) return false;
-    if (user) {
-      return likesData.some((like) => like.post_id === postId && like.user_id === user.id);
-    }
-    return likesData.some((like) => like.post_id === postId && like.session_id === sessionId);
-  };
-
-  const handleLikeToggle = (postId: string) => {
-    if (isLikedByUser(postId)) {
-      unlikeMutation.mutate(postId);
-    } else {
-      likeMutation.mutate(postId);
-    }
-  };
-
-  const handleSubmitReport = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || !content.trim() || !category) {
-      toast.error('Please fill in all fields');
-      return;
-    }
-    createPostMutation.mutate({ title, content, category });
-  };
-
-  const handlePostClick = (post: Post) => {
-    setSelectedPost(post);
-    setIsDetailOpen(true);
-  };
-
-  const clearCategoryFilter = () => {
-    setSelectedCategory(null);
+  const openReport = (r: PublicReport) => {
+    setSelectedReport(r);
+    setDetailOpen(true);
   };
 
   return (
     <div className="min-h-screen bg-background pb-24 lg:pb-8 lg:pt-14">
       <div className="app-container">
         {/* Header */}
-        <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border">
+        <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border lg:top-14">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+              <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="lg:hidden">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div>
                 <h1 className="text-lg font-bold">Community Wall</h1>
-                <p className="text-xs text-muted-foreground">Reports, announcements & projects</p>
+                <p className="text-xs text-muted-foreground">Public reports & municipal updates</p>
               </div>
             </div>
             <Button size="sm" className="gap-1" onClick={() => navigate('/report-issue')}>
@@ -358,256 +109,146 @@ const CommunityWall = () => {
           </div>
         </header>
 
-        {/* Search Bar */}
-        <div className="px-4 pt-3">
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search posts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-9 h-9"
-            />
-            {searchQuery && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                onClick={() => setSearchQuery('')}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            )}
-          </div>
-        </div>
+        <div className="p-4 space-y-3">
+          {/* Performance dashboard */}
+          <PerformanceDashboard reports={reports} />
 
-        {/* Filter Tabs */}
-        <div className="px-4">
-          <div className="flex items-center gap-2">
-            <Tabs 
-              value={activeFilter} 
-              onValueChange={(v) => {
-                setActiveFilter(v as FilterTab);
-                setSelectedCategory(null); // Reset category when changing tabs
-              }}
-              className="flex-1"
-            >
-              <TabsList className="w-full grid grid-cols-3">
+          {/* Search + tabs */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search reports & announcements..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-9 h-9"
+              />
+              {searchQuery && (
+                <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setSearchQuery('')}>
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+            <Tabs value={activeFilter} onValueChange={(v) => setActiveFilter(v as FilterTab)}>
+              <TabsList className="grid grid-cols-3 sm:w-auto w-full">
                 <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="reports" className="gap-1">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  Reports
-                </TabsTrigger>
-                <TabsTrigger value="announcements" className="gap-1">
-                  <Megaphone className="h-3.5 w-3.5" />
-                  Announcements
-                </TabsTrigger>
+                <TabsTrigger value="reports" className="gap-1"><AlertCircle className="h-3.5 w-3.5" />Reports</TabsTrigger>
+                <TabsTrigger value="announcements" className="gap-1"><Megaphone className="h-3.5 w-3.5" />News</TabsTrigger>
               </TabsList>
             </Tabs>
-
-            {/* Category Filter Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant={selectedCategory ? "default" : "outline"} 
-                  size="icon"
-                  className="shrink-0"
-                >
-                  <Filter className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {selectedCategory && (
-                  <>
-                    <DropdownMenuItem onClick={clearCategoryFilter} className="text-destructive">
-                      <X className="h-4 w-4 mr-2" />
-                      Clear Filter
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                  </>
-                )}
-                {availableCategories.length === 0 ? (
-                  <DropdownMenuItem disabled>No categories available</DropdownMenuItem>
-                ) : (
-                  availableCategories.map((cat) => (
-                    <DropdownMenuItem 
-                      key={cat} 
-                      onClick={() => setSelectedCategory(cat)}
-                      className={cn(selectedCategory === cat && "bg-accent")}
-                    >
-                      {cat}
-                    </DropdownMenuItem>
-                  ))
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
 
-          {/* Active Category Badge */}
-          {selectedCategory && (
-            <div className="mt-2 flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Filtered by:</span>
-              <Badge 
-                variant="secondary" 
-                className="gap-1 cursor-pointer hover:bg-secondary/80"
-                onClick={clearCategoryFilter}
-              >
-                {selectedCategory}
-                <X className="h-3 w-3" />
-              </Badge>
-            </div>
-          )}
-        </div>
-
-        {/* Content */}
-        <main className="p-4 space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 lg:grid-cols-3">
-          {activeFilter === 'announcements' ? (
-            !filteredAnnouncements || filteredAnnouncements.length === 0 ? (
-              <Card className="md:col-span-full">
-                <CardContent className="py-8 text-center text-muted-foreground">
-                  No announcements yet. Check back soon.
-                </CardContent>
-              </Card>
-            ) : (
-              filteredAnnouncements.map((a) => (
-                <Card
-                  key={a.id}
-                  className="overflow-hidden cursor-pointer hover:shadow-md border-primary/30 bg-primary/5"
-                  onClick={() => navigate('/updates')}
-                >
-                  {a.image_url && <img src={a.image_url} alt={a.title} className="w-full h-32 object-cover" />}
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-xl bg-primary/20">
-                        <Megaphone className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm line-clamp-1">{a.title}</h3>
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(a.published_at), 'MMM d, yyyy')}
-                        </span>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <p className="text-sm text-muted-foreground line-clamp-3">{a.excerpt || a.content}</p>
-                  </CardContent>
-                </Card>
-              ))
-            )
-          ) : isLoading ? (
-            <div className="text-center py-8 text-muted-foreground md:col-span-full">Loading posts...</div>
-          ) : filteredPosts?.length === 0 ? (
-            <Card className="md:col-span-full">
-              <CardContent className="py-8 text-center text-muted-foreground">
-                {selectedCategory
-                  ? `No posts found in "${selectedCategory}" category.`
-                  : activeFilter === 'all'
-                  ? 'No posts yet. Be the first to submit a report!'
-                  : 'No community reports yet.'}
-              </CardContent>
-            </Card>
-          ) : (
-            filteredPosts?.map((post) => {
-              const postType = post.post_type as string;
-              const Icon = postTypeIcons[postType] || AlertCircle;
-              const likesCount = getLikesCount(post.id);
-              const liked = isLikedByUser(post.id);
-              const isAdminPost = postType === 'announcement' || postType === 'project';
-
-              return (
-                <Card 
-                  key={post.id} 
-                  className={cn(
-                    "overflow-hidden transition-all cursor-pointer hover:shadow-md",
-                    isAdminPost && "border-primary/30 bg-primary/5"
-                  )}
-                  onClick={() => handlePostClick(post)}
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start gap-3">
-                      <div className={cn(
-                        "p-2 rounded-xl",
-                        isAdminPost ? "bg-primary/20" : "bg-muted"
-                      )}>
-                        <Icon className={cn(
-                          "h-5 w-5",
-                          isAdminPost ? "text-primary" : "text-muted-foreground"
-                        )} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center flex-wrap gap-2 mb-1">
-                          <h3 className="font-semibold text-sm line-clamp-1">{post.title}</h3>
-                          <Badge className={cn('text-xs', postTypeColors[postType])}>
-                            {postTypeLabels[postType]}
-                          </Badge>
+          <div className="grid lg:grid-cols-3 gap-3">
+            {/* Feed */}
+            <main className="lg:col-span-2 space-y-3">
+              {activeFilter !== 'reports' && filteredAnnouncements.length > 0 && (
+                <div className="space-y-3">
+                  {filteredAnnouncements.slice(0, activeFilter === 'announcements' ? 50 : 3).map((a) => (
+                    <Card key={a.id} className="cursor-pointer hover:shadow-md border-primary/30 bg-primary/5" onClick={() => navigate('/updates')}>
+                      {a.image_url && <img src={a.image_url} alt={a.title} className="w-full h-32 object-cover rounded-t-xl" />}
+                      <CardHeader className="pb-2">
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 rounded-xl bg-primary/20 shrink-0">
+                            <Megaphone className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-sm line-clamp-1">{a.title}</h3>
+                            <span className="text-xs text-muted-foreground">{format(new Date(a.published_at), 'MMM d, yyyy')}</span>
+                          </div>
+                          <Badge variant="secondary" className="text-[10px]">Announcement</Badge>
                         </div>
-                        {post.category && (
-                          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                            {post.category}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0 space-y-3">
-                    <p className="text-sm text-muted-foreground line-clamp-3">
-                      {post.content}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        {post.is_anonymous && (
-                          <span className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            Anonymous
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {format(new Date(post.created_at), 'MMM d, yyyy')}
-                        </span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          'gap-1.5 text-muted-foreground hover:text-destructive',
-                          liked && 'text-destructive'
-                        )}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleLikeToggle(post.id);
-                        }}
-                        disabled={likeMutation.isPending || unlikeMutation.isPending}
-                      >
-                        <Heart className={cn('h-4 w-4', liked && 'fill-current')} />
-                        <span>{likesCount}</span>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })
-          )}
-        </main>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <p className="text-sm text-muted-foreground line-clamp-2">{a.excerpt || a.content}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {activeFilter !== 'announcements' && (
+                <>
+                  {isLoading ? (
+                    <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Loading reports…</CardContent></Card>
+                  ) : filteredReports.length === 0 ? (
+                    <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">
+                      No reports yet. Be the first to report an issue.
+                    </CardContent></Card>
+                  ) : (
+                    filteredReports.map((r) => {
+                      const meta = statusMeta[r.status] || statusMeta.pending;
+                      const reporterName = r.reporter_name || (r.user_id ? 'Resident' : 'Anonymous');
+                      const cleanTitle = r.title.replace(/^\[REPORT\]\s*/, '');
+                      const cleanCategory = r.category.replace(/^Report:\s*/, '');
+                      return (
+                        <Card
+                          key={r.id}
+                          variant="elevated"
+                          className="cursor-pointer hover:shadow-md transition-shadow animate-slide-up"
+                          onClick={() => openReport(r)}
+                        >
+                          {r.photo_url && (
+                            <img src={r.photo_url} alt="" className="w-full h-40 object-cover rounded-t-xl" />
+                          )}
+                          <CardContent className="p-4 space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-sm leading-tight line-clamp-2">{cleanTitle}</h3>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Badge variant="secondary" className="text-[10px]">{cleanCategory}</Badge>
+                                  {r.assigned_department && (
+                                    <Badge variant="outline" className="text-[10px]">{r.assigned_department}</Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <Badge variant="outline" className={cn('shrink-0 text-[10px]', meta.cls)}>{meta.label}</Badge>
+                            </div>
+
+                            <p className="text-sm text-muted-foreground line-clamp-2">{r.description}</p>
+
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground pt-1">
+                              <span className="flex items-center gap-1"><User className="h-3 w-3" />{reporterName}</span>
+                              {r.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{r.location}</span>}
+                              <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}</span>
+                              {r.response_at && (
+                                <span className="text-amber-600 dark:text-amber-400">Responded in {fmtDur(new Date(r.response_at).getTime() - new Date(r.created_at).getTime())}</span>
+                              )}
+                              {r.resolved_at && (
+                                <span className="text-green-600 dark:text-green-400">Resolved in {fmtDur(new Date(r.resolved_at).getTime() - new Date(r.created_at).getTime())}</span>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })
+                  )}
+                </>
+              )}
+            </main>
+
+            {/* Side: activity feed */}
+            <aside className="lg:col-span-1">
+              <div className="lg:sticky lg:top-32">
+                <ActivityFeed reports={reports} />
+              </div>
+            </aside>
+          </div>
+        </div>
       </div>
 
-      {/* Post Detail Dialog */}
-      <PostDetailDialog
-        post={selectedPost}
-        open={isDetailOpen}
-        onOpenChange={setIsDetailOpen}
-        likesCount={selectedPost ? getLikesCount(selectedPost.id) : 0}
-        isLiked={selectedPost ? isLikedByUser(selectedPost.id) : false}
-        onLikeToggle={handleLikeToggle}
-        isLikeLoading={likeMutation.isPending || unlikeMutation.isPending}
-      />
-
-      <BottomNav />
+      <ReportDetailDialog report={selectedReport} open={detailOpen} onOpenChange={setDetailOpen} />
+      <BottomNav currentPath="/community" />
     </div>
   );
 };
+
+function fmtDur(ms: number): string {
+  const m = Math.floor(ms / 60000);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  return `${d}d`;
+}
 
 export default CommunityWall;
