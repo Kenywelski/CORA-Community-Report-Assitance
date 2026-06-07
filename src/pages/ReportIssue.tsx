@@ -84,6 +84,8 @@ const ReportIssue = () => {
       photo_url: media.find((m) => m.type === 'image')?.url ?? null,
       media_urls: media.map((m) => m.url),
       media_types: media.map((m) => m.type),
+      reporter_name: contactName.trim() || null,
+      is_public: isPublic,
     });
 
     if (error) {
