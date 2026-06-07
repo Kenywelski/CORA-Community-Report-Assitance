@@ -96,9 +96,9 @@ const AdminChat = () => {
   };
 
   return (
-    <AdminLayout>
+    <AdminLayout title="Staff Chat">
       <div className="space-y-4">
-        <div>
+        <div hidden>
           <h1 className="text-2xl font-bold">Staff Chat</h1>
           <p className="text-sm text-muted-foreground">Live conversations with residents.</p>
         </div>
