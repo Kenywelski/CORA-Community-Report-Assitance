@@ -488,7 +488,14 @@ export type Database = {
       announcement_type: "general" | "urgent" | "event"
       app_role: "admin" | "moderator" | "user"
       post_type: "report" | "announcement" | "project"
-      request_status: "pending" | "in_progress" | "completed" | "rejected"
+      request_status:
+        | "pending"
+        | "in_progress"
+        | "completed"
+        | "rejected"
+        | "under_review"
+        | "assigned"
+        | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -619,7 +626,15 @@ export const Constants = {
       announcement_type: ["general", "urgent", "event"],
       app_role: ["admin", "moderator", "user"],
       post_type: ["report", "announcement", "project"],
-      request_status: ["pending", "in_progress", "completed", "rejected"],
+      request_status: [
+        "pending",
+        "in_progress",
+        "completed",
+        "rejected",
+        "under_review",
+        "assigned",
+        "closed",
+      ],
     },
   },
 } as const
