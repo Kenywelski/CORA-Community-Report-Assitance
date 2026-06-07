@@ -239,7 +239,7 @@ export const ChatbotLauncher = () => {
 
               {/* AI tab */}
               <TabsContent value="ai" className="flex-1 flex flex-col overflow-hidden m-0 mt-2">
-                <ScrollArea className="flex-1 px-3" viewportRef={aiScrollRef as any}>
+                <div ref={aiScrollRef} className="flex-1 px-3 overflow-y-auto">
                   <div className="space-y-3 py-2">
                     {aiMessages.map((m, i) => (
                       <div key={i} className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
@@ -264,7 +264,7 @@ export const ChatbotLauncher = () => {
                       </div>
                     ))}
                   </div>
-                </ScrollArea>
+                </div>
                 <div className="p-2 border-t bg-card flex gap-2">
                   <Textarea
                     value={aiInput}
@@ -291,7 +291,7 @@ export const ChatbotLauncher = () => {
                 <div className="px-3 py-2 bg-muted/40 border-b text-xs text-muted-foreground">
                   Messages go to municipal staff. They'll reply when available.
                 </div>
-                <ScrollArea className="flex-1 px-3" viewportRef={staffScrollRef as any}>
+                <div ref={staffScrollRef} className="flex-1 px-3 overflow-y-auto">
                   <div className="space-y-3 py-2">
                     {staffMessages.length === 0 ? (
                       <div className="text-center text-sm text-muted-foreground py-8">
@@ -315,7 +315,7 @@ export const ChatbotLauncher = () => {
                       );
                     })}
                   </div>
-                </ScrollArea>
+                </div>
                 <div className="p-2 border-t bg-card flex gap-2">
                   <Textarea
                     value={staffInput}
