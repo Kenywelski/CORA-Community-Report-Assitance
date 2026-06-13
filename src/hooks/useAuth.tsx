@@ -87,8 +87,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signInWithGoogle = async () => {
-    const redirectUri = `${window.location.origin}/auth`;
-    const result = await lovable.auth.signInWithOAuth('google', { redirect_uri: redirectUri });
+    const result = await lovable.auth.signInWithOAuth('google', { redirect_uri: window.location.origin });
+    if (result.redirected) {
+      return { error: null };
+    }
     return { error: (result.error as Error) || null };
   };
 
