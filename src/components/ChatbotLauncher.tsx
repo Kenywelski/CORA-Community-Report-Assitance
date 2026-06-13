@@ -214,12 +214,12 @@ export const ChatbotLauncher = () => {
             className="absolute inset-0 sm:hidden"
             onClick={() => setOpen(false)}
           />
-          <div className="relative w-full sm:w-[400px] h-[85vh] sm:h-[600px] bg-card border border-border sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
+          <div className="relative w-full sm:w-[400px] h-[85vh] sm:h-[600px] bg-card border border-border rounded-t-2xl sm:rounded-2xl shadow-elevated flex flex-col overflow-hidden animate-slide-up">
             {/* Header */}
-            <div className="flex items-center justify-between p-3 border-b bg-gradient-to-r from-primary to-accent text-primary-foreground">
+            <div className="flex items-center justify-between p-3 border-b bg-[hsl(174,55%,22%)] text-primary-foreground">
               <div className="flex items-center gap-2">
                 <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
-                  <Sparkles className="h-5 w-5" />
+                  <MessageCircle className="h-5 w-5" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm">myCortes Helper</h3>
