@@ -188,7 +188,7 @@ export const ChatbotLauncher = () => {
     return (
       <button
         onClick={() => navigate('/auth')}
-        className="fixed bottom-24 right-4 lg:bottom-6 z-40 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center hover:scale-105 transition-transform"
+        className="fixed bottom-24 right-4 lg:bottom-6 z-40 h-14 w-14 rounded-full bg-[hsl(174,55%,22%)] text-primary-foreground shadow-elevated flex items-center justify-center hover:scale-105 transition-transform"
         aria-label="Sign in to chat"
       >
         <MessageCircle className="h-6 w-6" />
@@ -201,10 +201,10 @@ export const ChatbotLauncher = () => {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-24 right-4 lg:bottom-6 z-40 h-14 w-14 rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-xl flex items-center justify-center hover:scale-105 transition-transform"
+          className="fixed bottom-24 right-4 lg:bottom-6 z-40 h-14 w-14 rounded-full bg-[hsl(174,55%,22%)] text-primary-foreground shadow-elevated flex items-center justify-center hover:scale-105 transition-transform"
           aria-label="Open chatbot"
         >
-          <Sparkles className="h-6 w-6" />
+          <MessageCircle className="h-6 w-6" />
         </button>
       )}
 
