@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
-import { MessageCircle, X, Send, Bot, Headphones, Loader2, Sparkles, ChevronDown } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, Headphones, Loader2, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -188,7 +188,7 @@ export const ChatbotLauncher = () => {
     return (
       <button
         onClick={() => navigate('/auth')}
-        className="fixed bottom-24 right-4 lg:bottom-6 z-40 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center hover:scale-105 transition-transform"
+        className="fixed bottom-24 right-4 lg:bottom-6 z-40 h-14 w-14 rounded-full bg-[hsl(174,55%,22%)] text-primary-foreground shadow-elevated flex items-center justify-center hover:scale-105 transition-transform"
         aria-label="Sign in to chat"
       >
         <MessageCircle className="h-6 w-6" />
@@ -201,10 +201,10 @@ export const ChatbotLauncher = () => {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-24 right-4 lg:bottom-6 z-40 h-14 w-14 rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-xl flex items-center justify-center hover:scale-105 transition-transform"
+          className="fixed bottom-24 right-4 lg:bottom-6 z-40 h-14 w-14 rounded-full bg-[hsl(174,55%,22%)] text-primary-foreground shadow-elevated flex items-center justify-center hover:scale-105 transition-transform"
           aria-label="Open chatbot"
         >
-          <Sparkles className="h-6 w-6" />
+          <MessageCircle className="h-6 w-6" />
         </button>
       )}
 
@@ -214,12 +214,12 @@ export const ChatbotLauncher = () => {
             className="absolute inset-0 sm:hidden"
             onClick={() => setOpen(false)}
           />
-          <div className="relative w-full sm:w-[400px] h-[85vh] sm:h-[600px] bg-card border border-border sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
+          <div className="relative w-full sm:w-[400px] h-[85vh] sm:h-[600px] bg-card border border-border rounded-t-2xl sm:rounded-2xl shadow-elevated flex flex-col overflow-hidden animate-slide-up">
             {/* Header */}
-            <div className="flex items-center justify-between p-3 border-b bg-gradient-to-r from-primary to-accent text-primary-foreground">
+            <div className="flex items-center justify-between p-3 border-b bg-[hsl(174,55%,22%)] text-primary-foreground">
               <div className="flex items-center gap-2">
                 <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
-                  <Sparkles className="h-5 w-5" />
+                  <MessageCircle className="h-5 w-5" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm">myCortes Helper</h3>
