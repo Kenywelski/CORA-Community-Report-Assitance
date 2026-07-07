@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
-import { MessageCircle, X, Send, Bot, Headphones, Loader2, ChevronDown } from 'lucide-react';
+import {
+  MessageCircle, X, Send, Bot, Headphones, Loader2, ChevronDown,
+  Trash2, FileText, AlertTriangle, Phone, Sparkles, Building2, HelpCircle,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,28 +16,78 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 
-interface AiMsg { role: 'user' | 'assistant'; content: string }
+interface AiMsg { role: 'user' | 'assistant'; content: string; ts: number }
 interface StaffMsg { id: string; role: string; content: string; sender_id: string | null; created_at: string }
+
+const AUTH_ROUTES = ['/auth', '/login', '/register', '/signup', '/forgot-password', '/reset-password', '/otp', '/verify'];
+
+const WELCOME: AiMsg = {
+  role: 'assistant',
+  ts: Date.now(),
+  content: "Hi! I'm **myCortes Assistant** 👋\n\nAsk me about municipal services, programs, emergency contacts, or how to use the app. For specific case help, switch to the **Admin/Staff** tab.",
+};
+
+const QUICK_ACTIONS = [
+  { icon: FileText, label: 'Request Services', prompt: 'How do I request a municipal service or document?' },
+  { icon: AlertTriangle, label: 'Report an Issue', prompt: 'How do I report a community issue?' },
+  { icon: Phone, label: 'Emergency Contacts', prompt: 'What are the emergency contact numbers in Cortes?' },
+  { icon: Sparkles, label: 'Municipal Programs', prompt: 'What programs does the municipality offer?' },
+  { icon: Building2, label: 'Office Directory', prompt: 'List the municipal offices and what they do.' },
+  { icon: HelpCircle, label: 'FAQs', prompt: 'What are frequently asked questions about myCortes?' },
+];
+
+const STORAGE_KEY = 'mycortes-chat-ai-v1';
+const OPEN_KEY = 'mycortes-chat-open-v1';
+
+const formatTime = (ts: number) =>
+  new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
 export const ChatbotLauncher = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
+
+  const isAuthRoute = useMemo(
+    () => AUTH_ROUTES.some((r) => location.pathname === r || location.pathname.startsWith(r + '/')),
+    [location.pathname],
+  );
+
+  const [open, setOpen] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem(OPEN_KEY) === '1';
+  });
   const [tab, setTab] = useState<'ai' | 'staff'>('ai');
 
-  // ===== AI chat state =====
-  const [aiMessages, setAiMessages] = useState<AiMsg[]>([
-    { role: 'assistant', content: "Hi! I'm myCortes Assistant 👋\n\nAsk me about municipal services, programs, emergency contacts, or how to use the app. For specific case help, switch to the **Admin/Staff** tab." },
-  ]);
+  // ===== AI chat state (persisted) =====
+  const [aiMessages, setAiMessages] = useState<AiMsg[]>(() => {
+    if (typeof window === 'undefined') return [WELCOME];
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as AiMsg[];
+        if (Array.isArray(parsed) && parsed.length) return parsed;
+      }
+    } catch { /* noop */ }
+    return [WELCOME];
+  });
   const [aiInput, setAiInput] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const aiScrollRef = useRef<HTMLDivElement>(null);
+  const aiTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ===== Staff chat state =====
   const [staffInput, setStaffInput] = useState('');
   const [staffThreadId, setStaffThreadId] = useState<string | null>(null);
   const staffScrollRef = useRef<HTMLDivElement>(null);
+
+  // Persist AI messages + open state
+  useEffect(() => {
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(aiMessages)); } catch { /* noop */ }
+  }, [aiMessages]);
+  useEffect(() => {
+    try { window.localStorage.setItem(OPEN_KEY, open ? '1' : '0'); } catch { /* noop */ }
+  }, [open]);
 
   // Load or create staff thread when tab opens
   useEffect(() => {
@@ -91,20 +144,28 @@ export const ChatbotLauncher = () => {
   // Auto-scroll
   useEffect(() => {
     if (aiScrollRef.current) aiScrollRef.current.scrollTop = aiScrollRef.current.scrollHeight;
-  }, [aiMessages]);
+  }, [aiMessages, aiBusy]);
   useEffect(() => {
     if (staffScrollRef.current) staffScrollRef.current.scrollTop = staffScrollRef.current.scrollHeight;
   }, [staffMessages]);
 
-  const sendAi = async () => {
-    const text = aiInput.trim();
+  // Focus textarea on open / after sending
+  useEffect(() => {
+    if (open && tab === 'ai') {
+      requestAnimationFrame(() => aiTextareaRef.current?.focus());
+    }
+  }, [open, tab, aiBusy]);
+
+  const sendAi = async (overrideText?: string) => {
+    const text = (overrideText ?? aiInput).trim();
     if (!text || aiBusy) return;
-    const next = [...aiMessages, { role: 'user' as const, content: text }];
+    const userMsg: AiMsg = { role: 'user', content: text, ts: Date.now() };
+    const next = [...aiMessages, userMsg];
     setAiMessages(next);
     setAiInput('');
     setAiBusy(true);
     // Optimistic empty assistant message
-    setAiMessages([...next, { role: 'assistant', content: '' }]);
+    setAiMessages([...next, { role: 'assistant', content: '', ts: Date.now() }]);
 
     try {
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -115,7 +176,7 @@ export const ChatbotLauncher = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${ANON}`,
         },
-        body: JSON.stringify({ messages: next }),
+        body: JSON.stringify({ messages: next.map(({ role, content }) => ({ role, content })) }),
       });
 
       if (!res.ok) {
@@ -147,7 +208,7 @@ export const ChatbotLauncher = () => {
               assistant += delta;
               setAiMessages((prev) => {
                 const copy = [...prev];
-                copy[copy.length - 1] = { role: 'assistant', content: assistant };
+                copy[copy.length - 1] = { role: 'assistant', content: assistant, ts: copy[copy.length - 1].ts };
                 return copy;
               });
             }
@@ -158,13 +219,18 @@ export const ChatbotLauncher = () => {
       const message = (e as Error).message || 'Failed to reach the assistant';
       setAiMessages((prev) => {
         const copy = [...prev];
-        copy[copy.length - 1] = { role: 'assistant', content: `⚠️ ${message}` };
+        copy[copy.length - 1] = { role: 'assistant', content: `⚠️ ${message}`, ts: Date.now() };
         return copy;
       });
       toast.error(message);
     } finally {
       setAiBusy(false);
     }
+  };
+
+  const clearAi = () => {
+    setAiMessages([{ ...WELCOME, ts: Date.now() }]);
+    toast.success('Chat cleared');
   };
 
   const sendStaff = async () => {
@@ -184,114 +250,191 @@ export const ChatbotLauncher = () => {
       .eq('id', staffThreadId);
   };
 
-  if (!user) {
-    return (
-      <button
-        onClick={() => navigate('/auth')}
-        className="fixed bottom-24 right-4 lg:bottom-6 z-40 h-14 w-14 rounded-full bg-[hsl(174,55%,22%)] text-primary-foreground shadow-elevated flex items-center justify-center hover:scale-105 transition-transform"
-        aria-label="Sign in to chat"
-      >
-        <MessageCircle className="h-6 w-6" />
-      </button>
-    );
-  }
+  // Hide entirely on auth-related routes
+  if (isAuthRoute) return null;
+
+  // Not signed in — hide widget (only authenticated users can access)
+  if (!user) return null;
+
+  const showQuickActions = aiMessages.length <= 1 && !aiBusy;
 
   return (
     <>
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-24 right-4 lg:bottom-6 z-40 h-14 w-14 rounded-full bg-[hsl(174,55%,22%)] text-primary-foreground shadow-elevated flex items-center justify-center hover:scale-105 transition-transform"
+          className={cn(
+            'fixed bottom-24 right-4 lg:bottom-6 z-40 h-14 w-14 rounded-2xl',
+            'bg-[hsl(174,55%,22%)] text-primary-foreground shadow-elevated',
+            'flex items-center justify-center transition-all duration-300',
+            'hover:scale-110 hover:shadow-2xl active:scale-95',
+            'animate-scale-in',
+          )}
           aria-label="Open chatbot"
         >
           <MessageCircle className="h-6 w-6" />
+          <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-background animate-pulse" />
         </button>
       )}
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:justify-end p-0 sm:p-4 bg-background/60 backdrop-blur-sm sm:bg-transparent sm:backdrop-blur-0">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:justify-end p-0 sm:p-4 bg-background/60 backdrop-blur-sm sm:bg-transparent sm:backdrop-blur-0 animate-fade-in">
           <div
             className="absolute inset-0 sm:hidden"
             onClick={() => setOpen(false)}
           />
-          <div className="relative w-full sm:w-[400px] h-[85vh] sm:h-[600px] bg-card border border-border rounded-t-2xl sm:rounded-2xl shadow-elevated flex flex-col overflow-hidden animate-slide-up">
+          <div className={cn(
+            'relative w-full sm:w-[420px] h-[85vh] sm:h-[640px] max-h-[720px]',
+            'bg-card border border-border rounded-t-3xl sm:rounded-3xl',
+            'shadow-elevated flex flex-col overflow-hidden animate-scale-in',
+          )}>
             {/* Header */}
-            <div className="flex items-center justify-between p-3 border-b bg-[hsl(174,55%,22%)] text-primary-foreground">
-              <div className="flex items-center gap-2">
-                <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
-                  <MessageCircle className="h-5 w-5" />
+            <div className="flex items-center justify-between px-4 py-3 border-b bg-[hsl(174,55%,22%)] text-primary-foreground">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="h-10 w-10 rounded-2xl bg-white/15 flex items-center justify-center backdrop-blur">
+                    <MessageCircle className="h-5 w-5" />
+                  </div>
+                  <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-[hsl(174,55%,22%)]" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-sm">myCortes Helper</h3>
-                  <p className="text-xs opacity-90">Always here to help</p>
+                  <h3 className="font-semibold text-sm leading-tight">myCortes Helper</h3>
+                  <p className="text-[11px] opacity-90 flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 inline-block" />
+                    Always here to help
+                  </p>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => setOpen(false)} className="text-primary-foreground hover:bg-white/20 h-8 w-8">
-                <ChevronDown className="h-5 w-5" />
-              </Button>
+              <div className="flex items-center gap-1">
+                {tab === 'ai' && aiMessages.length > 1 && (
+                  <Button
+                    variant="ghost" size="icon"
+                    onClick={clearAi}
+                    className="text-primary-foreground hover:bg-white/20 h-8 w-8"
+                    aria-label="Clear chat"
+                    title="Clear chat"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost" size="icon"
+                  onClick={() => setOpen(false)}
+                  className="text-primary-foreground hover:bg-white/20 h-8 w-8"
+                  aria-label="Minimize chat"
+                >
+                  <ChevronDown className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
 
             <Tabs value={tab} onValueChange={(v) => setTab(v as 'ai' | 'staff')} className="flex-1 flex flex-col overflow-hidden">
-              <TabsList className="grid grid-cols-2 m-2 mb-0">
-                <TabsTrigger value="ai" className="gap-1.5"><Bot className="h-4 w-4" /> AI Assistant</TabsTrigger>
-                <TabsTrigger value="staff" className="gap-1.5"><Headphones className="h-4 w-4" /> Admin/Staff</TabsTrigger>
+              <TabsList className="grid grid-cols-2 mx-3 mt-3 mb-0 rounded-xl">
+                <TabsTrigger value="ai" className="gap-1.5 rounded-lg"><Bot className="h-4 w-4" /> AI Assistant</TabsTrigger>
+                <TabsTrigger value="staff" className="gap-1.5 rounded-lg"><Headphones className="h-4 w-4" /> Admin/Staff</TabsTrigger>
               </TabsList>
 
               {/* AI tab */}
-              <TabsContent value="ai" className="flex-1 flex flex-col overflow-hidden m-0 mt-2">
-                <div ref={aiScrollRef} className="flex-1 px-3 overflow-y-auto">
+              <TabsContent value="ai" className="flex-1 flex flex-col overflow-hidden m-0 mt-3">
+                <div ref={aiScrollRef} className="flex-1 px-3 overflow-y-auto scroll-smooth">
                   <div className="space-y-3 py-2">
                     {aiMessages.map((m, i) => (
-                      <div key={i} className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
+                      <div
+                        key={i}
+                        className={cn(
+                          'flex flex-col animate-fade-in',
+                          m.role === 'user' ? 'items-end' : 'items-start',
+                        )}
+                      >
                         <div className={cn(
-                          'max-w-[85%] rounded-2xl px-3 py-2 text-sm',
+                          'max-w-[85%] px-3.5 py-2.5 text-sm shadow-sm',
                           m.role === 'user'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted'
+                            ? 'bg-[hsl(174,55%,22%)] text-primary-foreground rounded-2xl rounded-br-md'
+                            : 'bg-muted text-foreground rounded-2xl rounded-bl-md',
                         )}>
                           {m.role === 'assistant' ? (
-                            <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1">
-                              {m.content ? (
+                            m.content ? (
+                              <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1">
                                 <ReactMarkdown>{m.content}</ReactMarkdown>
-                              ) : (
-                                <Loader2 className="h-4 w-4 animate-spin opacity-60" />
-                              )}
-                            </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 py-1" aria-label="Assistant is typing">
+                                <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                              </div>
+                            )
                           ) : (
                             <p className="whitespace-pre-wrap">{m.content}</p>
                           )}
                         </div>
+                        <span className="text-[10px] text-muted-foreground mt-1 px-1">
+                          {formatTime(m.ts)}
+                        </span>
                       </div>
                     ))}
+
+                    {showQuickActions && (
+                      <div className="pt-2 pb-1 animate-fade-in">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-2 px-1">
+                          Quick actions
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {QUICK_ACTIONS.map(({ icon: Icon, label, prompt }) => (
+                            <button
+                              key={label}
+                              onClick={() => sendAi(prompt)}
+                              className={cn(
+                                'flex items-center gap-2 px-3 py-2.5 rounded-xl',
+                                'bg-muted/60 hover:bg-muted border border-border/50',
+                                'text-xs font-medium text-left transition-all',
+                                'hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0',
+                              )}
+                            >
+                              <Icon className="h-4 w-4 text-[hsl(174,55%,22%)] shrink-0" />
+                              <span className="truncate">{label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="p-2 border-t bg-card flex gap-2">
-                  <Textarea
-                    value={aiInput}
-                    onChange={(e) => setAiInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        sendAi();
-                      }
-                    }}
-                    placeholder="Ask about services, offices, programs..."
-                    rows={1}
-                    className="resize-none min-h-[40px] max-h-32"
-                    disabled={aiBusy}
-                  />
-                  <Button onClick={sendAi} disabled={!aiInput.trim() || aiBusy} size="icon" className="h-10 w-10 shrink-0">
-                    {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  </Button>
+                <div className="p-3 border-t bg-card">
+                  <div className="flex items-end gap-2 bg-muted/50 rounded-2xl p-1.5 border border-border/60 focus-within:border-primary/50 focus-within:bg-muted/80 transition-colors">
+                    <Textarea
+                      ref={aiTextareaRef}
+                      value={aiInput}
+                      onChange={(e) => setAiInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          sendAi();
+                        }
+                      }}
+                      placeholder="Ask about services, offices, programs..."
+                      rows={1}
+                      className="resize-none min-h-[38px] max-h-32 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-2 py-2 text-sm"
+                      disabled={aiBusy}
+                    />
+                    <Button
+                      onClick={() => sendAi()}
+                      disabled={!aiInput.trim() || aiBusy}
+                      size="icon"
+                      className="h-9 w-9 shrink-0 rounded-xl bg-[hsl(174,55%,22%)] hover:bg-[hsl(174,55%,18%)] transition-transform hover:scale-105 active:scale-95 disabled:hover:scale-100"
+                    >
+                      {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
               </TabsContent>
 
               {/* Staff tab */}
-              <TabsContent value="staff" className="flex-1 flex flex-col overflow-hidden m-0 mt-2">
-                <div className="px-3 py-2 bg-muted/40 border-b text-xs text-muted-foreground">
+              <TabsContent value="staff" className="flex-1 flex flex-col overflow-hidden m-0 mt-3">
+                <div className="mx-3 mb-2 px-3 py-2 bg-muted/50 rounded-xl border border-border/60 text-xs text-muted-foreground">
                   Messages go to municipal staff. They'll reply when available.
                 </div>
-                <div ref={staffScrollRef} className="flex-1 px-3 overflow-y-auto">
+                <div ref={staffScrollRef} className="flex-1 px-3 overflow-y-auto scroll-smooth">
                   <div className="space-y-3 py-2">
                     {staffMessages.length === 0 ? (
                       <div className="text-center text-sm text-muted-foreground py-8">
@@ -300,14 +443,16 @@ export const ChatbotLauncher = () => {
                     ) : staffMessages.map((m) => {
                       const isMine = m.sender_id === user.id;
                       return (
-                        <div key={m.id} className={cn('flex flex-col', isMine ? 'items-end' : 'items-start')}>
+                        <div key={m.id} className={cn('flex flex-col animate-fade-in', isMine ? 'items-end' : 'items-start')}>
                           <div className={cn(
-                            'max-w-[85%] rounded-2xl px-3 py-2 text-sm',
-                            isMine ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                            'max-w-[85%] px-3.5 py-2.5 text-sm shadow-sm',
+                            isMine
+                              ? 'bg-[hsl(174,55%,22%)] text-primary-foreground rounded-2xl rounded-br-md'
+                              : 'bg-muted rounded-2xl rounded-bl-md',
                           )}>
                             <p className="whitespace-pre-wrap">{m.content}</p>
                           </div>
-                          <span className="text-[10px] text-muted-foreground mt-0.5 px-1">
+                          <span className="text-[10px] text-muted-foreground mt-1 px-1">
                             {!isMine && <span className="font-medium text-primary">Staff · </span>}
                             {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
                           </span>
@@ -316,24 +461,31 @@ export const ChatbotLauncher = () => {
                     })}
                   </div>
                 </div>
-                <div className="p-2 border-t bg-card flex gap-2">
-                  <Textarea
-                    value={staffInput}
-                    onChange={(e) => setStaffInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        sendStaff();
-                      }
-                    }}
-                    placeholder="Type your message to staff..."
-                    rows={1}
-                    className="resize-none min-h-[40px] max-h-32"
-                    disabled={!staffThreadId}
-                  />
-                  <Button onClick={sendStaff} disabled={!staffInput.trim() || !staffThreadId} size="icon" className="h-10 w-10 shrink-0">
-                    <Send className="h-4 w-4" />
-                  </Button>
+                <div className="p-3 border-t bg-card">
+                  <div className="flex items-end gap-2 bg-muted/50 rounded-2xl p-1.5 border border-border/60 focus-within:border-primary/50 focus-within:bg-muted/80 transition-colors">
+                    <Textarea
+                      value={staffInput}
+                      onChange={(e) => setStaffInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          sendStaff();
+                        }
+                      }}
+                      placeholder="Type your message to staff..."
+                      rows={1}
+                      className="resize-none min-h-[38px] max-h-32 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-2 py-2 text-sm"
+                      disabled={!staffThreadId}
+                    />
+                    <Button
+                      onClick={sendStaff}
+                      disabled={!staffInput.trim() || !staffThreadId}
+                      size="icon"
+                      className="h-9 w-9 shrink-0 rounded-xl bg-[hsl(174,55%,22%)] hover:bg-[hsl(174,55%,18%)] transition-transform hover:scale-105 active:scale-95 disabled:hover:scale-100"
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>
