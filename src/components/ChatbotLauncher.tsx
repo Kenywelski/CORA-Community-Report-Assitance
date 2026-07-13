@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import {
-  MessageCircle, X, Send, Bot, Headphones, Loader2, ChevronDown,
-  Trash2, FileText, AlertTriangle, Phone, Sparkles, Building2, HelpCircle,
+  MessageCircle, Send, Bot, Headphones, Loader2, ChevronDown,
+  Trash2, FileText, AlertTriangle, Phone, Megaphone, Building2, HelpCircle,
+  Mic, ImagePlus, Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 
 import { useAuth } from '@/hooks/useAuth';
@@ -24,26 +24,27 @@ const AUTH_ROUTES = ['/auth', '/login', '/register', '/signup', '/forgot-passwor
 const WELCOME: AiMsg = {
   role: 'assistant',
   ts: Date.now(),
-  content: "Hi! I'm **myCortes Assistant** 👋\n\nAsk me about municipal services, programs, emergency contacts, or how to use the app. For specific case help, switch to the **Admin/Staff** tab.",
+  content: '__WELCOME_CARD__',
 };
 
 const QUICK_ACTIONS = [
-  { icon: FileText, label: 'Request Services', prompt: 'How do I request a municipal service or document?' },
   { icon: AlertTriangle, label: 'Report an Issue', prompt: 'How do I report a community issue?' },
   { icon: Phone, label: 'Emergency Contacts', prompt: 'What are the emergency contact numbers in Cortes?' },
-  { icon: Sparkles, label: 'Municipal Programs', prompt: 'What programs does the municipality offer?' },
-  { icon: Building2, label: 'Office Directory', prompt: 'List the municipal offices and what they do.' },
+  { icon: Building2, label: 'Municipal Offices', prompt: 'List the municipal offices and what they do.' },
+  { icon: FileText, label: 'Request Documents', prompt: 'How do I request a municipal document or service?' },
+  { icon: Megaphone, label: 'Announcements', prompt: 'What are the latest announcements from the municipality?' },
   { icon: HelpCircle, label: 'FAQs', prompt: 'What are frequently asked questions about myCortes?' },
 ];
 
-const STORAGE_KEY = 'mycortes-chat-ai-v1';
+const STORAGE_KEY = 'mycortes-chat-ai-v2';
 const OPEN_KEY = 'mycortes-chat-open-v1';
+const TEAL = 'hsl(174,55%,22%)';
+const TEAL_DARK = 'hsl(174,55%,16%)';
 
 const formatTime = (ts: number) =>
   new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
 export const ChatbotLauncher = () => {
-  const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -59,7 +60,6 @@ export const ChatbotLauncher = () => {
   });
   const [tab, setTab] = useState<'ai' | 'staff'>('ai');
 
-  // ===== AI chat state (persisted) =====
   const [aiMessages, setAiMessages] = useState<AiMsg[]>(() => {
     if (typeof window === 'undefined') return [WELCOME];
     try {
@@ -74,14 +74,14 @@ export const ChatbotLauncher = () => {
   const [aiInput, setAiInput] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const aiScrollRef = useRef<HTMLDivElement>(null);
+  const aiEndRef = useRef<HTMLDivElement>(null);
   const aiTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // ===== Staff chat state =====
   const [staffInput, setStaffInput] = useState('');
   const [staffThreadId, setStaffThreadId] = useState<string | null>(null);
   const staffScrollRef = useRef<HTMLDivElement>(null);
+  const staffEndRef = useRef<HTMLDivElement>(null);
 
-  // Persist AI messages + open state
   useEffect(() => {
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(aiMessages)); } catch { /* noop */ }
   }, [aiMessages]);
@@ -89,7 +89,6 @@ export const ChatbotLauncher = () => {
     try { window.localStorage.setItem(OPEN_KEY, open ? '1' : '0'); } catch { /* noop */ }
   }, [open]);
 
-  // Load or create staff thread when tab opens
   useEffect(() => {
     if (!user || tab !== 'staff' || staffThreadId) return;
     (async () => {
@@ -115,7 +114,7 @@ export const ChatbotLauncher = () => {
     })();
   }, [user, tab, staffThreadId]);
 
-  const { data: staffMessages = [] } = useQuery({
+  const { data: staffMessages = [], isLoading: staffLoading } = useQuery({
     queryKey: ['staff-thread-messages', staffThreadId],
     queryFn: async (): Promise<StaffMsg[]> => {
       if (!staffThreadId) return [];
@@ -141,15 +140,13 @@ export const ChatbotLauncher = () => {
     return () => { supabase.removeChannel(ch); };
   }, [staffThreadId, queryClient]);
 
-  // Auto-scroll
   useEffect(() => {
-    if (aiScrollRef.current) aiScrollRef.current.scrollTop = aiScrollRef.current.scrollHeight;
+    aiEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [aiMessages, aiBusy]);
   useEffect(() => {
-    if (staffScrollRef.current) staffScrollRef.current.scrollTop = staffScrollRef.current.scrollHeight;
+    staffEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [staffMessages]);
 
-  // Focus textarea on open / after sending
   useEffect(() => {
     if (open && tab === 'ai') {
       requestAnimationFrame(() => aiTextareaRef.current?.focus());
@@ -160,11 +157,11 @@ export const ChatbotLauncher = () => {
     const text = (overrideText ?? aiInput).trim();
     if (!text || aiBusy) return;
     const userMsg: AiMsg = { role: 'user', content: text, ts: Date.now() };
-    const next = [...aiMessages, userMsg];
+    const base = aiMessages.filter((m) => m.content !== '__WELCOME_CARD__');
+    const next = [...base, userMsg];
     setAiMessages(next);
     setAiInput('');
     setAiBusy(true);
-    // Optimistic empty assistant message
     setAiMessages([...next, { role: 'assistant', content: '', ts: Date.now() }]);
 
     try {
@@ -212,7 +209,7 @@ export const ChatbotLauncher = () => {
                 return copy;
               });
             }
-          } catch { /* ignore malformed chunk */ }
+          } catch { /* ignore */ }
         }
       }
     } catch (e) {
@@ -250,13 +247,10 @@ export const ChatbotLauncher = () => {
       .eq('id', staffThreadId);
   };
 
-  // Hide entirely on auth-related routes
   if (isAuthRoute) return null;
-
-  // Not signed in — hide widget (only authenticated users can access)
   if (!user) return null;
 
-  const showQuickActions = aiMessages.length <= 1 && !aiBusy;
+  const showWelcome = aiMessages.length === 1 && aiMessages[0].content === '__WELCOME_CARD__';
 
   return (
     <>
@@ -265,11 +259,12 @@ export const ChatbotLauncher = () => {
           onClick={() => setOpen(true)}
           className={cn(
             'fixed bottom-24 right-4 lg:bottom-6 z-40 h-14 w-14 rounded-2xl',
-            'bg-[hsl(174,55%,22%)] text-primary-foreground shadow-elevated',
+            'text-primary-foreground shadow-elevated',
             'flex items-center justify-center transition-all duration-300',
             'hover:scale-110 hover:shadow-2xl active:scale-95',
             'animate-scale-in',
           )}
+          style={{ backgroundColor: TEAL }}
           aria-label="Open chatbot"
         >
           <MessageCircle className="h-6 w-6" />
@@ -284,29 +279,33 @@ export const ChatbotLauncher = () => {
             onClick={() => setOpen(false)}
           />
           <div className={cn(
-            'relative w-full sm:w-[420px] h-[85vh] sm:h-[640px] max-h-[720px]',
-            'bg-card border border-border rounded-t-3xl sm:rounded-3xl',
+            'relative w-full sm:w-[420px]',
+            'h-[100dvh] sm:h-[min(680px,90vh)]',
+            'bg-card border border-border sm:rounded-3xl rounded-t-3xl',
             'shadow-elevated flex flex-col overflow-hidden animate-scale-in',
           )}>
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b bg-[hsl(174,55%,22%)] text-primary-foreground">
+            <div
+              className="flex items-center justify-between px-4 py-3 text-primary-foreground shrink-0"
+              style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_DARK})` }}
+            >
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <div className="h-10 w-10 rounded-2xl bg-white/15 flex items-center justify-center backdrop-blur">
-                    <MessageCircle className="h-5 w-5" />
+                  <div className="h-11 w-11 rounded-2xl bg-white/15 flex items-center justify-center backdrop-blur ring-1 ring-white/20">
+                    <Bot className="h-6 w-6" />
                   </div>
-                  <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-[hsl(174,55%,22%)]" />
+                  <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-[hsl(174,55%,18%)] animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-sm leading-tight">myCortes Helper</h3>
-                  <p className="text-[11px] opacity-90 flex items-center gap-1">
+                  <h3 className="font-semibold text-[15px] leading-tight">myCortes AI Assistant</h3>
+                  <p className="text-[11px] opacity-90 flex items-center gap-1.5 mt-0.5">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 inline-block" />
-                    Always here to help
+                    Always ready to help
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                {tab === 'ai' && aiMessages.length > 1 && (
+                {tab === 'ai' && !showWelcome && (
                   <Button
                     variant="ghost" size="icon"
                     onClick={clearAi}
@@ -328,17 +327,93 @@ export const ChatbotLauncher = () => {
               </div>
             </div>
 
-            <Tabs value={tab} onValueChange={(v) => setTab(v as 'ai' | 'staff')} className="flex-1 flex flex-col overflow-hidden">
-              <TabsList className="grid grid-cols-2 mx-3 mt-3 mb-0 rounded-xl">
-                <TabsTrigger value="ai" className="gap-1.5 rounded-lg"><Bot className="h-4 w-4" /> AI Assistant</TabsTrigger>
-                <TabsTrigger value="staff" className="gap-1.5 rounded-lg"><Headphones className="h-4 w-4" /> Admin/Staff</TabsTrigger>
-              </TabsList>
+            {/* Segmented tabs */}
+            <div className="px-3 pt-3 pb-2 shrink-0">
+              <div className="relative grid grid-cols-2 bg-muted rounded-xl p-1 h-10">
+                <div
+                  className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-lg shadow-sm transition-all duration-300 ease-out"
+                  style={{
+                    backgroundColor: 'hsl(var(--card))',
+                    transform: tab === 'ai' ? 'translateX(4px)' : 'translateX(calc(100% + 4px))',
+                  }}
+                />
+                <button
+                  onClick={() => setTab('ai')}
+                  className={cn(
+                    'relative z-10 flex items-center justify-center gap-1.5 text-xs font-medium rounded-lg transition-colors',
+                    tab === 'ai' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <Bot className="h-3.5 w-3.5" /> AI Assistant
+                </button>
+                <button
+                  onClick={() => setTab('staff')}
+                  className={cn(
+                    'relative z-10 flex items-center justify-center gap-1.5 text-xs font-medium rounded-lg transition-colors',
+                    tab === 'staff' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <Headphones className="h-3.5 w-3.5" /> Admin/Staff
+                </button>
+              </div>
+            </div>
 
-              {/* AI tab */}
-              <TabsContent value="ai" className="flex-1 flex flex-col overflow-hidden m-0 mt-3">
-                <div ref={aiScrollRef} className="flex-1 px-3 overflow-y-auto scroll-smooth">
-                  <div className="space-y-3 py-2">
-                    {aiMessages.map((m, i) => (
+            {/* AI tab */}
+            {tab === 'ai' && (
+              <div className="flex-1 flex flex-col min-h-0">
+                <div ref={aiScrollRef} className="flex-1 min-h-0 overflow-y-auto scroll-smooth px-4 py-2">
+                  <div className="space-y-4">
+                    {showWelcome && (
+                      <div className="animate-fade-in">
+                        <div
+                          className="relative rounded-2xl p-5 text-primary-foreground overflow-hidden shadow-md"
+                          style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_DARK})` }}
+                        >
+                          <div className="absolute -top-6 -right-6 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
+                          <div className="relative flex items-start gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center shrink-0 ring-1 ring-white/20">
+                              <Sparkles className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-base leading-tight">Welcome to myCortes</h4>
+                              <p className="text-[13px] opacity-90 mt-1 leading-relaxed">
+                                I can help you with municipal services, emergency info, announcements, and how to navigate the app.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4">
+                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-2 px-1">
+                            Quick actions
+                          </p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {QUICK_ACTIONS.map(({ icon: Icon, label, prompt }) => (
+                              <button
+                                key={label}
+                                onClick={() => sendAi(prompt)}
+                                className={cn(
+                                  'group flex items-center gap-2 px-3 py-3 rounded-xl',
+                                  'bg-card border border-border/70',
+                                  'text-xs font-medium text-left transition-all',
+                                  'hover:border-primary/40 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0',
+                                )}
+                              >
+                                <span
+                                  className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-colors"
+                                  style={{ backgroundColor: 'hsl(174,55%,22%,0.08)' }}
+                                >
+                                  <Icon className="h-4 w-4" style={{ color: TEAL }} />
+                                </span>
+                                <span className="truncate leading-tight">{label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {!showWelcome && aiMessages.map((m, i) => (
                       <div
                         key={i}
                         className={cn(
@@ -346,62 +421,61 @@ export const ChatbotLauncher = () => {
                           m.role === 'user' ? 'items-end' : 'items-start',
                         )}
                       >
-                        <div className={cn(
-                          'max-w-[85%] px-3.5 py-2.5 text-sm shadow-sm',
-                          m.role === 'user'
-                            ? 'bg-[hsl(174,55%,22%)] text-primary-foreground rounded-2xl rounded-br-md'
-                            : 'bg-muted text-foreground rounded-2xl rounded-bl-md',
-                        )}>
-                          {m.role === 'assistant' ? (
-                            m.content ? (
-                              <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1">
-                                <ReactMarkdown>{m.content}</ReactMarkdown>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1 py-1" aria-label="Assistant is typing">
-                                <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '0ms' }} />
-                                <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '150ms' }} />
-                                <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '300ms' }} />
-                              </div>
-                            )
-                          ) : (
-                            <p className="whitespace-pre-wrap">{m.content}</p>
+                        <div className="flex items-end gap-2 max-w-[88%]">
+                          {m.role === 'assistant' && (
+                            <div
+                              className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-primary-foreground"
+                              style={{ backgroundColor: TEAL }}
+                            >
+                              <Bot className="h-3.5 w-3.5" />
+                            </div>
                           )}
+                          <div
+                            className={cn(
+                              'px-4 py-2.5 text-[14px] leading-relaxed shadow-sm',
+                              m.role === 'user'
+                                ? 'text-primary-foreground rounded-2xl rounded-br-md'
+                                : 'bg-muted text-foreground rounded-2xl rounded-bl-md',
+                            )}
+                            style={m.role === 'user' ? { backgroundColor: TEAL } : undefined}
+                          >
+                            {m.role === 'assistant' ? (
+                              m.content ? (
+                                <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1">
+                                  <ReactMarkdown>{m.content}</ReactMarkdown>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1 py-1" aria-label="Assistant is typing">
+                                  <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                  <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                  <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                </div>
+                              )
+                            ) : (
+                              <p className="whitespace-pre-wrap">{m.content}</p>
+                            )}
+                          </div>
                         </div>
-                        <span className="text-[10px] text-muted-foreground mt-1 px-1">
+                        <span className={cn('text-[10px] text-muted-foreground mt-1', m.role === 'user' ? 'pr-1' : 'pl-9')}>
                           {formatTime(m.ts)}
                         </span>
                       </div>
                     ))}
-
-                    {showQuickActions && (
-                      <div className="pt-2 pb-1 animate-fade-in">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium mb-2 px-1">
-                          Quick actions
-                        </p>
-                        <div className="grid grid-cols-2 gap-2">
-                          {QUICK_ACTIONS.map(({ icon: Icon, label, prompt }) => (
-                            <button
-                              key={label}
-                              onClick={() => sendAi(prompt)}
-                              className={cn(
-                                'flex items-center gap-2 px-3 py-2.5 rounded-xl',
-                                'bg-muted/60 hover:bg-muted border border-border/50',
-                                'text-xs font-medium text-left transition-all',
-                                'hover:shadow-sm hover:-translate-y-0.5 active:translate-y-0',
-                              )}
-                            >
-                              <Icon className="h-4 w-4 text-[hsl(174,55%,22%)] shrink-0" />
-                              <span className="truncate">{label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    <div ref={aiEndRef} />
                   </div>
                 </div>
-                <div className="p-3 border-t bg-card">
-                  <div className="flex items-end gap-2 bg-muted/50 rounded-2xl p-1.5 border border-border/60 focus-within:border-primary/50 focus-within:bg-muted/80 transition-colors">
+
+                <div className="p-3 border-t bg-card/80 backdrop-blur shrink-0">
+                  <div className="flex items-end gap-2 bg-muted/60 rounded-2xl px-2 py-1.5 border border-border/60 focus-within:border-primary/50 focus-within:bg-muted transition-colors">
+                    <button
+                      type="button"
+                      className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors"
+                      aria-label="Attach image"
+                      title="Attach image (coming soon)"
+                      onClick={() => toast.info('Image uploads coming soon')}
+                    >
+                      <ImagePlus className="h-4 w-4" />
+                    </button>
                     <Textarea
                       ref={aiTextareaRef}
                       value={aiInput}
@@ -412,44 +486,70 @@ export const ChatbotLauncher = () => {
                           sendAi();
                         }
                       }}
-                      placeholder="Ask about services, offices, programs..."
+                      placeholder="Ask me anything…"
                       rows={1}
-                      className="resize-none min-h-[38px] max-h-32 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-2 py-2 text-sm"
+                      className="resize-none min-h-[38px] max-h-32 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-1 py-2 text-sm"
                       disabled={aiBusy}
                     />
+                    <button
+                      type="button"
+                      className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors"
+                      aria-label="Voice input"
+                      title="Voice input (coming soon)"
+                      onClick={() => toast.info('Voice input coming soon')}
+                    >
+                      <Mic className="h-4 w-4" />
+                    </button>
                     <Button
                       onClick={() => sendAi()}
                       disabled={!aiInput.trim() || aiBusy}
                       size="icon"
-                      className="h-9 w-9 shrink-0 rounded-xl bg-[hsl(174,55%,22%)] hover:bg-[hsl(174,55%,18%)] transition-transform hover:scale-105 active:scale-95 disabled:hover:scale-100"
+                      className="h-9 w-9 shrink-0 rounded-xl transition-transform hover:scale-105 active:scale-95 disabled:hover:scale-100 text-primary-foreground"
+                      style={{ backgroundColor: TEAL }}
                     >
                       {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                     </Button>
                   </div>
+                  <p className="text-[10px] text-muted-foreground text-center mt-1.5">
+                    AI can make mistakes. Verify important info.
+                  </p>
                 </div>
-              </TabsContent>
+              </div>
+            )}
 
-              {/* Staff tab */}
-              <TabsContent value="staff" className="flex-1 flex flex-col overflow-hidden m-0 mt-3">
-                <div className="mx-3 mb-2 px-3 py-2 bg-muted/50 rounded-xl border border-border/60 text-xs text-muted-foreground">
+            {/* Staff tab */}
+            {tab === 'staff' && (
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="mx-3 mb-2 px-3 py-2 bg-muted/50 rounded-xl border border-border/60 text-xs text-muted-foreground shrink-0">
                   Messages go to municipal staff. They'll reply when available.
                 </div>
-                <div ref={staffScrollRef} className="flex-1 px-3 overflow-y-auto scroll-smooth">
-                  <div className="space-y-3 py-2">
-                    {staffMessages.length === 0 ? (
-                      <div className="text-center text-sm text-muted-foreground py-8">
+                <div ref={staffScrollRef} className="flex-1 min-h-0 overflow-y-auto scroll-smooth px-4 py-2">
+                  <div className="space-y-3">
+                    {staffLoading ? (
+                      <div className="space-y-3">
+                        {[...Array(3)].map((_, i) => (
+                          <div key={i} className={cn('flex', i % 2 ? 'justify-end' : 'justify-start')}>
+                            <div className="h-10 w-40 rounded-2xl bg-muted animate-pulse" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : staffMessages.length === 0 ? (
+                      <div className="text-center text-sm text-muted-foreground py-10">
                         No messages yet. Start by saying hello 👋
                       </div>
                     ) : staffMessages.map((m) => {
                       const isMine = m.sender_id === user.id;
                       return (
                         <div key={m.id} className={cn('flex flex-col animate-fade-in', isMine ? 'items-end' : 'items-start')}>
-                          <div className={cn(
-                            'max-w-[85%] px-3.5 py-2.5 text-sm shadow-sm',
-                            isMine
-                              ? 'bg-[hsl(174,55%,22%)] text-primary-foreground rounded-2xl rounded-br-md'
-                              : 'bg-muted rounded-2xl rounded-bl-md',
-                          )}>
+                          <div
+                            className={cn(
+                              'max-w-[85%] px-4 py-2.5 text-[14px] leading-relaxed shadow-sm',
+                              isMine
+                                ? 'text-primary-foreground rounded-2xl rounded-br-md'
+                                : 'bg-muted rounded-2xl rounded-bl-md',
+                            )}
+                            style={isMine ? { backgroundColor: TEAL } : undefined}
+                          >
                             <p className="whitespace-pre-wrap">{m.content}</p>
                           </div>
                           <span className="text-[10px] text-muted-foreground mt-1 px-1">
@@ -459,10 +559,11 @@ export const ChatbotLauncher = () => {
                         </div>
                       );
                     })}
+                    <div ref={staffEndRef} />
                   </div>
                 </div>
-                <div className="p-3 border-t bg-card">
-                  <div className="flex items-end gap-2 bg-muted/50 rounded-2xl p-1.5 border border-border/60 focus-within:border-primary/50 focus-within:bg-muted/80 transition-colors">
+                <div className="p-3 border-t bg-card/80 backdrop-blur shrink-0">
+                  <div className="flex items-end gap-2 bg-muted/60 rounded-2xl px-2 py-1.5 border border-border/60 focus-within:border-primary/50 focus-within:bg-muted transition-colors">
                     <Textarea
                       value={staffInput}
                       onChange={(e) => setStaffInput(e.target.value)}
@@ -472,7 +573,7 @@ export const ChatbotLauncher = () => {
                           sendStaff();
                         }
                       }}
-                      placeholder="Type your message to staff..."
+                      placeholder="Type your message to staff…"
                       rows={1}
                       className="resize-none min-h-[38px] max-h-32 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-2 py-2 text-sm"
                       disabled={!staffThreadId}
@@ -481,14 +582,15 @@ export const ChatbotLauncher = () => {
                       onClick={sendStaff}
                       disabled={!staffInput.trim() || !staffThreadId}
                       size="icon"
-                      className="h-9 w-9 shrink-0 rounded-xl bg-[hsl(174,55%,22%)] hover:bg-[hsl(174,55%,18%)] transition-transform hover:scale-105 active:scale-95 disabled:hover:scale-100"
+                      className="h-9 w-9 shrink-0 rounded-xl transition-transform hover:scale-105 active:scale-95 disabled:hover:scale-100 text-primary-foreground"
+                      style={{ backgroundColor: TEAL }}
                     >
                       <Send className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
-              </TabsContent>
-            </Tabs>
+              </div>
+            )}
           </div>
         </div>
       )}
