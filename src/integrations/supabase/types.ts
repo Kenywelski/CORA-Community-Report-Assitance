@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_logs: {
+        Row: {
+          action: string
+          actor: string
+          confidence: number | null
+          created_at: string
+          decision: string | null
+          department_id: string | null
+          id: string
+          metadata: Json
+          reasoning: string | null
+          report_id: string | null
+        }
+        Insert: {
+          action: string
+          actor?: string
+          confidence?: number | null
+          created_at?: string
+          decision?: string | null
+          department_id?: string | null
+          id?: string
+          metadata?: Json
+          reasoning?: string | null
+          report_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor?: string
+          confidence?: number | null
+          created_at?: string
+          decision?: string | null
+          department_id?: string | null
+          id?: string
+          metadata?: Json
+          reasoning?: string | null
+          report_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_logs_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_logs_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "service_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       announcements: {
         Row: {
           content: string
@@ -118,6 +172,80 @@ export type Database = {
           status?: string
           title?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      complaint_categories: {
+        Row: {
+          created_at: string
+          default_department_id: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          keywords: string[]
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_department_id?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          keywords?: string[]
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_department_id?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          keywords?: string[]
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "complaint_categories_default_department_id_fkey"
+            columns: ["default_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      departments: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          response_hours: number
+          slug: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          response_hours?: number
+          slug?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          response_hours?: number
+          slug?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -475,12 +603,25 @@ export type Database = {
       }
       service_requests: {
         Row: {
+          acknowledged_at: string | null
+          action_taken: string | null
           admin_notes: string | null
+          admin_overridden: boolean
+          ai_category: string | null
+          ai_confidence: number | null
+          ai_department_id: string | null
+          ai_priority: string | null
+          ai_processed_at: string | null
+          ai_reason: string | null
           assigned_department: string | null
           assigned_to: string | null
           category: string
+          category_id: string | null
           created_at: string
+          department_id: string | null
           description: string
+          due_at: string | null
+          escalated_at: string | null
           id: string
           is_public: boolean
           latitude: number | null
@@ -490,6 +631,7 @@ export type Database = {
           media_urls: string[] | null
           photo_url: string | null
           reporter_name: string | null
+          requires_review: boolean
           resolved_at: string | null
           response_at: string | null
           status: Database["public"]["Enums"]["request_status"]
@@ -498,12 +640,25 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          acknowledged_at?: string | null
+          action_taken?: string | null
           admin_notes?: string | null
+          admin_overridden?: boolean
+          ai_category?: string | null
+          ai_confidence?: number | null
+          ai_department_id?: string | null
+          ai_priority?: string | null
+          ai_processed_at?: string | null
+          ai_reason?: string | null
           assigned_department?: string | null
           assigned_to?: string | null
           category: string
+          category_id?: string | null
           created_at?: string
+          department_id?: string | null
           description: string
+          due_at?: string | null
+          escalated_at?: string | null
           id?: string
           is_public?: boolean
           latitude?: number | null
@@ -513,6 +668,7 @@ export type Database = {
           media_urls?: string[] | null
           photo_url?: string | null
           reporter_name?: string | null
+          requires_review?: boolean
           resolved_at?: string | null
           response_at?: string | null
           status?: Database["public"]["Enums"]["request_status"]
@@ -521,12 +677,25 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          acknowledged_at?: string | null
+          action_taken?: string | null
           admin_notes?: string | null
+          admin_overridden?: boolean
+          ai_category?: string | null
+          ai_confidence?: number | null
+          ai_department_id?: string | null
+          ai_priority?: string | null
+          ai_processed_at?: string | null
+          ai_reason?: string | null
           assigned_department?: string | null
           assigned_to?: string | null
           category?: string
+          category_id?: string | null
           created_at?: string
+          department_id?: string | null
           description?: string
+          due_at?: string | null
+          escalated_at?: string | null
           id?: string
           is_public?: boolean
           latitude?: number | null
@@ -536,12 +705,94 @@ export type Database = {
           media_urls?: string[] | null
           photo_url?: string | null
           reporter_name?: string | null
+          requires_review?: boolean
           resolved_at?: string | null
           response_at?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           title?: string
           updated_at?: string
           user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_requests_ai_department_id_fkey"
+            columns: ["ai_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_requests_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "complaint_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_requests_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_members: {
+        Row: {
+          created_at: string
+          department_id: string | null
+          id: string
+          is_active: boolean
+          position: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          is_active?: boolean
+          position?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          is_active?: boolean
+          position?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_members_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      system_settings: {
+        Row: {
+          description: string | null
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          updated_at?: string
+          value?: Json
         }
         Relationships: []
       }
@@ -650,7 +901,7 @@ export type Database = {
     }
     Enums: {
       announcement_type: "general" | "urgent" | "event"
-      app_role: "admin" | "moderator" | "user"
+      app_role: "admin" | "moderator" | "user" | "staff"
       post_type: "report" | "announcement" | "project"
       request_status:
         | "pending"
@@ -788,7 +1039,7 @@ export const Constants = {
   public: {
     Enums: {
       announcement_type: ["general", "urgent", "event"],
-      app_role: ["admin", "moderator", "user"],
+      app_role: ["admin", "moderator", "user", "staff"],
       post_type: ["report", "announcement", "project"],
       request_status: [
         "pending",
