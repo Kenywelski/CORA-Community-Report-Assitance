@@ -891,6 +891,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_staff_department: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -898,6 +899,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_active_staff: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       announcement_type: "general" | "urgent" | "event"
