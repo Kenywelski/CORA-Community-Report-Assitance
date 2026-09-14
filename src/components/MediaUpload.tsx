@@ -54,7 +54,12 @@ export const MediaUpload = ({
       }
       try {
         const ext = file.name.split('.').pop();
-        const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          toast.error('Please sign in to upload files');
+          break;
+        }
+        const path = `${folder}/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
         const { error } = await supabase.storage.from(bucket).upload(path, file, {
           contentType: file.type,
           upsert: false,
