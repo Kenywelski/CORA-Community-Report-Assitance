@@ -1,21 +1,20 @@
 import { useNavigate } from 'react-router-dom';
 import { 
-  FileText, AlertCircle, Calendar, MessageSquare, 
-  MapPin, Siren, Heart, Compass
+  AlertCircle, ClipboardList, MessageSquare, Newspaper,
+  MapPin, Siren, Heart
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from 'sonner';
 
 const services = [
-  { icon: FileText, label: "Request Service", color: "text-primary", bgColor: "bg-secondary", path: "/request-service", requiresAuth: true },
   { icon: AlertCircle, label: "Report Issue", color: "text-accent", bgColor: "bg-accent/10", path: "/report-issue", requiresAuth: false },
-  { icon: Calendar, label: "Events", color: "text-success", bgColor: "bg-success/10", path: "/events", requiresAuth: false },
+  { icon: ClipboardList, label: "My Reports", color: "text-primary", bgColor: "bg-secondary", path: "/my-requests", requiresAuth: true },
+  { icon: Newspaper, label: "Community", color: "text-success", bgColor: "bg-success/10", path: "/community", requiresAuth: false },
+  { icon: Siren, label: "Emergency", color: "text-destructive", bgColor: "bg-destructive/10", path: "/emergency", requiresAuth: false },
   { icon: MessageSquare, label: "Feedback", color: "text-warning", bgColor: "bg-warning/10", path: "/feedback", requiresAuth: true },
   { icon: MapPin, label: "Directory", color: "text-primary", bgColor: "bg-primary/10", path: "/directory", requiresAuth: false },
-  { icon: Siren, label: "Emergency", color: "text-destructive", bgColor: "bg-destructive/10", path: "/emergency", requiresAuth: false },
   { icon: Heart, label: "Programs", color: "text-emergency", bgColor: "bg-emergency/10", path: "/programs", requiresAuth: false },
-  { icon: Compass, label: "Tourism", color: "text-accent", bgColor: "bg-accent/10", path: "/tourist-spots", requiresAuth: false },
 ];
 
 export const QuickServices = () => {
