@@ -27,9 +27,7 @@ const menuItems = [
   { icon: MessageSquare, label: 'Staff Chat', path: '/admin/chat' },
   { icon: Users, label: 'Users', path: '/admin/users' },
   { icon: Megaphone, label: 'Announcements', path: '/admin/announcements' },
-  { icon: CalendarDays, label: 'Events', path: '/admin/events' },
   { icon: Siren, label: 'Emergency Contacts', path: '/admin/emergency-contacts' },
-  { icon: MapPin, label: 'Tourist Spots', path: '/admin/tourist-spots' },
   { icon: MessageSquare, label: 'Feedback', path: '/admin/feedback' },
 ];
 
