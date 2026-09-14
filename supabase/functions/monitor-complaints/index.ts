@@ -1,6 +1,7 @@
 // AI Monitoring Agent: finds complaints that are overdue or stalled, escalates them,
 // notifies admins and department staff, and records the decision in the AI audit log.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { requireUser } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +15,17 @@ Deno.serve(async (req) => {
     new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   try {
+    // Allow a trusted scheduler (shared secret) or an authenticated admin only.
+    const cronSecret = Deno.env.get("MONITOR_CRON_SECRET");
+    const providedSecret = req.headers.get("x-cron-secret");
+    const viaScheduler = !!cronSecret && providedSecret === cronSecret;
+
+    if (!viaScheduler) {
+      const auth = await requireUser(req);
+      if (!auth.ok) return json({ error: auth.error }, auth.status);
+      if (!auth.isAdmin) return json({ error: "Admin access required" }, 403);
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
