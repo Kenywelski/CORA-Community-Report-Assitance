@@ -52,11 +52,6 @@ const AdminDashboard = () => {
       .from('profiles')
       .select('*', { count: 'exact', head: true });
 
-    // Fetch tourist spots count
-    const { count: spotsCount } = await supabase
-      .from('tourist_spots')
-      .select('*', { count: 'exact', head: true });
-
     // Fetch feedback count
     const { count: feedbackCount } = await supabase
       .from('feedback')
@@ -73,7 +68,7 @@ const AdminDashboard = () => {
         pendingRequests: pending,
         completedRequests: completed,
         totalUsers: usersCount || 0,
-        totalSpots: spotsCount || 0,
+        totalSpots: 0,
         totalFeedback: feedbackCount || 0,
       });
 
@@ -115,11 +110,10 @@ const AdminDashboard = () => {
   };
 
   const statCards = [
-    { icon: ClipboardList, label: 'Total Requests', value: stats.totalRequests, color: 'text-primary' },
+    { icon: ClipboardList, label: 'Total Reports', value: stats.totalRequests, color: 'text-primary' },
     { icon: Clock, label: 'Pending', value: stats.pendingRequests, color: 'text-warning' },
-    { icon: CheckCircle, label: 'Completed', value: stats.completedRequests, color: 'text-success' },
+    { icon: CheckCircle, label: 'Resolved', value: stats.completedRequests, color: 'text-success' },
     { icon: Users, label: 'Users', value: stats.totalUsers, color: 'text-accent' },
-    { icon: MapPin, label: 'Tourist Spots', value: stats.totalSpots, color: 'text-primary' },
     { icon: MessageSquare, label: 'Feedback', value: stats.totalFeedback, color: 'text-muted-foreground' },
   ];
 
