@@ -2,6 +2,7 @@
 // Classifies a new report, determines priority, picks a department, logs its reasoning,
 // assigns the report and notifies the department staff.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { requireUser } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +22,9 @@ Deno.serve(async (req) => {
     new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   try {
+    const auth = await requireUser(req);
+    if (!auth.ok) return json({ error: auth.error }, auth.status);
+
     const { report_id } = await req.json() as { report_id?: string };
     if (!report_id) return json({ error: "report_id is required" }, 400);
 
@@ -36,6 +40,14 @@ Deno.serve(async (req) => {
       .eq("id", report_id)
       .maybeSingle();
     if (rErr || !report) return json({ error: "Report not found" }, 404);
+
+    // Only admins/staff, or the citizen who filed the report, may trigger routing.
+    if (!auth.isStaff) {
+      const { data: owner } = await supabase
+        .from("service_requests").select("user_id, ai_processed_at").eq("id", report_id).maybeSingle();
+      if (!owner || owner.user_id !== auth.userId) return json({ error: "Not authorized for this report" }, 403);
+      if (owner.ai_processed_at) return json({ error: "This report has already been routed" }, 409);
+    }
 
     const [{ data: depts }, { data: cats }, { data: settings }] = await Promise.all([
       supabase.from("departments").select("id, name, description, response_hours").eq("is_active", true),

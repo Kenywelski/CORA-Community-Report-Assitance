@@ -4,12 +4,21 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+import { requireUser } from "../_shared/auth.ts";
+
 interface Msg { role: "user" | "assistant" | "system"; content: string }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const auth = await requireUser(req);
+    if (!auth.ok) {
+      return new Response(JSON.stringify({ error: auth.error }), {
+        status: auth.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { messages } = await req.json() as { messages: Msg[] };
     const key = Deno.env.get("LOVABLE_API_KEY");
     if (!key) {

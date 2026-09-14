@@ -167,11 +167,14 @@ export const ChatbotLauncher = () => {
     try {
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Please sign in to use the assistant.');
       const res = await fetch(`${SUPABASE_URL}/functions/v1/chat-ai`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${ANON}`,
+          'apikey': ANON,
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ messages: next.map(({ role, content }) => ({ role, content })) }),
       });
