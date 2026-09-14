@@ -153,10 +153,10 @@ const MyRequests = () => {
                 <ClipboardList className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground">No requests yet</p>
                 <button
-                  onClick={() => navigate('/request-service')}
+                  onClick={() => navigate('/report-issue')}
                   className="text-primary font-medium mt-2 hover:underline"
                 >
-                  Submit your first request
+                  Submit your first report
                 </button>
               </Card>
             ) : (

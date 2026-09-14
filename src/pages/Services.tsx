@@ -4,31 +4,18 @@ import { BottomNav } from '@/components/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import {
-  FileText,
   AlertCircle,
-  Calendar,
+  ClipboardList,
   MessageSquare,
   MapPin,
-  Building2,
   Heart,
-  Wallet,
   Siren,
-  CalendarDays,
   ArrowLeft,
   ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const services = [
-  { 
-    icon: FileText, 
-    label: "Request Document/Service", 
-    description: "Request certificates, permits, IDs online",
-    color: "text-primary", 
-    bgColor: "bg-secondary",
-    path: "/request-service",
-    requiresAuth: true
-  },
   { 
     icon: AlertCircle, 
     label: "Report an Issue", 
@@ -37,6 +24,15 @@ const services = [
     bgColor: "bg-accent/10",
     path: "/report-issue",
     requiresAuth: false
+  },
+  { 
+    icon: ClipboardList, 
+    label: "My Reports", 
+    description: "Track the status of the reports you submitted",
+    color: "text-primary", 
+    bgColor: "bg-secondary",
+    path: "/my-requests",
+    requiresAuth: true
   },
   { 
     icon: Heart, 
@@ -57,15 +53,6 @@ const services = [
     requiresAuth: true
   },
   {
-    icon: CalendarDays,
-    label: "Events",
-    description: "Municipal events, schedules, and activities",
-    color: "text-accent",
-    bgColor: "bg-accent/10",
-    path: "/events",
-    requiresAuth: false
-  },
-  {
     icon: Siren,
     label: "Emergency Contacts",
     description: "Police, Fire, Rescue, Health hotlines for Cortes",
@@ -76,11 +63,11 @@ const services = [
   },
   {
     icon: MapPin,
-    label: "Tourist Spots",
-    description: "Explore Surigao del Sur destinations",
+    label: "Office Directory",
+    description: "Municipal offices, contacts, and schedules",
     color: "text-success",
     bgColor: "bg-success/10",
-    path: "/tourist-spots",
+    path: "/directory",
     requiresAuth: false
   },
 ];
