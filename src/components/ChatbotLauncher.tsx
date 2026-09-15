@@ -50,9 +50,13 @@ export const ChatbotLauncher = () => {
   const queryClient = useQueryClient();
 
   const isAuthRoute = useMemo(
-    () => AUTH_ROUTES.some((r) => location.pathname === r || location.pathname.startsWith(r + '/')),
+    () =>
+      AUTH_ROUTES.some((r) => location.pathname === r || location.pathname.startsWith(r + '/')) ||
+      location.pathname === '/admin' ||
+      location.pathname.startsWith('/admin/'),
     [location.pathname],
   );
+
 
   const [open, setOpen] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
