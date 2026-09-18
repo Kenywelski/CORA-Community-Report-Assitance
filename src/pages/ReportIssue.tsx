@@ -10,6 +10,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ArrowLeft, AlertTriangle, Loader2, CheckCircle, AlertCircle, MapPin } from 'lucide-react';
 import { MediaUpload, MediaItem } from '@/components/MediaUpload';
+import { ComplaintAgentChat } from '@/components/ComplaintAgentChat';
+import { Bot, FileText } from 'lucide-react';
 import { LocationPicker } from '@/components/LocationPicker';
 import { BarangaySelect } from '@/components/BarangaySelect';
 import { z } from 'zod';

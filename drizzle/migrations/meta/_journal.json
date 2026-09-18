@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1789728719265,
+      "tag": "0000_complaint_agent_knowledge_and_admin_fix",
+      "breakpoints": true
+    }
+  ]
+}
