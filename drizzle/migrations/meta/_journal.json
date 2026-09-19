@@ -15,6 +15,13 @@
       "when": 1789813384061,
       "tag": "0001_admin_role_cleanup_and_guest_uploads",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789813530472,
+      "tag": "0002_scope_admin_storage_policies_to_authenticated",
+      "breakpoints": true
     }
   ]
 }
