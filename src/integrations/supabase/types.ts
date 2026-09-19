@@ -640,12 +640,19 @@ export type Database = {
           action_taken: string | null
           admin_notes: string | null
           admin_overridden: boolean
+          admin_review_notes: string | null
+          admin_review_status: string
           ai_category: string | null
           ai_confidence: number | null
           ai_department_id: string | null
           ai_priority: string | null
           ai_processed_at: string | null
           ai_reason: string | null
+          ai_validated_at: string | null
+          ai_validation_confidence: number | null
+          ai_validation_elements: Json
+          ai_validation_reason: string | null
+          ai_validation_status: string
           assigned_department: string | null
           assigned_to: string | null
           category: string
@@ -677,12 +684,19 @@ export type Database = {
           action_taken?: string | null
           admin_notes?: string | null
           admin_overridden?: boolean
+          admin_review_notes?: string | null
+          admin_review_status?: string
           ai_category?: string | null
           ai_confidence?: number | null
           ai_department_id?: string | null
           ai_priority?: string | null
           ai_processed_at?: string | null
           ai_reason?: string | null
+          ai_validated_at?: string | null
+          ai_validation_confidence?: number | null
+          ai_validation_elements?: Json
+          ai_validation_reason?: string | null
+          ai_validation_status?: string
           assigned_department?: string | null
           assigned_to?: string | null
           category: string
@@ -714,12 +728,19 @@ export type Database = {
           action_taken?: string | null
           admin_notes?: string | null
           admin_overridden?: boolean
+          admin_review_notes?: string | null
+          admin_review_status?: string
           ai_category?: string | null
           ai_confidence?: number | null
           ai_department_id?: string | null
           ai_priority?: string | null
           ai_processed_at?: string | null
           ai_reason?: string | null
+          ai_validated_at?: string | null
+          ai_validation_confidence?: number | null
+          ai_validation_elements?: Json
+          ai_validation_reason?: string | null
+          ai_validation_status?: string
           assigned_department?: string | null
           assigned_to?: string | null
           category?: string
