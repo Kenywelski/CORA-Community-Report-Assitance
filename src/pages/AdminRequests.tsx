@@ -446,6 +446,93 @@ const AdminRequests = () => {
                     </SectionCard>
                   )}
 
+                  {/* AI validation */}
+                  {(() => {
+                    const el = (req.ai_validation_elements ?? {}) as Record<string, any>;
+                    const vs = req.ai_validation_status || 'pending';
+                    const vColor = vs === 'valid' ? 'bg-success text-success-foreground'
+                      : vs === 'suspicious' ? 'bg-warning text-warning-foreground'
+                      : vs === 'rejected' ? 'bg-destructive text-destructive-foreground'
+                      : 'bg-muted text-muted-foreground';
+                    const authLabel: Record<string, string> = {
+                      likely_authentic: 'Likely authentic photo',
+                      likely_ai_generated: 'Likely AI-generated image',
+                      uncertain: 'Uncertain',
+                      no_image: 'No image attached',
+                    };
+                    const reviewLabel: Record<string, string> = {
+                      pending: 'Awaiting admin review',
+                      approved: 'Verified by admin',
+                      rejected: 'Marked invalid by admin',
+                      needs_verification: 'Needs further verification',
+                    };
+                    return (
+                      <SectionCard title="AI Validation (assistive only)" icon={CheckCircle}>
+                        <div className="flex flex-wrap items-center gap-2 mb-3">
+                          <Badge className={cn('text-[11px]', vColor)}>
+                            {vs === 'pending' ? 'Not yet validated' : vs.toUpperCase()}
+                          </Badge>
+                          {req.ai_validation_confidence != null && (
+                            <Badge variant="secondary" className="text-[11px]">
+                              Confidence {req.ai_validation_confidence}%
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="text-[11px]">
+                            {reviewLabel[req.admin_review_status] ?? req.admin_review_status}
+                          </Badge>
+                          {req.ai_validated_at && (
+                            <span className="text-[11px] text-muted-foreground">
+                              {format(new Date(req.ai_validated_at), 'MMM d, h:mm a')}
+                            </span>
+                          )}
+                        </div>
+                        {req.ai_validation_reason && (
+                          <p className="text-sm mb-3">{req.ai_validation_reason}</p>
+                        )}
+                        <div className="grid sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
+                          {el.description && <p><strong className="text-foreground">Description:</strong> {el.description}</p>}
+                          {el.location && <p><strong className="text-foreground">Location:</strong> {el.location}</p>}
+                          {el.image && <p><strong className="text-foreground">Image:</strong> {el.image}</p>}
+                          {el.image_authenticity && (
+                            <p><strong className="text-foreground">Image check:</strong> {authLabel[el.image_authenticity] ?? el.image_authenticity}</p>
+                          )}
+                        </div>
+                        {Array.isArray(el.knowledge_used) && el.knowledge_used.length > 0 && (
+                          <p className="text-[11px] text-muted-foreground mt-2">
+                            Knowledge used: {el.knowledge_used.join(', ')}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-2 mt-4">
+                          <Button size="sm" variant="outline" disabled={isUpdating || vs !== 'pending'}
+                            onClick={async () => {
+                              setIsUpdating(true);
+                              const { error } = await supabase.functions.invoke('validate-report', { body: { reportId: req.id } });
+                              setIsUpdating(false);
+                              if (error) toast.error('AI validation is unavailable right now');
+                              else { toast.success('AI validation finished'); fetchRequests(); }
+                            }}>
+                            <RefreshCw className="h-4 w-4 mr-1" /> Run AI validation
+                          </Button>
+                          <Button size="sm" className="bg-success hover:bg-success/90 text-success-foreground"
+                            disabled={isUpdating} onClick={() => setReview(req.id, 'approved')}>
+                            <CheckCircle className="h-4 w-4 mr-1" /> Verify report
+                          </Button>
+                          <Button size="sm" variant="secondary" disabled={isUpdating}
+                            onClick={() => setReview(req.id, 'needs_verification')}>
+                            Needs verification
+                          </Button>
+                          <Button size="sm" variant="destructive" disabled={isUpdating}
+                            onClick={() => setReview(req.id, 'rejected')}>
+                            <XCircle className="h-4 w-4 mr-1" /> Mark invalid
+                          </Button>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-3">
+                          AI results are assistive. The final decision is always made by municipal personnel.
+                        </p>
+                      </SectionCard>
+                    );
+                  })()}
+
                   {/* Map */}
                   {req.latitude != null && req.longitude != null && (
                     <SectionCard title="Pinned Location" icon={MapPin}>
