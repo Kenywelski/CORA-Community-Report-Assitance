@@ -9,6 +9,7 @@ import {
   Newspaper,
   CalendarDays,
   Siren,
+  BookOpen,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -29,6 +30,7 @@ const menuItems = [
   { icon: Megaphone, label: 'Announcements', path: '/admin/announcements' },
   { icon: Siren, label: 'Emergency Contacts', path: '/admin/emergency-contacts' },
   { icon: MessageSquare, label: 'Feedback', path: '/admin/feedback' },
+  { icon: BookOpen, label: 'Knowledge Base', path: '/admin/knowledge' },
 ];
 
 export const AdminSidebar = () => {

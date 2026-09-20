@@ -72,11 +72,12 @@ const ReportIssue = () => {
       toast.error('Please fix the errors in the form');
       return;
     }
+    if (isSubmitting) return;
     setIsSubmitting(true);
     const selected = reportCategories.find((c) => c.value === category);
     const { data: { user } } = await supabase.auth.getUser();
 
-    const { error } = await supabase.from('service_requests').insert({
+    const { data: inserted, error } = await supabase.from('service_requests').insert({
       user_id: user?.id || null,
       title: `[REPORT] ${selected?.label || category}`,
       description: `${description}\n\n${contactName ? `Reporter: ${contactName}` : 'Anonymous Report'}\n${contactNumber ? `Contact: ${contactNumber}` : ''}\n${locationDetails ? `Location Details: ${locationDetails}` : ''}`,
@@ -89,16 +90,30 @@ const ReportIssue = () => {
       media_types: media.map((m) => m.type),
       reporter_name: contactName.trim() || null,
       is_public: isPublic,
-    });
+    }).select('id').single();
 
-    if (error) {
+    if (error || !inserted) {
       console.error(error);
-      toast.error('Failed to submit report');
-    } else {
-      setIsSuccess(true);
-      toast.success('Report submitted successfully!');
+      toast.error(error?.message || 'Failed to submit report. Please check your connection and try again.');
+      setIsSubmitting(false);
+      return;
     }
+
+    setIsSuccess(true);
+    toast.success('Report submitted successfully!');
     setIsSubmitting(false);
+
+    // Kick off AI validation + routing (non-blocking for the resident)
+    try {
+      await supabase.functions.invoke('validate-report', { body: { reportId: inserted.id } });
+    } catch (e) {
+      console.error('validation failed', e);
+    }
+    try {
+      await supabase.functions.invoke('route-complaint', { body: { reportId: inserted.id } });
+    } catch (e) {
+      console.error('routing failed', e);
+    }
   };
 
   if (isSuccess) {
