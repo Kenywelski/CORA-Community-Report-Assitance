@@ -156,6 +156,23 @@ const AdminRequests = () => {
     setIsUpdating(false);
   };
 
+  const setReview = async (id: string, review: 'approved' | 'rejected' | 'needs_verification') => {
+    setIsUpdating(true);
+    const { error } = await supabase
+      .from('service_requests')
+      .update({ admin_review_status: review, admin_review_notes: adminNotes || null })
+      .eq('id', id);
+    setIsUpdating(false);
+    if (error) { toast.error('Failed to save review'); return; }
+    toast.success(
+      review === 'approved' ? 'Report marked as verified by admin'
+        : review === 'rejected' ? 'Report marked as invalid'
+        : 'Report flagged for further verification'
+    );
+    setSelectedRequest((prev) => prev ? { ...prev, admin_review_status: review, admin_review_notes: adminNotes || null } : prev);
+    fetchRequests();
+  };
+
   const deleteRequest = async (id: string) => {
     const { error } = await supabase.from('service_requests').delete().eq('id', id);
     if (error) {
