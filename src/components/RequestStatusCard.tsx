@@ -1,37 +1,116 @@
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from "@/components/ui/card";
-import { ClipboardList, Clock, CheckCircle2 } from "lucide-react";
+import { ClipboardList, Clock, CheckCircle2, ListChecks, ChevronRight, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
-const stats = [
-  { icon: ClipboardList, label: "Pending", value: 0, color: "text-warning", bg: "bg-warning/10" },
-  { icon: Clock, label: "In Progress", value: 0, color: "text-primary", bg: "bg-primary/10" },
-  { icon: CheckCircle2, label: "Completed", value: 0, color: "text-success", bg: "bg-success/10" },
-];
+interface ReportSummary {
+  id: string;
+  title: string;
+  category: string;
+  status: string;
+  created_at: string;
+  location: string | null;
+}
 
 export const RequestStatusCard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { data: reports = [], isLoading, error, refetch } = useQuery({
+    queryKey: ['my-reports', user?.id],
+    queryFn: async (): Promise<ReportSummary[]> => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from('service_requests')
+        .select('id,title,category,status,created_at,location')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return (data || []) as ReportSummary[];
+    },
+    enabled: !!user,
+    staleTime: 30_000,
+  });
+
+  const stats = [
+    { icon: ListChecks, label: "Total Reports", value: reports.length, color: "text-foreground", bg: "bg-muted" },
+    { icon: ClipboardList, label: "Pending", value: reports.filter((report) => report.status === 'pending').length, color: "text-warning", bg: "bg-warning/10" },
+    { icon: Clock, label: "Under Review", value: reports.filter((report) => ['under_review', 'assigned', 'in_progress'].includes(report.status)).length, color: "text-primary", bg: "bg-primary/10" },
+    { icon: CheckCircle2, label: "Resolved", value: reports.filter((report) => report.status === 'completed').length, color: "text-success", bg: "bg-success/10" },
+  ];
 
   return (
     <section className="px-4">
-      <h2 className="text-lg font-semibold mb-4">My Requests</h2>
-      <Card variant="elevated" className="overflow-hidden cursor-pointer" onClick={() => navigate(user ? '/my-requests' : '/auth')}>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold">My Reports</h2>
+        {user && (
+          <button type="button" onClick={() => navigate('/my-requests')} className="flex items-center gap-1 text-sm font-medium text-primary">
+            View All <ChevronRight className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      <Card variant="elevated" className="overflow-hidden">
         <CardContent className="p-0">
-          <div className="grid grid-cols-3 divide-x divide-border">
-            {stats.map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <div key={stat.label} className="flex flex-col items-center gap-2 p-4 hover:bg-muted/50 transition-colors">
-                  <div className={`p-2 rounded-xl ${stat.bg}`}>
-                    <Icon className={`h-5 w-5 ${stat.color}`} />
+          {!user ? (
+            <div className="px-5 py-6 text-center">
+              <p className="font-medium">Sign in to track your reports</p>
+              <button type="button" onClick={() => navigate('/auth')} className="mt-2 text-sm font-medium text-primary">Sign In</button>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 divide-x divide-y divide-border sm:grid-cols-4 sm:divide-y-0">
+                {stats.map((stat) => {
+                  const Icon = stat.icon;
+                  return (
+                    <div key={stat.label} className="flex flex-col items-center gap-2 p-4">
+                      <div className={`rounded-lg p-2 ${stat.bg}`}>
+                        <Icon className={`h-5 w-5 ${stat.color}`} />
+                      </div>
+                      <span className="text-2xl font-bold">
+                        {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : error ? '—' : stat.value}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{stat.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="border-t border-border px-4 py-4">
+                <h3 className="mb-3 text-sm font-semibold">Recent Reports</h3>
+                {isLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                ) : error ? (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Could not load your reports. Check your connection and try again.</p>
+                    <button type="button" onClick={() => refetch()} className="mt-2 text-sm font-medium text-primary">Try Again</button>
                   </div>
-                  <span className="text-2xl font-bold">{stat.value}</span>
-                  <span className="text-xs text-muted-foreground">{stat.label}</span>
-                </div>
-              );
-            })}
-          </div>
+                ) : reports.length === 0 ? (
+                  <div className="py-2">
+                    <p className="text-sm font-medium">No Reports Yet</p>
+                    <p className="mt-1 text-sm text-muted-foreground">You haven't submitted any community reports.</p>
+                    <button type="button" onClick={() => navigate('/report-issue')} className="mt-3 text-sm font-medium text-primary">Report an Issue</button>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {reports.slice(0, 3).map((report) => (
+                      <div key={report.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{report.title || report.category}</p>
+                          <p className="mt-1 truncate text-xs text-muted-foreground">
+                            {report.location || 'Location not provided'} · {new Date(report.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-medium capitalize text-muted-foreground">
+                          {report.status.split('_').join(' ')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </section>

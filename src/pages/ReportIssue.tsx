@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,12 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { BottomNav } from '@/components/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ArrowLeft, AlertTriangle, Loader2, CheckCircle, AlertCircle, MapPin } from 'lucide-react';
-import { MediaUpload, MediaItem } from '@/components/MediaUpload';
-import { ComplaintAgentChat } from '@/components/ComplaintAgentChat';
-import { Bot, FileText } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Loader2, CheckCircle, AlertCircle, MapPin, Camera } from 'lucide-react';
 import { LocationPicker } from '@/components/LocationPicker';
 import { BarangaySelect } from '@/components/BarangaySelect';
+import { DirectCameraCapture } from '@/components/DirectCameraCapture';
 import { z } from 'zod';
 
 const reportCategories = [
@@ -44,16 +42,65 @@ const ReportIssue = () => {
   const [locationDetails, setLocationDetails] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactNumber, setContactNumber] = useState('');
-  const [media, setMedia] = useState<MediaItem[]>([]);
+  const [cameraOpen, setCameraOpen] = useState(true);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [submittedReportId, setSubmittedReportId] = useState<string | null>(null);
+  const [submittedReportStatus, setSubmittedReportStatus] = useState<string | null>(null);
+  const [submittedAt, setSubmittedAt] = useState<string | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationAccessError, setLocationAccessError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isReviewing, setIsReviewing] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const requestCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationAccessError('Location access is unavailable in this browser. You can select the issue location on the map.');
+      return;
+    }
+    setLocationAccessError('');
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
+      },
+      () => setLocationAccessError('Location access was not granted. You can select the issue location on the map.'),
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  };
+
+  useEffect(() => {
+    if (!cameraOpen && !isSuccess && !coords) requestCurrentLocation();
+  }, [cameraOpen, isSuccess, coords]);
+
+  const handlePhotoCaptured = async (photo: Blob) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    const owner = user?.id ?? 'guest';
+    const path = `reports/${owner}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+    const { error } = await supabase.storage.from('public-media').upload(path, photo, {
+      contentType: 'image/jpeg',
+      upsert: false,
+    });
+
+    if (error) {
+      console.error(error);
+      toast.error('Could not save the captured photo. Check your connection and try again.');
+      return;
+    }
+
+    const { data: { publicUrl } } = supabase.storage.from('public-media').getPublicUrl(path);
+    setPhotoUrl(publicUrl);
+    setCameraOpen(false);
+  };
 
   const validate = () => {
     try {
       reportSchema.parse({ category, description, barangay });
+      if (!coords) {
+        setErrors({ location: 'Select the issue location on the map or use your current location before submitting.' });
+        return false;
+      }
       setErrors({});
       return true;
     } catch (e) {
@@ -72,6 +119,10 @@ const ReportIssue = () => {
       toast.error('Please fix the errors in the form');
       return;
     }
+    if (!isReviewing) {
+      setIsReviewing(true);
+      return;
+    }
     if (isSubmitting) return;
     setIsSubmitting(true);
     const selected = reportCategories.find((c) => c.value === category);
@@ -85,12 +136,12 @@ const ReportIssue = () => {
       location: barangay + (locationDetails ? `, ${locationDetails}` : ''),
       latitude: coords?.lat ?? null,
       longitude: coords?.lng ?? null,
-      photo_url: media.find((m) => m.type === 'image')?.url ?? null,
-      media_urls: media.map((m) => m.url),
-      media_types: media.map((m) => m.type),
+      photo_url: photoUrl,
+      media_urls: photoUrl ? [photoUrl] : [],
+      media_types: photoUrl ? ['image'] : [],
       reporter_name: contactName.trim() || null,
       is_public: isPublic,
-    }).select('id').single();
+    }).select('id,status,created_at').single();
 
     if (error || !inserted) {
       console.error(error);
@@ -100,6 +151,9 @@ const ReportIssue = () => {
     }
 
     setIsSuccess(true);
+    setSubmittedReportId(inserted.id);
+    setSubmittedReportStatus(inserted.status);
+    setSubmittedAt(inserted.created_at);
     toast.success('Report submitted successfully!');
     setIsSubmitting(false);
 
@@ -116,6 +170,15 @@ const ReportIssue = () => {
     }
   };
 
+  if (cameraOpen) {
+    return (
+      <DirectCameraCapture
+        onUsePhoto={handlePhotoCaptured}
+        onCancel={() => navigate('/')}
+      />
+    );
+  }
+
   if (isSuccess) {
     return (
       <div className="min-h-screen bg-background pb-24">
@@ -124,21 +187,33 @@ const ReportIssue = () => {
             <div className="w-20 h-20 rounded-full bg-success/10 flex items-center justify-center mb-6 animate-scale-in">
               <CheckCircle className="h-10 w-10 text-success" />
             </div>
-            <h1 className="text-2xl font-bold text-center mb-2">Report Submitted!</h1>
+            <h1 className="text-2xl font-bold text-center mb-2">Report Submitted Successfully</h1>
             <p className="text-muted-foreground text-center mb-8">
-              Thank you. The municipal office will review and take action.
+              Your community report has been submitted for barangay review.
             </p>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => navigate('/')}>Go Home</Button>
+            <div className="mb-6 w-full max-w-sm rounded-xl border bg-card p-4 text-sm">
+              <p><span className="font-medium">Report ID:</span> {submittedReportId}</p>
+              <p className="mt-2"><span className="font-medium">Category:</span> {reportCategories.find((item) => item.value === category)?.label || category}</p>
+              <p className="mt-2"><span className="font-medium">Location:</span> {barangay}{locationDetails ? `, ${locationDetails}` : ''}</p>
+              <p className="mt-2"><span className="font-medium">Date Submitted:</span> {submittedAt ? new Date(submittedAt).toLocaleDateString() : '—'}</p>
+              <p className="mt-2"><span className="font-medium">Status:</span> {submittedReportStatus === 'pending' ? 'Pending Review' : submittedReportStatus?.split('_').join(' ') || 'Submitted'}</p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Button variant="outline" onClick={() => navigate('/')}>Back to Home</Button>
+              {submittedReportId && (
+                <Button variant="outline" onClick={() => navigate('/my-requests')}>View My Reports</Button>
+              )}
               <Button
                 onClick={() => {
                   setIsSuccess(false);
                   setCategory(''); setDescription(''); setBarangay('');
                   setLocationDetails(''); setContactName(''); setContactNumber('');
-                  setMedia([]); setCoords(null);
+                  setPhotoUrl(null); setSubmittedReportId(null); setSubmittedReportStatus(null); setSubmittedAt(null); setCoords(null);
+                  setIsReviewing(false);
+                  setCameraOpen(true);
                 }}
               >
-                Submit Another
+                New Report
               </Button>
             </div>
           </div>
@@ -150,8 +225,8 @@ const ReportIssue = () => {
 
   return (
     <div className="min-h-screen bg-background pb-24 lg:pb-8 lg:pt-14">
-      <div className="app-container lg:max-w-2xl">
-        <div className="bg-gradient-to-b from-accent to-accent/80 px-4 pt-12 pb-8">
+      <div className="app-container pb-10 lg:max-w-2xl">
+        <div className="bg-gradient-to-b from-accent to-accent/80 px-4 pt-8 pb-8">
           <button
             onClick={() => navigate('/services')}
             className="flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors lg:hidden"
@@ -165,7 +240,7 @@ const ReportIssue = () => {
             </div>
             <div>
               <h1 className="text-white text-xl font-bold">Report an Issue</h1>
-              <p className="text-white/70 text-sm">No login required • Help improve our community</p>
+              <p className="text-white/70 text-sm">Add details about your community concern</p>
             </div>
           </div>
         </div>
@@ -175,9 +250,23 @@ const ReportIssue = () => {
         <div className="px-4 -mt-2">
           <Card variant="elevated" className="animate-slide-up">
             <CardContent className="p-5">
+              {!isReviewing ? (
               <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="flex items-center gap-3 rounded-lg border bg-card p-3">
+                  {photoUrl ? (
+                    <img src={photoUrl} alt="Captured community issue" className="h-16 w-16 rounded-md object-cover" />
+                  ) : (
+                    <Camera className="h-8 w-8 text-muted-foreground" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold">Photo captured</p>
+                    <p className="text-xs text-muted-foreground">Image classification is not configured. Choose the issue category that best matches your photo.</p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setCameraOpen(true)}>Retake</Button>
+                </div>
+
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Type of Issue *</label>
+                  <label className="text-sm font-medium">Community Issue *</label>
                   <Select value={category} onValueChange={(v) => { setCategory(v); setErrors((p) => ({ ...p, category: '' })); }}>
                     <SelectTrigger className={errors.category ? 'border-destructive' : ''}>
                       <SelectValue placeholder="What are you reporting?" />
@@ -200,7 +289,7 @@ const ReportIssue = () => {
                   <Textarea
                     value={description}
                     onChange={(e) => { setDescription(e.target.value); setErrors((p) => ({ ...p, description: '' })); }}
-                    placeholder="What did you observe? When did it happen?"
+                    placeholder="Describe what is happening and include any important details."
                     rows={4}
                     maxLength={1000}
                     className={errors.description ? 'border-destructive' : ''}
@@ -231,14 +320,26 @@ const ReportIssue = () => {
                   />
                 </div>
 
-                <LocationPicker value={coords} onChange={setCoords} />
-
-                <MediaUpload
-                  folder="reports"
-                  value={media}
-                  onChange={setMedia}
-                  label="Photo / Video Evidence (Recommended)"
+                <LocationPicker
+                  value={coords}
+                  onChange={(nextCoords) => {
+                    setCoords(nextCoords);
+                    setErrors((current) => ({ ...current, location: '' }));
+                  }}
                 />
+                {locationAccessError && (
+                  <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
+                    <p>{locationAccessError}</p>
+                    <Button type="button" variant="outline" size="sm" className="mt-2" onClick={requestCurrentLocation}>Enable Location</Button>
+                  </div>
+                )}
+                {coords && (
+                  <div className="rounded-lg border bg-card p-3">
+                    <p className="text-sm font-medium">Selected location</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}</p>
+                  </div>
+                )}
+                {errors.location && <p className="text-sm text-destructive">{errors.location}</p>}
 
                 <div className="p-4 rounded-xl bg-muted/50 space-y-3">
                   <p className="text-sm font-medium">Contact Information (Optional)</p>
@@ -259,18 +360,42 @@ const ReportIssue = () => {
                     className="mt-1 h-4 w-4 rounded border-input accent-primary"
                   />
                   <div className="flex-1">
-                    <p className="text-sm font-medium">Post to Community Wall</p>
+                    <p className="text-sm font-medium">Share as a Community Report</p>
                     <p className="text-xs text-muted-foreground">
-                      Share this report publicly so other residents can track progress. Uncheck to keep it private to the municipality.
+                      Let other residents view this report and follow its progress. Uncheck to keep it private to authorized personnel.
                     </p>
                   </div>
                 </label>
 
 
                 <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit Report'}
+                  Review Report
                 </Button>
               </form>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  <div>
+                    <h2 className="text-lg font-semibold">Review Your Report</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">Check the photo and details before submitting.</p>
+                  </div>
+                  {photoUrl && <img src={photoUrl} alt="Captured community issue" className="max-h-64 w-full rounded-lg object-cover" />}
+                  <div className="space-y-3 rounded-lg border p-4 text-sm">
+                    <div><p className="text-xs font-semibold uppercase text-muted-foreground">Community Issue</p><p className="mt-1 font-medium">{reportCategories.find((item) => item.value === category)?.label || category}</p></div>
+                    <div><p className="text-xs font-semibold uppercase text-muted-foreground">Description</p><p className="mt-1 whitespace-pre-wrap">{description}</p></div>
+                    <div><p className="text-xs font-semibold uppercase text-muted-foreground">Location</p><p className="mt-1">{barangay}{locationDetails ? `, ${locationDetails}` : ''}</p>{coords && <p className="mt-1 text-xs text-muted-foreground">{coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}</p>}</div>
+                  </div>
+                  <div className="rounded-lg bg-muted p-4 text-sm">
+                    <p className="font-semibold">AI-Assisted Analysis</p>
+                    <p className="mt-1 text-muted-foreground">Report analysis will run after submission. Barangay personnel remain responsible for final review and decisions.</p>
+                  </div>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Button type="button" variant="outline" className="min-h-12 flex-1" onClick={() => setIsReviewing(false)}>Edit Report</Button>
+                    <Button type="submit" size="lg" className="min-h-12 flex-1" disabled={isSubmitting}>
+                      {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit Report'}
+                    </Button>
+                  </div>
+                </form>
+              )}
             </CardContent>
           </Card>
         </div>

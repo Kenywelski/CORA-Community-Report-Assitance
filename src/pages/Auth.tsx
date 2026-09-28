@@ -7,7 +7,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { Mail, Lock, User, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import logoIcon from '@/assets/mycortes-logo.png';
 import heroImage from '@/assets/hero-coastal.jpg';
 
 const emailSchema = z.string().email('Please enter a valid email address');
@@ -151,29 +150,30 @@ const Auth = () => {
       <div className="lg:grid lg:grid-cols-2 lg:min-h-screen">
         {/* Left panel - Hero (desktop only) */}
         <div className="hidden lg:flex lg:flex-col lg:relative lg:overflow-hidden">
-          <img src={heroImage} alt="Cortes coastal view" className="absolute inset-0 w-full h-full object-cover" />
+          <img src={heroImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
           <div className="absolute inset-0 hero-gradient opacity-90" />
           <div className="relative z-10 flex flex-col justify-between h-full p-10">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl overflow-hidden bg-white/10 backdrop-blur-sm">
-                <img src={logoIcon} alt="myCortes logo" className="w-full h-full object-cover" />
+              <div className="w-12 h-12 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-sm font-bold text-white ring-1 ring-white/25">
+                CORA
               </div>
               <div>
-                <p className="text-white/70 text-sm font-medium">Municipality of</p>
-                <h1 className="text-white text-xl font-bold tracking-tight">Cortes</h1>
+                <h1 className="text-white text-xl font-bold tracking-tight">CORA</h1>
+                <p className="text-white/70 text-sm">Community Report System</p>
+                <p className="text-white/60 text-xs">Barangay Purisima, Tago, Surigao del Sur</p>
               </div>
             </div>
             <div className="mb-12">
               <h2 className="text-white text-4xl font-bold mb-3">
-                {isLogin ? 'Welcome Back!' : 'Join myCortes'}
+                {isLogin ? 'Welcome Back!' : 'Create Your Account'}
               </h2>
               <p className="text-white/70 text-lg leading-relaxed max-w-md">
                 {isLogin 
-                  ? 'Sign in to access municipal services, track your requests, and stay updated.' 
-                  : 'Create your account to access all municipal services and community features.'}
+                  ? 'Sign in to track your community reports and stay informed.'
+                  : 'Create an account to track your reports and receive community updates.'}
               </p>
             </div>
-            <p className="text-white/40 text-xs">© 2026 Municipality of Cortes. All rights reserved.</p>
+                <p className="text-white/60 text-xs">Barangay Purisima, Tago, Surigao del Sur</p>
           </div>
         </div>
 
@@ -190,11 +190,12 @@ const Auth = () => {
 
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 rounded-xl overflow-hidden bg-white/20 backdrop-blur-sm">
-                <img src={logoIcon} alt="myCortes logo" className="w-full h-full object-cover" />
+                <span className="text-white text-sm font-bold">CORA</span>
               </div>
               <div>
-                <p className="text-white/70 text-sm font-medium">Municipality of</p>
-                <h1 className="text-white text-xl font-bold tracking-tight">Cortes</h1>
+                <p className="text-white text-xl font-bold tracking-tight">CORA</p>
+                <p className="text-white/70 text-xs">Community Report System</p>
+                <p className="text-white/60 text-xs">Barangay Purisima, Tago, Surigao del Sur</p>
               </div>
             </div>
 
@@ -202,7 +203,7 @@ const Auth = () => {
               {isLogin ? 'Welcome Back!' : 'Create Account'}
             </h2>
             <p className="text-white/70 text-sm mt-1">
-              {isLogin ? 'Sign in to access municipal services' : 'Join myCortes to get started'}
+              {isLogin ? 'Sign in to track your community reports' : 'Create an account to get started'}
             </p>
           </div>
           <div className="h-6 bg-background rounded-t-3xl -mt-6 relative z-10" />

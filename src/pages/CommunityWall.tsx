@@ -98,8 +98,8 @@ const CommunityWall = () => {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div>
-                <h1 className="text-lg font-bold">Community Wall</h1>
-                <p className="text-xs text-muted-foreground">Public reports & municipal updates</p>
+                <h1 className="text-lg font-bold">Community Reports</h1>
+                <p className="text-xs text-muted-foreground">Reports shared by community members</p>
               </div>
             </div>
             <Button size="sm" className="gap-1" onClick={() => navigate('/report-issue')}>

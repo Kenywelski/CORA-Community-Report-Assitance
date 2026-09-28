@@ -154,8 +154,8 @@ const MyRequests = () => {
           </button>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-bold">Track My Reports</h1>
-              <p className="text-muted-foreground text-sm mt-1">Follow the progress of your complaints and reports</p>
+              <h1 className="text-2xl font-bold">My Reports</h1>
+              <p className="text-muted-foreground text-sm mt-1">View the status and updates for community reports you submitted.</p>
             </div>
             <span className={cn(
               'flex items-center gap-1.5 text-[10px] font-medium px-2 py-1 rounded-full shrink-0',

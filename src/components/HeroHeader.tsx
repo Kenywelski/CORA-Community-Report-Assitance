@@ -4,28 +4,31 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "@/components/NotificationBell";
 import heroImage from "@/assets/hero-coastal.jpg";
-import logoIcon from "@/assets/mycortes-logo.png";
 
 export const HeroHeader = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const residentName =
+    (user?.user_metadata?.full_name as string | undefined) ||
+    (user?.user_metadata?.name as string | undefined) ||
+    user?.email?.split('@')[0];
 
   return (
     <header className="relative overflow-hidden">
       <div className="absolute inset-0 z-0">
-        <img src={heroImage} alt="Cortes coastal view" className="w-full h-full object-cover" />
+        <img src={heroImage} alt="" className="w-full h-full object-cover" />
         <div className="absolute inset-0 hero-gradient opacity-85" />
       </div>
 
       <div className="relative z-10 px-4 pt-12 pb-8 lg:pt-6 lg:pb-12 lg:px-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl overflow-hidden">
-              <img src={logoIcon} alt="myCortes logo" className="w-full h-full object-cover" />
+            <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-xs font-bold text-white ring-1 ring-white/25">
+              CORA
             </div>
             <div>
-              <p className="text-white/70 text-xs font-medium">Municipality of</p>
-              <h1 className="text-white text-lg font-bold tracking-tight">Cortes</h1>
+              <p className="text-white/90 text-sm font-semibold">Community Report System</p>
+              <p className="text-white/70 text-xs">Barangay Purisima, Tago, Surigao del Sur</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -37,9 +40,9 @@ export const HeroHeader = () => {
         </div>
 
         <div className="mb-6 lg:max-w-lg">
-          <p className="text-white/80 text-sm mb-1">Magandang hapon,</p>
-          <h2 className="text-white text-2xl lg:text-3xl font-bold mb-2">Welcome to myCortes!</h2>
-          <p className="text-white/70 text-sm lg:text-base leading-relaxed">Your digital gateway to municipal services</p>
+          <p className="text-white/80 text-sm mb-1">Welcome{residentName ? `, ${residentName}` : ''}</p>
+          <h2 className="text-white text-2xl lg:text-3xl font-bold mb-2">Report a Community Issue</h2>
+          <p className="text-white/80 text-sm lg:text-base leading-relaxed">Report community concerns and stay informed about Barangay Purisima.</p>
         </div>
 
         <Button variant="accent" size="lg" className="w-full lg:w-auto lg:px-8" onClick={() => navigate('/report-issue')}>

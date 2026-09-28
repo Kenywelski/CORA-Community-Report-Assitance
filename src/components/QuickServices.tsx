@@ -1,28 +1,27 @@
 import { useNavigate } from 'react-router-dom';
 import { 
-  AlertCircle, ClipboardList, MessageSquare, Newspaper,
-  MapPin, Siren, Heart
+  AlertCircle, ClipboardList, Bell, MapPin, Siren, CalendarDays,
+  ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from 'sonner';
 
-const services = [
-  { icon: AlertCircle, label: "Report Issue", color: "text-accent", bgColor: "bg-accent/10", path: "/report-issue", requiresAuth: false },
-  { icon: ClipboardList, label: "My Reports", color: "text-primary", bgColor: "bg-secondary", path: "/my-requests", requiresAuth: true },
-  { icon: Newspaper, label: "Community", color: "text-success", bgColor: "bg-success/10", path: "/community", requiresAuth: false },
-  { icon: Siren, label: "Emergency", color: "text-destructive", bgColor: "bg-destructive/10", path: "/emergency", requiresAuth: false },
-  { icon: MessageSquare, label: "Feedback", color: "text-warning", bgColor: "bg-warning/10", path: "/feedback", requiresAuth: true },
-  { icon: MapPin, label: "Directory", color: "text-primary", bgColor: "bg-primary/10", path: "/directory", requiresAuth: false },
-  { icon: Heart, label: "Programs", color: "text-emergency", bgColor: "bg-emergency/10", path: "/programs", requiresAuth: false },
+const actions = [
+  { icon: AlertCircle, label: "Report an Issue", path: "/report-issue", requiresAuth: false, primary: true },
+  { icon: ClipboardList, label: "My Reports", path: "/my-requests", requiresAuth: true },
+  { icon: Siren, label: "Emergency Contacts", path: "/emergency", requiresAuth: false },
+  { icon: MapPin, label: "Barangay Directory", path: "/directory", requiresAuth: false },
+  { icon: CalendarDays, label: "Community Programs", path: "/programs", requiresAuth: false },
+  { icon: Bell, label: "Announcements", path: "/updates", requiresAuth: false },
 ];
 
 export const QuickServices = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const handleServiceClick = (service: typeof services[0]) => {
-    if (service.requiresAuth && !user) {
+  const handleActionClick = (action: typeof actions[number]) => {
+    if (action.requiresAuth && !user) {
       toast.error('You must be logged in to perform this action.', {
         action: {
           label: 'Sign In',
@@ -31,24 +30,32 @@ export const QuickServices = () => {
       });
       return;
     }
-    navigate(service.path);
+    navigate(action.path);
   };
 
   return (
     <section className="px-4">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">Quick Services</h2>
-        <button className="text-sm text-primary font-medium" onClick={() => navigate('/services')}>See All</button>
-      </div>
-      <div className="grid grid-cols-4 lg:grid-cols-8 gap-3">
-        {services.map((service, index) => {
-          const Icon = service.icon;
+      <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {actions.map((action, index) => {
+          const Icon = action.icon;
           return (
-            <button key={service.label} onClick={() => handleServiceClick(service)} className="flex flex-col items-center gap-2 group animate-slide-up" style={{ animationDelay: `${index * 50}ms` }}>
-              <div className={cn("w-full aspect-square max-w-[72px] lg:max-w-[80px] rounded-2xl flex items-center justify-center transition-all duration-200", service.bgColor, "group-hover:scale-105 group-active:scale-95 shadow-soft")}>
-                <Icon className={cn("h-6 w-6", service.color)} />
-              </div>
-              <span className="text-[11px] font-medium text-foreground text-center leading-tight">{service.label}</span>
+            <button
+              key={action.label}
+              type="button"
+              onClick={() => handleActionClick(action)}
+              className={cn(
+                "group flex min-h-20 items-center gap-4 rounded-xl border px-4 py-4 text-left transition-colors animate-slide-up",
+                action.primary && "hidden lg:flex",
+                action.primary
+                  ? "border-primary bg-primary text-primary-foreground shadow-soft hover:bg-primary/90"
+                  : "border-border bg-card text-foreground hover:bg-muted/60",
+              )}
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <Icon className={cn("h-5 w-5 shrink-0", !action.primary && "text-primary")} />
+              <span className="flex-1 text-sm font-semibold">{action.label}</span>
+              <ArrowRight className="h-4 w-4 shrink-0 opacity-70 transition-transform group-hover:translate-x-1" />
             </button>
           );
         })}
