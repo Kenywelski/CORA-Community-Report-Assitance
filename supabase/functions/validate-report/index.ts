@@ -27,6 +27,8 @@ const SCHEMA = {
       enum: ["likely_authentic", "likely_ai_generated", "uncertain", "no_image"],
     },
     knowledge_used: { type: "array", items: { type: "string" } },
+    recommended_actions: { type: "array", items: { type: "string" } },
+    is_unrelated: { type: "boolean" },
   },
   required: [
     "status",
@@ -37,6 +39,8 @@ const SCHEMA = {
     "image_assessment",
     "image_authenticity",
     "knowledge_used",
+    "recommended_actions",
+    "is_unrelated",
   ],
 };
 
@@ -84,7 +88,7 @@ serve(async (req) => {
     const { data: report, error: fetchErr } = await svc
       .from("service_requests")
       .select(
-        "id, title, description, category, location, latitude, longitude, photo_url, media_urls, media_types, ai_validation_status",
+        "id, user_id, title, description, category, location, latitude, longitude, photo_url, media_urls, media_types, ai_validation_status",
       )
       .eq("id", reportId)
       .maybeSingle();
@@ -154,6 +158,8 @@ Rules:
 - You assist administrators; you never make the final decision. When unsure, prefer "suspicious" over "rejected".
 - Also judge whether the photo looks like a real photograph or AI-generated/manipulated. Uncertainty is normal — do not assume fake.
 - confidence is 0-100 for how sure you are of your verdict.
+- recommended_actions: if the report is valid or suspicious, give 3-5 short, concrete next steps for municipal personnel (e.g. which office to forward to, inspection, coordination with the barangay). Base office names ONLY on the knowledge base; if unknown, say "appropriate municipal office". Empty array if rejected.
+- is_unrelated: true ONLY when the text and/or image is clearly not a community concern (memes, selfies, food, random scenery, gibberish, spam, test messages) or the image is clearly AI-generated and unrelated.
 - Write reason and assessments in clear, short English (1-2 sentences each).
 
 Approved municipal knowledge base (the only authoritative reference):
@@ -232,17 +238,21 @@ Images attached: ${usedImages.length}`,
       image_authenticity: parsed.image_authenticity ?? (usedImages.length ? "uncertain" : "no_image"),
       images_analyzed: usedImages.length,
       knowledge_used: parsed.knowledge_used ?? [],
+      recommended_actions: Array.isArray(parsed.recommended_actions) ? parsed.recommended_actions : [],
+      is_unrelated: parsed.is_unrelated === true,
     };
+    const autoFlagged = status === "rejected" || (parsed.is_unrelated === true && confidence >= 70);
+    const finalStatus = autoFlagged ? "rejected" : status;
 
     const { error: updateErr } = await svc
       .from("service_requests")
       .update({
-        ai_validation_status: status,
+        ai_validation_status: finalStatus,
         ai_validation_reason: (parsed.reason as string) ?? null,
         ai_validation_confidence: confidence,
         ai_validated_at: new Date().toISOString(),
         ai_validation_elements: elements,
-        requires_review: status !== "valid",
+        requires_review: finalStatus !== "valid",
       })
       .eq("id", reportId);
     if (updateErr) throw updateErr;
@@ -250,14 +260,24 @@ Images attached: ${usedImages.length}`,
     await svc.from("ai_logs").insert({
       report_id: reportId,
       action: "validate_report",
-      decision: status,
+      decision: finalStatus,
       confidence,
       reasoning: (parsed.reason as string) ?? null,
       actor: "validation_agent",
       metadata: elements,
     });
 
-    return json({ status, confidence, reason: parsed.reason ?? null, elements });
+    if (autoFlagged && report.user_id) {
+      await svc.from("notifications").insert({
+        user_id: report.user_id,
+        type: "report_invalid",
+        title: "Your report could not be verified",
+        body: `"${report.title}" was flagged as not valid: ${parsed.reason ?? "the text or image is unrelated to a community concern"}. Please resubmit with accurate details and a clear photo. Municipal staff will still review it.`,
+        link: "/my-requests",
+      });
+    }
+
+    return json({ status: finalStatus, confidence, reason: parsed.reason ?? null, elements });
   } catch (error) {
     console.error("validate-report error:", error);
     return json({ error: (error as Error).message ?? "Validation failed", status: "pending" }, 500);
