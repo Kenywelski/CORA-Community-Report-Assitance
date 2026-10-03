@@ -68,14 +68,22 @@ export const BottomNav = ({ currentPath }: BottomNavProps) => {
   return (
     <>
       {/* Desktop Sidebar - hidden on mobile */}
-      <nav aria-label="Main navigation" className="desktop-sidebar fixed inset-y-0 left-0 z-50 hidden w-64 flex-col border-r border-border bg-card px-4 py-6 lg:flex">
-        <div className="mb-8 px-3">
-          <span className="block text-2xl font-bold leading-none text-primary">CORA</span>
-          <span className="mt-1 block text-xs text-muted-foreground">Community Report System</span>
-          <span className="mt-3 block text-xs leading-relaxed text-muted-foreground">Barangay Purisima<br />Tago, Surigao del Sur</span>
+      <nav aria-label="Main navigation" className="desktop-sidebar fixed inset-y-0 left-0 z-50 hidden w-64 flex-col border-r border-border bg-card px-3 py-5 lg:flex">
+        <div className="mb-5 rounded-2xl bg-primary px-4 py-4 text-primary-foreground shadow-sm">
+          <span className="block text-xl font-bold leading-none">myCortes</span>
+          <span className="mt-1 block text-xs opacity-80">Complaint & Community Portal</span>
+          <span className="mt-2 block text-[11px] opacity-70">Municipality of Cortes, Surigao del Sur</span>
         </div>
-        <div className="flex flex-col gap-1">
-          {desktopNavItems.map((item) => {
+        <button
+          type="button"
+          onClick={() => navigate('/report-issue')}
+          className="mb-4 flex items-center justify-center gap-2 rounded-xl bg-accent px-3 py-2.5 text-sm font-semibold text-accent-foreground shadow-sm transition-transform hover:scale-[1.02]"
+        >
+          <Plus className="h-4 w-4" /> Report an Issue
+        </button>
+        <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Menu</p>
+        <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
+          {desktopNavItems.filter((i) => i.path !== '/report-issue').map((item) => {
             const isActive = activePath === item.path;
             const Icon = item.icon;
             return (
@@ -84,12 +92,13 @@ export const BottomNav = ({ currentPath }: BottomNavProps) => {
                 onClick={() => navigate(item.path)}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "relative flex items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium transition-colors",
-                  isActive ? "bg-secondary text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors",
+                  isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
+                {isActive && <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-primary" />}
                 <div className="relative">
-                  <Icon className={cn("h-5 w-5", isActive && "animate-scale-in")} />
+                  <Icon className="h-5 w-5" />
                   {item.badge && (
                     <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-foreground">
                       {item.badge > 9 ? '9+' : item.badge}
@@ -104,7 +113,7 @@ export const BottomNav = ({ currentPath }: BottomNavProps) => {
         <button
           type="button"
           onClick={handleLogout}
-          className="mt-auto flex items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="mt-3 flex items-center gap-3 rounded-xl border-t border-border px-3 py-3 text-left text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
         >
           <LogOut className="h-5 w-5" />
           <span>Logout</span>

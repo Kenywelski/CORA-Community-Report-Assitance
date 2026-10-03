@@ -128,7 +128,10 @@ const ReportIssue = () => {
     const selected = reportCategories.find((c) => c.value === category);
     const { data: { user } } = await supabase.auth.getUser();
 
-    const { data: inserted, error } = await supabase.from('service_requests').insert({
+    const newId = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
+    const { error } = await supabase.from('service_requests').insert({
+      id: newId,
       user_id: user?.id || null,
       title: `[REPORT] ${selected?.label || category}`,
       description: `${description}\n\n${contactName ? `Reporter: ${contactName}` : 'Anonymous Report'}\n${contactNumber ? `Contact: ${contactNumber}` : ''}\n${locationDetails ? `Location Details: ${locationDetails}` : ''}`,
@@ -141,9 +144,10 @@ const ReportIssue = () => {
       media_types: photoUrl ? ['image'] : [],
       reporter_name: contactName.trim() || null,
       is_public: isPublic,
-    }).select('id,status,created_at').single();
+    });
+    const inserted = { id: newId };
 
-    if (error || !inserted) {
+    if (error) {
       console.error(error);
       toast.error(error?.message || 'Failed to submit report. Please check your connection and try again.');
       setIsSubmitting(false);
@@ -151,9 +155,9 @@ const ReportIssue = () => {
     }
 
     setIsSuccess(true);
-    setSubmittedReportId(inserted.id);
-    setSubmittedReportStatus(inserted.status);
-    setSubmittedAt(inserted.created_at);
+    setSubmittedReportId(newId);
+    setSubmittedReportStatus('pending');
+    setSubmittedAt(createdAt);
     toast.success('Report submitted successfully!');
     setIsSubmitting(false);
 
