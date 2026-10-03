@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_feedback_logs: {
+        Row: {
+          admin_id: string
+          admin_verdict: string
+          ai_confidence: number | null
+          ai_verdict: string
+          created_at: string
+          id: string
+          is_agreed: boolean
+          notes: string | null
+          report_id: string | null
+        }
+        Insert: {
+          admin_id: string
+          admin_verdict: string
+          ai_confidence?: number | null
+          ai_verdict: string
+          created_at?: string
+          id?: string
+          is_agreed: boolean
+          notes?: string | null
+          report_id?: string | null
+        }
+        Update: {
+          admin_id?: string
+          admin_verdict?: string
+          ai_confidence?: number | null
+          ai_verdict?: string
+          created_at?: string
+          id?: string
+          is_agreed?: boolean
+          notes?: string | null
+          report_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_feedback_logs_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "service_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_logs: {
         Row: {
           action: string
