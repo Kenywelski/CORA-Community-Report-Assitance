@@ -93,6 +93,7 @@ const AdminRequests = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
+  const [aiFilter, setAiFilter] = useState<'all' | 'suspicious' | 'valid' | 'rejected' | 'pending'>('all');
   const [pendingStatus, setPendingStatus] = useState<null | 'pending' | 'in_progress' | 'completed' | 'rejected'>(null);
   const [rejectReason, setRejectReason] = useState('');
 
@@ -162,6 +163,18 @@ const AdminRequests = () => {
       .from('service_requests')
       .update({ admin_review_status: review, admin_review_notes: adminNotes || null })
       .eq('id', id);
+    if (!error) {
+      const req = requests.find((r) => r.id === id);
+      const aiV = req?.ai_validation_status || 'pending';
+      if (aiV !== 'pending') {
+        const { data: { user } } = await supabase.auth.getUser();
+        const agreed = (aiV === 'valid' && review === 'approved') || (aiV === 'rejected' && review === 'rejected') || (aiV === 'suspicious' && review === 'needs_verification');
+        if (user) await (supabase as any).from('ai_feedback_logs').insert({
+          report_id: id, admin_id: user.id, ai_verdict: aiV, admin_verdict: review,
+          is_agreed: agreed, ai_confidence: req?.ai_validation_confidence ?? null, notes: adminNotes || null,
+        });
+      }
+    }
     setIsUpdating(false);
     if (error) { toast.error('Failed to save review'); return; }
     toast.success(
@@ -198,6 +211,7 @@ const AdminRequests = () => {
 
   const filteredRequests = requests
     .filter(r => activeTab === 'all' || r.status === activeTab)
+    .filter(r => aiFilter === 'all' || (r.ai_validation_status || 'pending') === aiFilter)
     .filter(r => {
       const q = search.toLowerCase().trim();
       if (!q) return true;
@@ -249,6 +263,27 @@ const AdminRequests = () => {
         />
       </div>
 
+      {/* AI Quick Filter */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {([
+          { k: 'all', label: 'All reports', cls: 'bg-muted text-foreground' },
+          { k: 'suspicious', label: 'Needs review', cls: 'bg-warning/15 text-warning' },
+          { k: 'valid', label: 'AI verified', cls: 'bg-success/15 text-success' },
+          { k: 'rejected', label: 'Flagged invalid', cls: 'bg-destructive/15 text-destructive' },
+          { k: 'pending', label: 'Not validated', cls: 'bg-secondary text-secondary-foreground' },
+        ] as const).map((f) => {
+          const count = f.k === 'all' ? requests.length : requests.filter((r) => (r.ai_validation_status || 'pending') === f.k).length;
+          return (
+            <button key={f.k} onClick={() => setAiFilter(f.k)}
+              className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border-2 transition-all',
+                aiFilter === f.k ? 'border-primary shadow-sm' : 'border-transparent', f.cls)}>
+              {f.label}
+              <span className="rounded-full bg-background/70 px-1.5 text-[10px] font-bold">{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Tabs and Requests */}
       <Card variant="elevated">
         <CardContent className="p-4">
@@ -280,6 +315,17 @@ const AdminRequests = () => {
                               <StatusIcon className="h-3 w-3 mr-1" />
                               {statusConfig[req.status].label}
                             </Badge>
+                            {(() => {
+                              const v = req.ai_validation_status || 'pending';
+                              const m: Record<string, [string, string]> = {
+                                valid: ['AI verified', 'bg-success/15 text-success'],
+                                suspicious: ['Needs review', 'bg-warning/15 text-warning'],
+                                rejected: ['Flagged invalid', 'bg-destructive/15 text-destructive'],
+                                pending: ['Not validated', 'bg-muted text-muted-foreground'],
+                              };
+                              const [l, c] = m[v] ?? m.pending;
+                              return <Badge className={cn('text-xs', c)}>{l}{req.ai_validation_confidence != null && v !== 'pending' ? ` · ${req.ai_validation_confidence}%` : ''}</Badge>;
+                            })()}
                           </div>
                           <p className="font-medium text-sm line-clamp-1">{req.title}</p>
                           <p className="text-xs text-muted-foreground mt-1">
@@ -497,6 +543,19 @@ const AdminRequests = () => {
                             <p><strong className="text-foreground">Image check:</strong> {authLabel[el.image_authenticity] ?? el.image_authenticity}</p>
                           )}
                         </div>
+                        {Array.isArray(el.recommended_actions) && el.recommended_actions.length > 0 && (
+                          <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                            <p className="text-xs font-semibold text-primary mb-1.5">AI suggested next steps</p>
+                            <ol className="list-decimal pl-4 space-y-1 text-xs text-foreground">
+                              {el.recommended_actions.map((a: string, i: number) => <li key={i}>{a}</li>)}
+                            </ol>
+                          </div>
+                        )}
+                        {vs === 'rejected' && (
+                          <p className="mt-3 text-xs rounded-lg bg-destructive/10 text-destructive p-2">
+                            Auto-flagged as unrelated/invalid — the resident was notified. Confirm with "Mark invalid" or restore with "Verify report".
+                          </p>
+                        )}
                         {Array.isArray(el.knowledge_used) && el.knowledge_used.length > 0 && (
                           <p className="text-[11px] text-muted-foreground mt-2">
                             Knowledge used: {el.knowledge_used.join(', ')}
