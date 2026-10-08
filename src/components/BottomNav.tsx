@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -21,7 +22,7 @@ interface BottomNavProps {
   onNavigate?: (path: string) => void;
 }
 
-export const BottomNav = ({ currentPath }: BottomNavProps) => {
+export const BottomNav = forwardRef<HTMLElement, BottomNavProps>(function BottomNav({ currentPath }, _ref) {
   const navigate = useNavigate();
   const location = useLocation();
   const { signOut } = useAuth();
@@ -158,4 +159,4 @@ export const BottomNav = ({ currentPath }: BottomNavProps) => {
       </nav>
     </>
   );
-};
+});
