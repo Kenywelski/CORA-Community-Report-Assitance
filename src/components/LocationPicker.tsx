@@ -20,8 +20,8 @@ interface LocationPickerProps {
   readOnly?: boolean;
 }
 
-// Default center: Cortes, Surigao del Sur
-const DEFAULT_CENTER: [number, number] = [9.0167, 125.95];
+// Default center: Purisima, Tago, Surigao del Sur (OpenStreetMap place node 8928665117)
+const DEFAULT_CENTER: [number, number] = [9.0178894, 126.2335553];
 
 const ClickHandler = ({ onClick }: { onClick: (lat: number, lng: number) => void }) => {
   useMapEvents({
@@ -77,7 +77,7 @@ export const LocationPicker = ({ value, onChange, height = '280px', readOnly = f
         <MapContainer
           key={mapKeyRef.current}
           center={center}
-          zoom={value ? 16 : 12}
+          zoom={value ? 16 : 15}
           style={{ height: '100%', width: '100%' }}
           scrollWheelZoom
         >

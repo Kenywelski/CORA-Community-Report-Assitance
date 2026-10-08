@@ -29,11 +29,11 @@ const WELCOME: AiMsg = {
 
 const QUICK_ACTIONS = [
   { icon: AlertTriangle, label: 'Report an Issue', prompt: 'How do I report a community issue?' },
-  { icon: Phone, label: 'Emergency Contacts', prompt: 'What are the emergency contact numbers in Cortes?' },
+  { icon: Phone, label: 'Emergency Contacts', prompt: 'What are the emergency contact numbers in Barangay Purisima, Tago?' },
   { icon: Building2, label: 'Municipal Offices', prompt: 'List the municipal offices and what they do.' },
   { icon: FileText, label: 'Request Documents', prompt: 'How do I request a municipal document or service?' },
   { icon: Megaphone, label: 'Announcements', prompt: 'What are the latest announcements from the municipality?' },
-  { icon: HelpCircle, label: 'FAQs', prompt: 'What are frequently asked questions about myCortes?' },
+  { icon: HelpCircle, label: 'FAQs', prompt: 'What are frequently asked questions about CORA?' },
 ];
 
 const STORAGE_KEY = 'mycortes-chat-ai-v2';
@@ -304,7 +304,7 @@ export const ChatbotLauncher = () => {
                   <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-[hsl(174,55%,18%)] animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-[15px] leading-tight">myCortes AI Assistant</h3>
+                  <h3 className="font-semibold text-[15px] leading-tight">CORA AI Assistant</h3>
                   <p className="text-[11px] opacity-90 flex items-center gap-1.5 mt-0.5">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 inline-block" />
                     Always ready to help
@@ -382,7 +382,7 @@ export const ChatbotLauncher = () => {
                               <Sparkles className="h-5 w-5" />
                             </div>
                             <div>
-                              <h4 className="font-semibold text-base leading-tight">Welcome to myCortes</h4>
+                              <h4 className="font-semibold text-base leading-tight">Welcome to CORA</h4>
                               <p className="text-[13px] opacity-90 mt-1 leading-relaxed">
                                 I can help you with municipal services, emergency info, announcements, and how to navigate the app.
                               </p>

@@ -55,7 +55,7 @@ const EmergencyContacts = () => {
             </div>
             <div>
               <h1 className="text-white text-xl font-bold">Emergency Contacts</h1>
-              <p className="text-white/80 text-sm">Municipality of Cortes • Tap to call</p>
+              <p className="text-white/80 text-sm">Barangay Purisima, Tago • Tap to call</p>
             </div>
           </div>
         </div>

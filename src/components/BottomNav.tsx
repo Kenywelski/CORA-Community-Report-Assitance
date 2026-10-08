@@ -70,9 +70,9 @@ export const BottomNav = ({ currentPath }: BottomNavProps) => {
       {/* Desktop Sidebar - hidden on mobile */}
       <nav aria-label="Main navigation" className="desktop-sidebar fixed inset-y-0 left-0 z-50 hidden w-64 flex-col border-r border-border bg-card px-3 py-5 lg:flex">
         <div className="mb-5 rounded-2xl bg-primary px-4 py-4 text-primary-foreground shadow-sm">
-          <span className="block text-xl font-bold leading-none">myCortes</span>
+          <span className="block text-xl font-bold leading-none">CORA</span>
           <span className="mt-1 block text-xs opacity-80">Complaint & Community Portal</span>
-          <span className="mt-2 block text-[11px] opacity-70">Municipality of Cortes, Surigao del Sur</span>
+          <span className="mt-2 block text-[11px] opacity-70">Barangay Purisima, Tago, Surigao del Sur</span>
         </div>
         <button
           type="button"

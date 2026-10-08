@@ -91,7 +91,7 @@ const AdminEmergencyContacts = () => {
   };
 
   return (
-    <AdminLayout title="Emergency Contacts" subtitle="Manage municipal emergency hotlines for Cortes">
+    <AdminLayout title="Emergency Contacts" subtitle="Manage emergency contacts for Barangay Purisima, Tago">
       <div className="space-y-6">
         <div className="flex justify-end">
           <Dialog open={open} onOpenChange={(o) => o ? setOpen(true) : close()}>

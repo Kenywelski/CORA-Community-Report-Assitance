@@ -1,20 +1,8 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MapPin } from 'lucide-react';
 
-// Official list of barangays in the Municipality of Cortes, Surigao del Sur
-const CORTES_BARANGAYS = [
-  'Burgos',
-  'Capandan',
-  'Mabahin',
-  'Madreliño',
-  'Manlico',
-  'Matho',
-  'Poblacion',
-  'Tag-Anongan',
-  'Tigao',
-  'Tuboran',
-  'Uba',
-];
+// Current study barangay: Purisima, Tago, Surigao del Sur.
+const STUDY_BARANGAYS = ['Purisima'];
 
 interface BarangaySelectProps {
   value: string;
@@ -39,7 +27,7 @@ export const BarangaySelect = ({
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {CORTES_BARANGAYS.map((barangay) => (
+          {STUDY_BARANGAYS.map((barangay) => (
             <SelectItem key={barangay} value={barangay}>
               {barangay}
             </SelectItem>
@@ -51,4 +39,4 @@ export const BarangaySelect = ({
   );
 };
 
-export { CORTES_BARANGAYS };
+export { STUDY_BARANGAYS };
