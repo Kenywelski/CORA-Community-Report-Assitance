@@ -163,14 +163,16 @@ const ReportIssue = () => {
 
     // Kick off AI validation + routing (non-blocking for the resident)
     try {
-      await supabase.functions.invoke('validate-report', { body: { reportId: inserted.id } });
+      const { error: validationError } = await supabase.functions.invoke('validate-report', { body: { reportId: inserted.id } });
+      if (validationError) console.warn('Report saved; AI validation is pending:', validationError.message);
     } catch (e) {
-      console.error('validation failed', e);
+      console.warn('Report saved; AI validation is pending:', e);
     }
     try {
-      await supabase.functions.invoke('route-complaint', { body: { reportId: inserted.id } });
+      const { error: routingError } = await supabase.functions.invoke('route-complaint', { body: { report_id: inserted.id } });
+      if (routingError) console.warn('Report saved; routing needs review:', routingError.message);
     } catch (e) {
-      console.error('routing failed', e);
+      console.warn('Report saved; routing needs review:', e);
     }
   };
 

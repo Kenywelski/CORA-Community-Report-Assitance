@@ -55,7 +55,7 @@ const services = [
   {
     icon: Siren,
     label: "Emergency Contacts",
-    description: "Police, Fire, Rescue, Health hotlines for Cortes",
+    description: "Emergency contacts for Barangay Purisima, Tago",
     color: "text-destructive",
     bgColor: "bg-destructive/10",
     path: "/emergency",
@@ -64,7 +64,7 @@ const services = [
   {
     icon: MapPin,
     label: "Office Directory",
-    description: "Municipal offices, contacts, and schedules",
+    description: "Barangay offices, contacts, and schedules",
     color: "text-success",
     bgColor: "bg-success/10",
     path: "/directory",

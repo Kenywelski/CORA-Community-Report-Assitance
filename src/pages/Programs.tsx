@@ -4,56 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { BottomNav } from '@/components/BottomNav';
 import { ArrowLeft, GraduationCap, HeartPulse, Briefcase, Users, Baby, Sprout } from 'lucide-react';
 
-const programs = [
-  {
-    icon: GraduationCap,
-    category: 'Scholarship',
-    title: 'Cortes Municipal Scholarship Program',
-    description: 'Financial assistance for deserving students from Cortes pursuing college education.',
-    schedule: 'Application: June – August yearly',
-    color: 'text-primary', bg: 'bg-primary/10',
-  },
-  {
-    icon: HeartPulse,
-    category: 'Health',
-    title: 'Free Medical & Dental Mission',
-    description: 'Quarterly medical, dental, and laboratory check-ups for residents at the Rural Health Unit.',
-    schedule: 'Every 1st Saturday of the quarter',
-    color: 'text-destructive', bg: 'bg-destructive/10',
-  },
-  {
-    icon: Sprout,
-    category: 'Livelihood',
-    title: 'Sustainable Livelihood Program (SLP)',
-    description: 'Capital, training, and seedling assistance for farmers, fisherfolk, and small enterprises.',
-    schedule: 'Continuous enrollment at MSWDO',
-    color: 'text-success', bg: 'bg-success/10',
-  },
-  {
-    icon: Users,
-    category: 'Youth',
-    title: 'Sangguniang Kabataan (SK) Programs',
-    description: 'Sports clinics, leadership training, and youth development activities per barangay.',
-    schedule: 'Year-round',
-    color: 'text-accent', bg: 'bg-accent/10',
-  },
-  {
-    icon: Baby,
-    category: 'Senior Citizen',
-    title: 'OSCA Benefits & Pension Distribution',
-    description: 'Social pension, ID issuance, and special assistance for senior citizens of Cortes.',
-    schedule: 'Distribution every quarter',
-    color: 'text-warning', bg: 'bg-warning/10',
-  },
-  {
-    icon: Briefcase,
-    category: 'Employment',
-    title: 'PESO Job Placement & TUPAD',
-    description: 'Job referrals, special program for employment, and emergency employment (TUPAD).',
-    schedule: 'Apply anytime at PESO Office',
-    color: 'text-primary', bg: 'bg-primary/10',
-  },
-];
+const programs: { icon: typeof GraduationCap; category: string; title: string; description: string; schedule: string; color: string; bg: string }[] = [];
 
 const Programs = () => {
   const navigate = useNavigate();
@@ -64,10 +15,11 @@ const Programs = () => {
           <button onClick={() => navigate('/')} className="flex items-center gap-2 text-muted-foreground mb-4 lg:hidden">
             <ArrowLeft className="h-5 w-5" /><span className="text-sm font-medium">Back</span>
           </button>
-          <h1 className="text-2xl font-bold">Municipal Programs</h1>
-          <p className="text-muted-foreground text-sm mt-1">Active programs and services for Cortes residents</p>
+          <h1 className="text-2xl font-bold">Community Programs</h1>
+          <p className="text-muted-foreground text-sm mt-1">Community programs for Barangay Purisima, Tago, Surigao del Sur</p>
         </div>
         <div className="px-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {programs.length === 0 && <p className="col-span-full py-8 text-center text-muted-foreground">No verified community programs available for Barangay Purisima yet.</p>}
           {programs.map((p, i) => {
             const Icon = p.icon;
             return (

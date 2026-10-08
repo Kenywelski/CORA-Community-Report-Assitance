@@ -13,7 +13,7 @@ type Msg = { role: 'user' | 'assistant'; content: string };
 const WELCOME: Msg = {
   role: 'assistant',
   content:
-    "Kumusta! I'm the myCortes complaint assistant. Tell me what problem you want to report — for example \"walang ilaw sa kalsada sa Poblacion\" — and I'll ask only what's needed, then file it for you.",
+    "Kumusta! I'm the CORA complaint assistant. Tell me what problem you want to report — for example \"walang ilaw sa kalsada sa Purisima\" — and I'll ask only what's needed, then file it for you.",
 };
 
 const SUGGESTIONS = [
