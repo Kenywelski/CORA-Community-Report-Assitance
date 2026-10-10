@@ -1,4 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import {
   Home,
@@ -11,6 +13,9 @@ import {
   User,
   LogOut,
   Plus,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +27,7 @@ interface BottomNavProps {
 }
 
 export function BottomNav({ currentPath }: BottomNavProps) {
+  const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { signOut } = useAuth();
@@ -68,35 +74,47 @@ export function BottomNav({ currentPath }: BottomNavProps) {
   return (
     <>
       {/* Desktop Sidebar - hidden on mobile */}
-      <nav aria-label="Main navigation" className="desktop-sidebar fixed inset-y-0 left-0 z-50 hidden w-64 flex-col border-r border-border bg-card px-3 py-5 lg:flex">
-        <div className="mb-5 rounded-2xl bg-primary px-4 py-4 text-primary-foreground shadow-sm">
-          <span className="block text-xl font-bold leading-none">CORA</span>
-          <span className="mt-1 block text-xs opacity-80">Complaint & Community Portal</span>
-          <span className="mt-2 block text-[11px] opacity-70">Barangay Purisima, Tago, Surigao del Sur</span>
+      <nav aria-label="Main navigation" data-collapsed={collapsed} className={cn("desktop-sidebar fixed inset-y-0 left-0 z-50 hidden flex-col border-r border-border bg-card lg:flex", collapsed ? "w-20 px-3" : "w-64 px-4")}>
+        <div className={cn("flex min-h-20 items-center border-b border-border", collapsed ? "justify-center" : "justify-between gap-2")}>
+          {!collapsed && <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground"><ShieldCheck className="h-6 w-6" /></div>
+            <div><span className="block text-xl font-extrabold text-primary">CORA</span><span className="block text-[10px] font-medium text-muted-foreground">Community Portal</span></div>
+          </div>}
+          <Button variant="ghost" size="icon-sm" className="shrink-0 rounded-lg text-muted-foreground" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+            {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+          </Button>
         </div>
-        <button
+        {!collapsed && <div className="flex gap-2 py-4 text-xs leading-relaxed text-muted-foreground"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span>Barangay Purisima<br />Tago, Surigao del Sur</span></div>}
+        <Button
           type="button"
           onClick={() => navigate('/report-issue')}
-          className="mb-4 flex items-center justify-center gap-2 rounded-xl bg-accent px-3 py-2.5 text-sm font-semibold text-accent-foreground shadow-sm transition-transform hover:scale-[1.02]"
+          variant="accent"
+          aria-label="Report an Issue"
+          title={collapsed ? "Report an Issue" : undefined}
+          className={cn("my-3 shrink-0 rounded-lg", collapsed ? "w-full px-0" : "w-full")}
         >
-          <Plus className="h-4 w-4" /> Report an Issue
-        </button>
-        <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Menu</p>
-        <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
+          <Plus className="h-4 w-4" /> {!collapsed && "Report an Issue"}
+        </Button>
+        <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pb-3">
           {desktopNavItems.filter((i) => i.path !== '/report-issue').map((item) => {
             const isActive = activePath === item.path;
             const Icon = item.icon;
             return (
-              <button
+              <div key={item.path}>
+              {!collapsed && (item.path === '/' || item.path === '/updates' || item.path === '/profile') && <p className="px-3 pb-2 pt-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{item.path === '/' ? 'Your reports' : item.path === '/updates' ? 'Community' : 'Account'}</p>}
+              <Button
+                variant="ghost"
                 key={item.path + item.label}
                 onClick={() => navigate(item.path)}
+                aria-label={item.label}
+                title={collapsed ? item.label : undefined}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors",
-                  isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  "relative h-11 w-full gap-3 rounded-lg text-left text-[13px] font-medium",
+                  collapsed ? "justify-center px-0" : "justify-start px-3",
+                  isActive ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
-                {isActive && <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-primary" />}
                 <div className="relative">
                   <Icon className="h-5 w-5" />
                   {item.badge && (
@@ -105,19 +123,25 @@ export function BottomNav({ currentPath }: BottomNavProps) {
                     </span>
                   )}
                 </div>
-                <span>{item.label}</span>
-              </button>
+                {!collapsed && <span className="whitespace-normal leading-tight">{item.label}</span>}
+              </Button>
+              </div>
             );
           })}
         </div>
-        <button
+        <div className="shrink-0 border-t border-border py-3">
+        <Button
+          variant="ghost"
           type="button"
           onClick={handleLogout}
-          className="mt-3 flex items-center gap-3 rounded-xl border-t border-border px-3 py-3 text-left text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
+          aria-label="Logout"
+          title={collapsed ? "Logout" : undefined}
+          className={cn("w-full gap-3 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 hover:text-destructive", collapsed ? "justify-center px-0" : "justify-start px-3")}
         >
           <LogOut className="h-5 w-5" />
-          <span>Logout</span>
-        </button>
+          {!collapsed && <span>Logout</span>}
+        </Button>
+        </div>
       </nav>
 
       {/* Mobile Bottom Nav - hidden on desktop */}
