@@ -9,6 +9,10 @@
     padding-left: 16rem;
   }
 
+  #root:has(.desktop-sidebar[data-collapsed="true"]) {
+    padding-left: 5rem;
+  }
+
   #root:has(.desktop-sidebar) [class~="lg:pt-14"] {
     padding-top: 0;
   }
