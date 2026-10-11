@@ -13,6 +13,7 @@ import { LocationPicker } from '@/components/LocationPicker';
 import { BarangaySelect } from '@/components/BarangaySelect';
 import { DirectCameraCapture } from '@/components/DirectCameraCapture';
 import { z } from 'zod';
+import { VoiceReportAssistant, type VoiceOrganized } from '@/components/VoiceReportAssistant';
 
 const reportCategories = [
   { value: 'road_damage', label: 'Road Damage' },
@@ -54,6 +55,15 @@ const ReportIssue = () => {
   const [isReviewing, setIsReviewing] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [usedVoice, setUsedVoice] = useState(false);
+
+  const applyVoice = (r: VoiceOrganized) => {
+    if (r.category && r.category !== 'unknown' && reportCategories.some((c) => c.value === r.category)) setCategory(r.category);
+    setDescription(r.description.slice(0, 1000));
+    if (r.location_details && !locationDetails) setLocationDetails(r.location_details.slice(0, 200));
+    setErrors({});
+    setUsedVoice(true);
+  };
 
   const requestCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -134,7 +144,7 @@ const ReportIssue = () => {
       id: newId,
       user_id: user?.id || null,
       title: `[REPORT] ${selected?.label || category}`,
-      description: `${description}\n\n${contactName ? `Reporter: ${contactName}` : 'Anonymous Report'}\n${contactNumber ? `Contact: ${contactNumber}` : ''}\n${locationDetails ? `Location Details: ${locationDetails}` : ''}`,
+      description: `${description}\n\n${contactName ? `Reporter: ${contactName}` : 'Anonymous Report'}\n${contactNumber ? `Contact: ${contactNumber}` : ''}\n${locationDetails ? `Location Details: ${locationDetails}` : ''}${usedVoice ? '\nInput: CORA voice-assisted report (resident reviewed and confirmed)' : ''}`,
       category: `Report: ${selected?.label || category}`,
       location: barangay + (locationDetails ? `, ${locationDetails}` : ''),
       latitude: coords?.lat ?? null,
@@ -213,7 +223,7 @@ const ReportIssue = () => {
                 onClick={() => {
                   setIsSuccess(false);
                   setCategory(''); setDescription(''); setBarangay('');
-                  setLocationDetails(''); setContactName(''); setContactNumber('');
+                  setLocationDetails(''); setContactName(''); setContactNumber(''); setUsedVoice(false);
                   setPhotoUrl(null); setSubmittedReportId(null); setSubmittedReportStatus(null); setSubmittedAt(null); setCoords(null);
                   setIsReviewing(false);
                   setCameraOpen(true);
@@ -270,6 +280,13 @@ const ReportIssue = () => {
                   </div>
                   <Button type="button" variant="outline" size="sm" onClick={() => setCameraOpen(true)}>Retake</Button>
                 </div>
+
+                <VoiceReportAssistant
+                  barangay={barangay}
+                  locationDetails={locationDetails}
+                  hasPhoto={!!photoUrl}
+                  onApply={applyVoice}
+                />
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Community Issue *</label>
