@@ -223,7 +223,7 @@ const ReportIssue = () => {
                 onClick={() => {
                   setIsSuccess(false);
                   setCategory(''); setDescription(''); setBarangay('');
-                  setLocationDetails(''); setContactName(''); setContactNumber('');
+                  setLocationDetails(''); setContactName(''); setContactNumber(''); setUsedVoice(false);
                   setPhotoUrl(null); setSubmittedReportId(null); setSubmittedReportStatus(null); setSubmittedAt(null); setCoords(null);
                   setIsReviewing(false);
                   setCameraOpen(true);
