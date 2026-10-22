@@ -22,9 +22,6 @@ Deno.serve(async (req) => {
     new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   try {
-    const auth = await requireUser(req);
-    if (!auth.ok) return json({ error: auth.error }, auth.status);
-
     const { report_id } = await req.json() as { report_id?: string };
     if (!report_id) return json({ error: "report_id is required" }, 400);
 
@@ -34,6 +31,17 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    const auth = await requireUser(req);
+    let anonymousPass = false;
+    if (!auth.ok) {
+      // Guest submissions carry no session. Allow a one-shot unauthenticated
+      // routing pass for anonymous reports only (user_id null, never routed).
+      const { data: candidate } = await supabase
+        .from("service_requests").select("user_id, ai_processed_at").eq("id", report_id).maybeSingle();
+      anonymousPass = !!candidate && candidate.user_id === null && !candidate.ai_processed_at;
+      if (!anonymousPass) return json({ error: auth.error }, auth.status);
+    }
+
     const { data: report, error: rErr } = await supabase
       .from("service_requests")
       .select("id, title, description, category, location, status, department_id")
@@ -42,7 +50,8 @@ Deno.serve(async (req) => {
     if (rErr || !report) return json({ error: "Report not found" }, 404);
 
     // Only admins/staff, or the citizen who filed the report, may trigger routing.
-    if (!auth.isStaff) {
+    // Anonymous reports were already vetted in the anonymousPass check above.
+    if (auth.ok && !auth.isStaff) {
       const { data: owner } = await supabase
         .from("service_requests").select("user_id, ai_processed_at").eq("id", report_id).maybeSingle();
       if (!owner || owner.user_id !== auth.userId) return json({ error: "Not authorized for this report" }, 403);
