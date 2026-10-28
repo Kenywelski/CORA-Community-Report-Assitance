@@ -313,7 +313,7 @@ const MyRequests = () => {
         </AuthGuard>
       </div>
 
-      <BottomNav currentPath="/" onNavigate={(path) => navigate(path)} />
+      <BottomNav currentPath="/my-requests" onNavigate={(path) => navigate(path)} />
     </div>
   );
 };

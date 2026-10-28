@@ -6,16 +6,35 @@
 
 @media (min-width: 1024px) {
   #root:has(.desktop-sidebar) {
-    padding-left: 16rem;
+    padding-left: 17rem;
+    transition: padding-left 200ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   #root:has(.desktop-sidebar[data-collapsed="true"]) {
-    padding-left: 5rem;
+    padding-left: 4.75rem;
   }
 
   #root:has(.desktop-sidebar) [class~="lg:pt-14"] {
     padding-top: 0;
   }
+}
+
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 9999px;
 }
 
 /* Leaflet map styles - imported dynamically but needs base z-index */
