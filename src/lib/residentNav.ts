@@ -129,3 +129,14 @@ export function isResidentNavItemActive(itemPath: string, activePath: string): b
 export function parseSidebarCollapsed(rawValue: string | null | undefined): boolean {
   return rawValue === 'true';
 }
+
+/**
+ * Detects whether the user agent belongs to a mobile phone device
+ * (so phones always use the bottom navigation bar instead of the desktop sidebar,
+ * even if mobile Chrome is in "Desktop site" mode).
+ */
+export function isPhoneUserAgent(userAgent: string | null | undefined): boolean {
+  if (!userAgent) return false;
+  return /Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+}
+

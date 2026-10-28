@@ -5,6 +5,7 @@ import {
   resolveActiveResidentPath,
   isResidentNavItemActive,
   parseSidebarCollapsed,
+  isPhoneUserAgent,
 } from './residentNav';
 
 test('RESIDENT_NAV_SECTIONS organizes items into MAIN, COMMUNITY, and ACCOUNT without broken routes', () => {
@@ -53,3 +54,25 @@ test('parseSidebarCollapsed safely parses persisted boolean strings', () => {
   assert.equal(parseSidebarCollapsed(null), false);
   assert.equal(parseSidebarCollapsed(undefined), false);
 });
+
+test('isPhoneUserAgent identifies Android phones and iPhones while excluding desktop browsers', () => {
+  assert.equal(
+    isPhoneUserAgent(
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36',
+    ),
+    true,
+  );
+  assert.equal(
+    isPhoneUserAgent(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+    ),
+    true,
+  );
+  assert.equal(
+    isPhoneUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
+    ),
+    false,
+  );
+});
+
