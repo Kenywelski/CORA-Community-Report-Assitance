@@ -55,7 +55,16 @@ export const AdminSidebar = () => {
         >
           <Menu className="h-5 w-5" />
         </Button>
-        <span className="ml-3 font-semibold text-primary">Admin Panel</span>
+        <div className="ml-3 flex items-center gap-2">
+          <div className="h-8 w-8 rounded-lg overflow-hidden bg-white ring-1 ring-border shrink-0">
+            <img
+              src="/assets/aistudio/3d37efc1-7635-48f1-b2ad-74baa90bab76_7adcf976.png"
+              alt="CORA Logo"
+              className="h-full w-full scale-[1.18] object-cover"
+            />
+          </div>
+          <span className="font-semibold text-primary">CORA Admin</span>
+        </div>
       </div>
 
       {/* Sidebar */}
@@ -70,7 +79,16 @@ export const AdminSidebar = () => {
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-border">
           {!isCollapsed && (
-            <span className="font-bold text-lg text-primary">Admin Panel</span>
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-xl overflow-hidden bg-white shadow-sm ring-1 ring-border shrink-0">
+                <img
+                  src="/assets/aistudio/3d37efc1-7635-48f1-b2ad-74baa90bab76_7adcf976.png"
+                  alt="CORA Logo"
+                  className="h-full w-full scale-[1.18] object-cover"
+                />
+              </div>
+              <span className="font-bold text-lg text-primary">CORA Admin</span>
+            </div>
           )}
           <Button
             variant="ghost"

@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Button } from '@/components/ui/button';
 import { Crosshair, Loader2, MapPin } from 'lucide-react';
+import { PURISIMA_CENTER } from '@/lib/purisimaGeo';
 
 // Fix Leaflet default icon paths in bundlers
 delete (L.Icon.Default.prototype as { _getIconUrl?: unknown })._getIconUrl;
@@ -21,7 +22,7 @@ interface LocationPickerProps {
 }
 
 // Default center: Purisima, Tago, Surigao del Sur (OpenStreetMap place node 8928665117)
-const DEFAULT_CENTER: [number, number] = [9.0178894, 126.2335553];
+const DEFAULT_CENTER: [number, number] = PURISIMA_CENTER;
 
 const ClickHandler = ({ onClick }: { onClick: (lat: number, lng: number) => void }) => {
   useMapEvents({

@@ -22,9 +22,13 @@ export const HeroHeader = () => {
 
       <div className="relative z-10 px-4 pt-12 pb-8 lg:pt-6 lg:pb-12 lg:px-8">
         <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-xs font-bold text-white ring-1 ring-white/25">
-              CORA
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-white overflow-hidden flex items-center justify-center shadow-sm ring-1 ring-white/30 shrink-0">
+              <img
+                src="/assets/aistudio/3d37efc1-7635-48f1-b2ad-74baa90bab76_7adcf976.png"
+                alt="CORA Logo"
+                className="w-full h-full scale-[1.18] object-cover"
+              />
             </div>
             <div>
               <p className="text-white/90 text-sm font-semibold">Community Report System</p>

@@ -154,8 +154,12 @@ const Auth = () => {
           <div className="absolute inset-0 hero-gradient opacity-90" />
           <div className="relative z-10 flex flex-col justify-between h-full p-10">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-sm font-bold text-white ring-1 ring-white/25">
-                CORA
+              <div className="w-12 h-12 rounded-xl bg-white overflow-hidden flex items-center justify-center shadow-sm ring-1 ring-white/30 shrink-0">
+                <img
+                  src="/assets/aistudio/3d37efc1-7635-48f1-b2ad-74baa90bab76_7adcf976.png"
+                  alt="CORA Logo"
+                  className="w-full h-full scale-[1.18] object-cover"
+                />
               </div>
               <div>
                 <h1 className="text-white text-xl font-bold tracking-tight">CORA</h1>
@@ -189,8 +193,12 @@ const Auth = () => {
             </button>
 
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-xl overflow-hidden bg-white/20 backdrop-blur-sm">
-                <span className="text-white text-sm font-bold">CORA</span>
+              <div className="w-12 h-12 rounded-xl overflow-hidden bg-white flex items-center justify-center shadow-sm ring-1 ring-white/30 shrink-0">
+                <img
+                  src="/assets/aistudio/3d37efc1-7635-48f1-b2ad-74baa90bab76_7adcf976.png"
+                  alt="CORA Logo"
+                  className="w-full h-full scale-[1.18] object-cover"
+                />
               </div>
               <div>
                 <p className="text-white text-xl font-bold tracking-tight">CORA</p>

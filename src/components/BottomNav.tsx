@@ -77,7 +77,13 @@ export function BottomNav({ currentPath }: BottomNavProps) {
       <nav aria-label="Main navigation" data-collapsed={collapsed} className={cn("desktop-sidebar fixed inset-y-0 left-0 z-50 hidden flex-col border-r border-border bg-card lg:flex", collapsed ? "w-20 px-3" : "w-64 px-4")}>
         <div className={cn("flex min-h-20 items-center border-b border-border", collapsed ? "justify-center" : "justify-between gap-2")}>
           {!collapsed && <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground"><ShieldCheck className="h-6 w-6" /></div>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-border">
+              <img
+                src="/assets/aistudio/3d37efc1-7635-48f1-b2ad-74baa90bab76_7adcf976.png"
+                alt="CORA Logo"
+                className="h-full w-full scale-[1.18] object-cover"
+              />
+            </div>
             <div><span className="block text-xl font-extrabold text-primary">CORA</span><span className="block text-[10px] font-medium text-muted-foreground">Community Portal</span></div>
           </div>}
           <Button variant="ghost" size="icon-sm" className="shrink-0 rounded-lg text-muted-foreground" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>

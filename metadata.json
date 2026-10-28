@@ -1,0 +1,9 @@
+{
+  "name": "CORA | Community Report System",
+  "description": "CORA, the Community Report System for Barangay Purisima, Tago, Surigao del Sur.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
