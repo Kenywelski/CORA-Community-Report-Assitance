@@ -52,6 +52,7 @@ export const ChatbotLauncher = () => {
   const isAuthRoute = useMemo(
     () =>
       AUTH_ROUTES.some((r) => location.pathname === r || location.pathname.startsWith(r + '/')) ||
+      location.pathname === '/landing' ||
       location.pathname === '/admin' ||
       location.pathname.startsWith('/admin/'),
     [location.pathname],

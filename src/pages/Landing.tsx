@@ -37,6 +37,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { BarangayPurisimaMap } from "@/components/BarangayPurisimaMap";
 import { AnnouncementDetailDialog } from "@/components/AnnouncementDetailDialog";
+import { LandingFaqChatbot } from "@/components/LandingFaqChatbot";
 
 interface Announcement {
   id: string;
@@ -152,6 +153,7 @@ export const Landing = () => {
   const [showVideo, setShowVideo] = useState(false);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [faqChatOpen, setFaqChatOpen] = useState(false);
 
   useEffect(() => {
     document.title = "CORA — Barangay Purisima | Community Reporting System";
@@ -216,6 +218,10 @@ export const Landing = () => {
 
   const scrollToSection = (id: string) => {
     setMobileMenuOpen(false);
+    if (id === "faqs") {
+      setFaqChatOpen(true);
+      return;
+    }
     if (id === "home") {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
@@ -232,6 +238,7 @@ export const Landing = () => {
     { label: "Announcements", id: "announcements" },
     { label: "Programs", id: "programs" },
     { label: "Emergency Contacts", id: "emergency-contacts" },
+    { label: "FAQs", id: "faqs" },
   ];
 
   const primaryBarangayContact = emergencyContacts.find(
@@ -271,7 +278,7 @@ export const Landing = () => {
           {/* Desktop Navigation Links + Sign In */}
           <nav
             aria-label="Primary navigation"
-            className="hidden items-center gap-7 lg:flex"
+            className="hidden items-center gap-5 xl:gap-6 lg:flex"
           >
             {navItems.map((item) => (
               <button
@@ -917,6 +924,19 @@ export const Landing = () => {
         announcement={selectedAnnouncement}
         open={isDetailOpen}
         onOpenChange={setIsDetailOpen}
+      />
+
+      <LandingFaqChatbot
+        open={faqChatOpen}
+        onOpenChange={setFaqChatOpen}
+        onScrollToSection={scrollToSection}
+        onNavigate={(path) => navigate(path)}
+        isAuthenticated={Boolean(user)}
+        liveContext={{
+          emergencyContacts,
+          announcements,
+          programs,
+        }}
       />
     </div>
   );
