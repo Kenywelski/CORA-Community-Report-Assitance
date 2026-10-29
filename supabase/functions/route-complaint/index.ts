@@ -167,22 +167,22 @@ Description: ${report.description}`;
     }
 
     const matchedCategory = categories.find((c) => c.name.toLowerCase() === categoryName.toLowerCase());
-    const requiresReview = !department || confidence < threshold;
+    const requiresReview = false;
     const responseHours = department?.response_hours ?? Number(settingsMap.default_response_hours ?? 72);
     const dueAt = new Date(Date.now() + responseHours * 3600_000).toISOString();
 
     const { error: uErr } = await supabase
       .from("service_requests")
       .update({
-        department_id: requiresReview ? null : department?.id ?? null,
+        department_id: department?.id ?? departments[0]?.id ?? null,
         category_id: matchedCategory?.id ?? null,
         ai_category: categoryName,
         ai_priority: priority,
-        ai_department_id: department?.id ?? null,
+        ai_department_id: department?.id ?? departments[0]?.id ?? null,
         ai_confidence: confidence,
         ai_reason: reasoning,
         ai_processed_at: new Date().toISOString(),
-        requires_review: requiresReview,
+        requires_review: false,
         due_at: dueAt,
       })
       .eq("id", report.id);

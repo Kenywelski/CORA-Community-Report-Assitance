@@ -1,20 +1,49 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { 
-  CheckCircle, Clock, XCircle, MapPin, 
-  MessageSquare, RefreshCw, Loader2, Trash2,
-  User, FileText, Calendar, Hash, Phone, Home, Cake, Users as UsersIcon, Briefcase, Save, X
+import {
+  CheckCircle,
+  XCircle,
+  MapPin,
+  MessageSquare,
+  RefreshCw,
+  Loader2,
+  Trash2,
+  User,
+  FileText,
+  Calendar,
+  Hash,
+  Phone,
+  Home,
+  Cake,
+  Users as UsersIcon,
+  Briefcase,
+  Save,
+  X,
+  Sparkles,
+  ShieldCheck,
+  Search,
 } from 'lucide-react';
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { format } from 'date-fns';
@@ -24,38 +53,64 @@ import { AdminLayout } from '@/components/admin/AdminLayout';
 import { MediaGallery, MediaItem } from '@/components/MediaUpload';
 import { LocationPicker } from '@/components/LocationPicker';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
 import type { Tables } from '@/integrations/supabase/types';
+import {
+  APPROVED_CONCERN_CATEGORIES,
+  evaluateExistingReportRecordByAi,
+  inspectCapturedImageQuality,
+  runMobileNetV3Classification,
+  evaluateImageSuitability,
+  evaluateAutonomousAiReportDecision,
+  DEFAULT_CONFIDENCE_THRESHOLD,
+} from '@/lib/mobilenetClassifyServiceBridge';
 
 type ServiceRequest = Tables<'service_requests'>;
 
-const statusConfig = {
-  pending: { label: 'Pending', color: 'bg-warning text-warning-foreground', icon: Clock },
-  in_progress: { label: 'Processing', color: 'bg-primary text-primary-foreground', icon: RefreshCw },
-  completed: { label: 'Completed', color: 'bg-success text-success-foreground', icon: CheckCircle },
-  rejected: { label: 'Rejected', color: 'bg-destructive text-destructive-foreground', icon: XCircle },
+const statusConfig: Record<
+  string,
+  { label: string; color: string; icon: typeof CheckCircle }
+> = {
+  pending: {
+    label: 'AI Evaluating',
+    color: 'bg-primary/15 text-primary',
+    icon: Sparkles,
+  },
+  in_progress: {
+    label: 'AI Approved · Active',
+    color: 'bg-primary text-primary-foreground',
+    icon: CheckCircle,
+  },
+  completed: {
+    label: 'Resolved',
+    color: 'bg-success text-success-foreground',
+    icon: CheckCircle,
+  },
+  rejected: {
+    label: 'AI Auto-Rejected',
+    color: 'bg-destructive text-destructive-foreground',
+    icon: XCircle,
+  },
 };
 
-// Parse "Label: value" description blocks (mixed Tagalog/English)
-const FIELD_MAP: Record<string, { key: string; icon: any }> = {
+const FIELD_MAP: Record<string, { key: string; icon: typeof User }> = {
   'buong pangalan': { key: 'fullName', icon: User },
   'full name': { key: 'fullName', icon: User },
   'petsa ng kapanganakan': { key: 'birthDate', icon: Cake },
   'date of birth': { key: 'birthDate', icon: Cake },
-  'edad': { key: 'age', icon: Cake },
-  'age': { key: 'age', icon: Cake },
-  'kasarian': { key: 'gender', icon: UsersIcon },
-  'gender': { key: 'gender', icon: UsersIcon },
+  edad: { key: 'age', icon: Cake },
+  age: { key: 'age', icon: Cake },
+  kasarian: { key: 'gender', icon: UsersIcon },
+  gender: { key: 'gender', icon: UsersIcon },
   'katayuang sibil': { key: 'civilStatus', icon: UsersIcon },
   'civil status': { key: 'civilStatus', icon: UsersIcon },
-  'tirahan': { key: 'address', icon: Home },
-  'address': { key: 'address', icon: Home },
-  'trabaho': { key: 'occupation', icon: Briefcase },
-  'occupation': { key: 'occupation', icon: Briefcase },
+  tirahan: { key: 'address', icon: Home },
+  address: { key: 'address', icon: Home },
+  trabaho: { key: 'occupation', icon: Briefcase },
+  occupation: { key: 'occupation', icon: Briefcase },
   'contact number': { key: 'contact', icon: Phone },
-  'contact': { key: 'contact', icon: Phone },
-  'layunin': { key: 'purpose', icon: FileText },
-  'purpose': { key: 'purpose', icon: FileText },
+  contact: { key: 'contact', icon: Phone },
+  layunin: { key: 'purpose', icon: FileText },
+  purpose: { key: 'purpose', icon: FileText },
   'taunang kita': { key: 'income', icon: Briefcase },
 };
 
@@ -63,8 +118,9 @@ function parseDescription(desc: string) {
   const fields: Record<string, string> = {};
   const extras: string[] = [];
   if (!desc) return { fields, extras };
-  // Split on newlines, fall back to splitting on " <Label>:" pattern
-  const lines = desc.includes('\n') ? desc.split('\n') : desc.split(/(?=\s[A-ZÀ-ÿ][a-zà-ÿ ]+:\s)/);
+  const lines = desc.includes('\n')
+    ? desc.split('\n')
+    : desc.split(/(?=\s[A-ZÀ-ÿ][a-zà-ÿ ]+:\s)/);
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
@@ -88,61 +144,225 @@ function parseDescription(desc: string) {
 const AdminRequests = () => {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null);
+  const [isAutoEvaluating, setIsAutoEvaluating] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(
+    null
+  );
   const [adminNotes, setAdminNotes] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
-  const [aiFilter, setAiFilter] = useState<'all' | 'suspicious' | 'valid' | 'rejected' | 'pending'>('all');
-  const [pendingStatus, setPendingStatus] = useState<null | 'pending' | 'in_progress' | 'completed' | 'rejected'>(null);
-  const [rejectReason, setRejectReason] = useState('');
+  const [aiFilter, setAiFilter] = useState<'all' | 'valid' | 'rejected'>('all');
+
+  /**
+   * Autonomous AI Enforcement (No Human-in-the-Loop):
+   * Automatically evaluates any report that is still pending or marked for review
+   * and immediately approves it (if clear & in the 4 supported classes) or rejects it
+   * (if blurred, missing photo, or unrelated to the 4 classes).
+   */
+  const applyAutonomousAiToRecord = useCallback(
+    async (req: ServiceRequest): Promise<ServiceRequest> => {
+      const nowIso = new Date().toISOString();
+      let decision = evaluateExistingReportRecordByAi(req);
+
+      // If there's an attached photo URL and we are running in the browser, also inspect actual image clarity/blur if possible
+      const imageUrl =
+        req.photo_url ||
+        (req.media_urls && req.media_urls.length > 0 ? req.media_urls[0] : null);
+
+      if (imageUrl && decision.verdict === 'approved') {
+        try {
+          const response = await fetch(imageUrl);
+          if (response.ok) {
+            const blob = await response.blob();
+            if (blob.size > 0) {
+              const quality = await inspectCapturedImageQuality(blob);
+              const inference = await runMobileNetV3Classification({
+                imageUrl,
+                photoBlob: blob,
+                gps:
+                  req.latitude != null && req.longitude != null
+                    ? {
+                        lat: Number(req.latitude),
+                        lng: Number(req.longitude),
+                        accuracyMeters: 15,
+                        locationTimestamp: Date.now(),
+                        capturedAtTimestamp: Date.now(),
+                      }
+                    : null,
+              });
+              const suitability = evaluateImageSuitability(
+                quality,
+                inference,
+                DEFAULT_CONFIDENCE_THRESHOLD
+              );
+              // Prefer explicit valid 4-class category if the image itself passed blur/readability checks
+              if (!suitability.isReadable) {
+                decision = evaluateAutonomousAiReportDecision({
+                  suitability,
+                  hasPhoto: true,
+                });
+              }
+            }
+          }
+        } catch {
+          // Use record-level AI evaluation if cross-origin image fetch is blocked
+        }
+      }
+
+      const nextStatus =
+        req.status === 'completed' ? 'completed' : decision.requestStatus;
+
+      const patch = {
+        status: nextStatus,
+        ai_category:
+          decision.matchedCategory?.label ?? req.ai_category ?? null,
+        ai_confidence: decision.confidencePercent,
+        ai_reason: decision.reason,
+        ai_validation_status: decision.aiValidationStatus,
+        ai_validation_confidence: decision.confidencePercent,
+        ai_validation_reason: decision.reason,
+        ai_validated_at: nowIso,
+        ai_validation_elements: decision.elements,
+        admin_review_status: decision.adminReviewStatus,
+        admin_notes: req.admin_notes || decision.adminNote,
+        acknowledged_at:
+          decision.verdict === 'approved'
+            ? req.acknowledged_at || nowIso
+            : null,
+        response_at:
+          decision.verdict === 'approved' ? req.response_at || nowIso : null,
+        requires_review: false,
+      };
+
+      await supabase.from('service_requests').update(patch).eq('id', req.id);
+
+      return {
+        ...req,
+        ...patch,
+      } as ServiceRequest;
+    },
+    []
+  );
+
+  const fetchRequests = useCallback(async () => {
+    const { data } = await supabase
+      .from('service_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (data) {
+      // Automatically process any pending or unvalidated report with AI (zero human-in-the-loop)
+      const needsAutoDecision = data.filter(
+        (r) =>
+          r.status === 'pending' ||
+          r.requires_review === true ||
+          !r.ai_validation_status ||
+          r.ai_validation_status === 'pending' ||
+          r.ai_validation_status === 'suspicious'
+      );
+
+      if (needsAutoDecision.length > 0) {
+        const updatedMap = new Map<string, ServiceRequest>();
+        for (const item of needsAutoDecision) {
+          const updated = await applyAutonomousAiToRecord(item);
+          updatedMap.set(item.id, updated);
+        }
+        setRequests(data.map((r) => updatedMap.get(r.id) ?? r));
+      } else {
+        setRequests(data);
+      }
+    }
+    setIsLoading(false);
+  }, [applyAutonomousAiToRecord]);
 
   useEffect(() => {
     fetchRequests();
     const channel = supabase
       .channel('admin-requests-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'service_requests' }, () => fetchRequests())
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'service_requests' },
+        () => fetchRequests()
+      )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchRequests]);
 
-  const fetchRequests = async () => {
-    const { data } = await supabase
-      .from('service_requests')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (data) setRequests(data);
-    setIsLoading(false);
+  const handleAutoVerifyAll = async () => {
+    setIsAutoEvaluating(true);
+    try {
+      const updatedList: ServiceRequest[] = [];
+      let approvedCount = 0;
+      let rejectedCount = 0;
+
+      for (const req of requests) {
+        const updated = await applyAutonomousAiToRecord(req);
+        if (updated.ai_validation_status === 'valid') approvedCount++;
+        else rejectedCount++;
+        updatedList.push(updated);
+      }
+
+      setRequests(updatedList);
+      if (selectedRequest) {
+        const refreshed = updatedList.find((r) => r.id === selectedRequest.id);
+        if (refreshed) setSelectedRequest(refreshed);
+      }
+      toast.success(
+        `AI Auto-Verification complete: ${approvedCount} approved, ${rejectedCount} rejected.`
+      );
+    } finally {
+      setIsAutoEvaluating(false);
+    }
   };
 
-  const updateStatus = async (id: string, status: 'pending' | 'in_progress' | 'completed' | 'rejected', notes?: string, keepOpen = false) => {
+  const handleRerunSingleAiDecision = async (req: ServiceRequest) => {
     setIsUpdating(true);
-    const updateData: any = { status };
-    if (notes !== undefined) updateData.admin_notes = notes;
+    try {
+      const updated = await applyAutonomousAiToRecord(req);
+      setRequests((prev) =>
+        prev.map((item) => (item.id === updated.id ? updated : item))
+      );
+      setSelectedRequest(updated);
+      setAdminNotes(updated.admin_notes || '');
+      if (updated.ai_validation_status === 'valid') {
+        toast.success(
+          `AI Automatically Approved: ${updated.ai_category || updated.category}`
+        );
+      } else {
+        toast.error(
+          updated.ai_validation_reason || 'AI Automatically Rejected report.'
+        );
+      }
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
+  const markReportResolved = async (id: string) => {
+    setIsUpdating(true);
+    const nowIso = new Date().toISOString();
     const { error } = await supabase
       .from('service_requests')
-      .update(updateData)
+      .update({
+        status: 'completed',
+        resolved_at: nowIso,
+        admin_notes: adminNotes || undefined,
+      })
       .eq('id', id);
 
     if (!error) {
-      const refNum = `REQ-${id.slice(0, 8).toUpperCase()}`;
-      if (status === 'completed') toast.success(`Request approved • Ref ${refNum}`);
-      else if (status === 'rejected') toast.success('Request rejected');
-      else toast.success('Request updated successfully');
+      toast.success('Report marked as Resolved');
       await fetchRequests();
-      if (!keepOpen) {
-        setSelectedRequest(null);
-        setAdminNotes('');
-      } else {
-        setSelectedRequest((prev) => prev ? { ...prev, status, admin_notes: notes ?? prev.admin_notes } : prev);
-      }
+      setSelectedRequest((prev) =>
+        prev ? { ...prev, status: 'completed', resolved_at: nowIso } : null
+      );
     } else {
-      toast.error('Failed to update request');
+      toast.error('Failed to update report');
     }
     setIsUpdating(false);
-    setPendingStatus(null);
-    setRejectReason('');
   };
 
   const saveRemarksOnly = async () => {
@@ -157,37 +377,11 @@ const AdminRequests = () => {
     setIsUpdating(false);
   };
 
-  const setReview = async (id: string, review: 'approved' | 'rejected' | 'needs_verification') => {
-    setIsUpdating(true);
+  const deleteRequest = async (id: string) => {
     const { error } = await supabase
       .from('service_requests')
-      .update({ admin_review_status: review, admin_review_notes: adminNotes || null })
+      .delete()
       .eq('id', id);
-    if (!error) {
-      const req = requests.find((r) => r.id === id);
-      const aiV = req?.ai_validation_status || 'pending';
-      if (aiV !== 'pending') {
-        const { data: { user } } = await supabase.auth.getUser();
-        const agreed = (aiV === 'valid' && review === 'approved') || (aiV === 'rejected' && review === 'rejected') || (aiV === 'suspicious' && review === 'needs_verification');
-        if (user) await (supabase as any).from('ai_feedback_logs').insert({
-          report_id: id, admin_id: user.id, ai_verdict: aiV, admin_verdict: review,
-          is_agreed: agreed, ai_confidence: req?.ai_validation_confidence ?? null, notes: adminNotes || null,
-        });
-      }
-    }
-    setIsUpdating(false);
-    if (error) { toast.error('Failed to save review'); return; }
-    toast.success(
-      review === 'approved' ? 'Report marked as verified by admin'
-        : review === 'rejected' ? 'Report marked as invalid'
-        : 'Report flagged for further verification'
-    );
-    setSelectedRequest((prev) => prev ? { ...prev, admin_review_status: review, admin_review_notes: adminNotes || null } : prev);
-    fetchRequests();
-  };
-
-  const deleteRequest = async (id: string) => {
-    const { error } = await supabase.from('service_requests').delete().eq('id', id);
     if (error) {
       toast.error('Failed to delete request');
     } else {
@@ -204,15 +398,35 @@ const AdminRequests = () => {
 
   const stats = {
     total: requests.length,
-    pending: requests.filter(r => r.status === 'pending').length,
-    in_progress: requests.filter(r => r.status === 'in_progress').length,
-    completed: requests.filter(r => r.status === 'completed').length,
+    aiApproved: requests.filter(
+      (r) =>
+        r.ai_validation_status === 'valid' ||
+        r.status === 'in_progress' ||
+        r.status === 'completed'
+    ).length,
+    aiRejected: requests.filter(
+      (r) => r.ai_validation_status === 'rejected' || r.status === 'rejected'
+    ).length,
+    completed: requests.filter((r) => r.status === 'completed').length,
   };
 
   const filteredRequests = requests
-    .filter(r => activeTab === 'all' || r.status === activeTab)
-    .filter(r => aiFilter === 'all' || (r.ai_validation_status || 'pending') === aiFilter)
-    .filter(r => {
+    .filter((r) => {
+      if (activeTab === 'all') return true;
+      if (activeTab === 'in_progress') {
+        return r.status === 'in_progress' || r.status === 'assigned';
+      }
+      return r.status === activeTab;
+    })
+    .filter((r) => {
+      if (aiFilter === 'all') return true;
+      const effectiveAi =
+        r.ai_validation_status === 'rejected' || r.status === 'rejected'
+          ? 'rejected'
+          : 'valid';
+      return effectiveAi === aiFilter;
+    })
+    .filter((r) => {
       const q = search.toLowerCase().trim();
       if (!q) return true;
       return (
@@ -225,7 +439,10 @@ const AdminRequests = () => {
 
   if (isLoading) {
     return (
-      <AdminLayout title="Service Requests" subtitle="Manage all requests">
+      <AdminLayout
+        title="Autonomous AI Report Management"
+        subtitle="Automatic AI approval and rejection across the 4 community concern classes"
+      >
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
@@ -234,18 +451,73 @@ const AdminRequests = () => {
   }
 
   return (
-    <AdminLayout title="Service Requests" subtitle={`${stats.total} total requests`}>
+    <AdminLayout
+      title="Autonomous AI Report Management"
+      subtitle={`${stats.total} total resident reports · Zero human-in-the-loop verification`}
+    >
+      {/* Autonomous AI Policy Banner */}
+      <Card
+        data-testid="autonomous-ai-policy-banner"
+        className="mb-6 border-primary/25 bg-primary/5"
+      >
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <p className="text-sm font-bold text-foreground">
+                Autonomous AI Gatekeeper Active (No Human-in-the-Loop)
+              </p>
+            </div>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              AI automatically <strong>approves</strong> clear photos matching
+              the 4 supported classes (
+              {APPROVED_CONCERN_CATEGORIES.map((c) => c.label).join(', ')}) and
+              automatically <strong>rejects</strong> blurred, unclear, or
+              non-related reports.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            data-testid="admin-auto-verify-all-btn"
+            onClick={handleAutoVerifyAll}
+            disabled={isAutoEvaluating}
+            className="shrink-0 gap-1.5"
+          >
+            {isAutoEvaluating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            Re-Verify All with AI
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { label: 'Total', value: stats.total, color: 'text-foreground' },
-          { label: 'Pending', value: stats.pending, color: 'text-warning' },
-          { label: 'Processing', value: stats.in_progress, color: 'text-primary' },
-          { label: 'Completed', value: stats.completed, color: 'text-success' },
+          { label: 'Total Reports', value: stats.total, color: 'text-foreground' },
+          {
+            label: 'AI Auto-Approved',
+            value: stats.aiApproved,
+            color: 'text-success',
+          },
+          {
+            label: 'AI Auto-Rejected',
+            value: stats.aiRejected,
+            color: 'text-destructive',
+          },
+          {
+            label: 'Resolved',
+            value: stats.completed,
+            color: 'text-primary',
+          },
         ].map((stat) => (
           <Card key={stat.label} variant="elevated">
             <CardContent className="p-4 text-center">
-              <p className={cn("text-2xl font-bold", stat.color)}>{stat.value}</p>
+              <p className={cn('text-2xl font-bold', stat.color)}>
+                {stat.value}
+              </p>
               <p className="text-xs text-muted-foreground">{stat.label}</p>
             </CardContent>
           </Card>
@@ -254,7 +526,7 @@ const AdminRequests = () => {
 
       {/* Search */}
       <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -263,83 +535,142 @@ const AdminRequests = () => {
         />
       </div>
 
-      {/* AI Quick Filter */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {([
-          { k: 'all', label: 'All reports', cls: 'bg-muted text-foreground' },
-          { k: 'suspicious', label: 'Needs review', cls: 'bg-warning/15 text-warning' },
-          { k: 'valid', label: 'AI verified', cls: 'bg-success/15 text-success' },
-          { k: 'rejected', label: 'Flagged invalid', cls: 'bg-destructive/15 text-destructive' },
-          { k: 'pending', label: 'Not validated', cls: 'bg-secondary text-secondary-foreground' },
-        ] as const).map((f) => {
-          const count = f.k === 'all' ? requests.length : requests.filter((r) => (r.ai_validation_status || 'pending') === f.k).length;
-          return (
-            <button key={f.k} onClick={() => setAiFilter(f.k)}
-              className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border-2 transition-all',
-                aiFilter === f.k ? 'border-primary shadow-sm' : 'border-transparent', f.cls)}>
-              {f.label}
-              <span className="rounded-full bg-background/70 px-1.5 text-[10px] font-bold">{count}</span>
-            </button>
-          );
-        })}
+      {/* Autonomous AI Verdict Filter */}
+      <div
+        data-testid="ai-filter-bar"
+        className="mb-4 flex flex-wrap gap-2"
+      >
+        {(
+          [
+            {
+              k: 'all',
+              label: 'All Reports',
+              cls: 'bg-muted text-foreground',
+              count: requests.length,
+            },
+            {
+              k: 'valid',
+              label: 'AI Auto-Approved (4 Classes)',
+              cls: 'bg-success/15 text-success',
+              count: stats.aiApproved,
+            },
+            {
+              k: 'rejected',
+              label: 'AI Auto-Rejected (Blurred / Unrelated)',
+              cls: 'bg-destructive/15 text-destructive',
+              count: stats.aiRejected,
+            },
+          ] as const
+        ).map((f) => (
+          <button
+            key={f.k}
+            type="button"
+            data-testid={`ai-filter-${f.k}`}
+            onClick={() => setAiFilter(f.k)}
+            className={cn(
+              'flex items-center gap-2 rounded-lg border-2 px-3 py-1.5 text-xs font-semibold transition-all',
+              aiFilter === f.k
+                ? 'border-primary shadow-sm'
+                : 'border-transparent',
+              f.cls
+            )}
+          >
+            {f.label}
+            <span className="rounded-md bg-background/70 px-1.5 text-[10px] font-bold">
+              {f.count}
+            </span>
+          </button>
+        ))}
       </div>
 
       {/* Tabs and Requests */}
       <Card variant="elevated">
         <CardContent className="p-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4 mb-4">
+            <TabsList className="mb-4 grid w-full grid-cols-4">
               <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="pending">Pending</TabsTrigger>
-              <TabsTrigger value="in_progress">Processing</TabsTrigger>
-              <TabsTrigger value="completed">Completed</TabsTrigger>
+              <TabsTrigger value="in_progress">AI Approved</TabsTrigger>
+              <TabsTrigger value="completed">Resolved</TabsTrigger>
+              <TabsTrigger value="rejected">AI Rejected</TabsTrigger>
             </TabsList>
 
-            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+            <div className="max-h-[60vh] space-y-3 overflow-y-auto">
               {filteredRequests.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">No requests found</p>
+                <p className="py-8 text-center text-muted-foreground">
+                  No reports found
+                </p>
               ) : (
                 filteredRequests.map((req) => {
-                  const StatusIcon = statusConfig[req.status].icon;
+                  const cfg =
+                    statusConfig[req.status] ?? statusConfig.in_progress;
+                  const StatusIcon = cfg.icon;
+                  const isRejected =
+                    req.ai_validation_status === 'rejected' ||
+                    req.status === 'rejected';
                   return (
-                    <div 
-                      key={req.id} 
-                      className="p-4 border rounded-xl space-y-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                    <div
+                      key={req.id}
+                      data-testid="admin-report-item"
+                      className="cursor-pointer space-y-3 rounded-xl border p-4 transition-colors hover:bg-muted/50"
                       onClick={() => openRequestDetails(req)}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Badge variant="secondary" className="text-xs">{req.category}</Badge>
-                            <Badge className={cn("text-xs", statusConfig[req.status].color)}>
-                              <StatusIcon className="h-3 w-3 mr-1" />
-                              {statusConfig[req.status].label}
+                          <div className="mb-1 flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary" className="text-xs">
+                              {req.category}
                             </Badge>
-                            {(() => {
-                              const v = req.ai_validation_status || 'pending';
-                              const m: Record<string, [string, string]> = {
-                                valid: ['AI verified', 'bg-success/15 text-success'],
-                                suspicious: ['Needs review', 'bg-warning/15 text-warning'],
-                                rejected: ['Flagged invalid', 'bg-destructive/15 text-destructive'],
-                                pending: ['Not validated', 'bg-muted text-muted-foreground'],
-                              };
-                              const [l, c] = m[v] ?? m.pending;
-                              return <Badge className={cn('text-xs', c)}>{l}{req.ai_validation_confidence != null && v !== 'pending' ? ` · ${req.ai_validation_confidence}%` : ''}</Badge>;
-                            })()}
+                            <Badge className={cn('text-xs', cfg.color)}>
+                              <StatusIcon className="mr-1 h-3 w-3" />
+                              {cfg.label}
+                            </Badge>
+                            <Badge
+                              className={cn(
+                                'text-xs',
+                                isRejected
+                                  ? 'bg-destructive/15 text-destructive'
+                                  : 'bg-success/15 text-success'
+                              )}
+                            >
+                              {isRejected
+                                ? 'AI Auto-Rejected'
+                                : 'AI Auto-Approved'}
+                              {req.ai_validation_confidence != null
+                                ? ` · ${Math.round(
+                                    req.ai_validation_confidence <= 1
+                                      ? req.ai_validation_confidence * 100
+                                      : req.ai_validation_confidence
+                                  )}%`
+                                : ''}
+                            </Badge>
                           </div>
-                          <p className="font-medium text-sm line-clamp-1">{req.title}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {format(new Date(req.created_at), 'MMM d, yyyy • h:mm a')}
+                          <p className="line-clamp-1 text-sm font-medium">
+                            {req.title}
+                          </p>
+                          {req.ai_validation_reason && (
+                            <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                              {req.ai_validation_reason}
+                            </p>
+                          )}
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {format(
+                              new Date(req.created_at),
+                              'MMM d, yyyy • h:mm a'
+                            )}
                           </p>
                         </div>
                         {req.photo_url && (
-                          <div className="w-12 h-12 rounded-lg overflow-hidden ml-3">
-                            <img src={req.photo_url} alt="" className="w-full h-full object-cover" />
+                          <div className="ml-3 h-12 w-12 overflow-hidden rounded-lg">
+                            <img
+                              src={req.photo_url}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
                           </div>
                         )}
                       </div>
                       {req.location && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <p className="flex items-center gap-1 text-xs text-muted-foreground">
                           <MapPin className="h-3 w-3" />
                           {req.location}
                         </p>
@@ -353,393 +684,425 @@ const AdminRequests = () => {
         </CardContent>
       </Card>
 
-      {/* Request Details Dialog — redesigned */}
-      <Dialog open={!!selectedRequest} onOpenChange={(o) => !o && setSelectedRequest(null)}>
-        <DialogContent className="max-w-3xl max-h-[92vh] p-0 gap-0 overflow-hidden">
-          {selectedRequest && (() => {
-            const req = selectedRequest;
-            const cfg = statusConfig[req.status];
-            const StatusIcon = cfg.icon;
-            const refNum = `REQ-${req.id.slice(0, 8).toUpperCase()}`;
-            const { fields, extras } = parseDescription(req.description || '');
-            const items: MediaItem[] = (req.media_urls && req.media_urls.length > 0)
-              ? req.media_urls.map((url, i) => ({
-                  url,
-                  type: ((req.media_types?.[i] as 'image' | 'video') || (url.match(/\.(mp4|webm|mov)$/i) ? 'video' : 'image')),
-                }))
-              : req.photo_url ? [{ url: req.photo_url, type: 'image' as const }] : [];
-            const firstImage = items.find((i) => i.type === 'image')?.url;
+      {/* Request Details Dialog */}
+      <Dialog
+        open={!!selectedRequest}
+        onOpenChange={(o) => !o && setSelectedRequest(null)}
+      >
+        <DialogContent className="max-h-[92vh] max-w-3xl gap-0 overflow-hidden p-0">
+          {selectedRequest &&
+            (() => {
+              const req = selectedRequest;
+              const cfg = statusConfig[req.status] ?? statusConfig.in_progress;
+              const StatusIcon = cfg.icon;
+              const refNum = `REQ-${req.id.slice(0, 8).toUpperCase()}`;
+              const { fields, extras } = parseDescription(
+                req.description || ''
+              );
+              const items: MediaItem[] =
+                req.media_urls && req.media_urls.length > 0
+                  ? req.media_urls.map((url, i) => ({
+                      url,
+                      type:
+                        (req.media_types?.[i] as 'image' | 'video') ||
+                        (url.match(/\.(mp4|webm|mov)$/i) ? 'video' : 'image'),
+                    }))
+                  : req.photo_url
+                  ? [{ url: req.photo_url, type: 'image' as const }]
+                  : [];
+              const firstImage = items.find((i) => i.type === 'image')?.url;
+              const isRejected =
+                req.ai_validation_status === 'rejected' ||
+                req.status === 'rejected';
+              const el = (req.ai_validation_elements ?? {}) as Record<
+                string,
+                unknown
+              >;
 
-            const InfoRow = ({ icon: Icon, label, value }: any) => (
-              <div className="flex items-start gap-3 py-2">
-                <div className="mt-0.5 p-2 rounded-lg bg-muted">
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-                  <p className="text-sm font-medium break-words">{value || '—'}</p>
-                </div>
-              </div>
-            );
-
-            const SectionCard = ({ title, icon: Icon, children }: any) => (
-              <div className="rounded-xl border bg-card p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Icon className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold">{title}</h3>
-                </div>
-                {children}
-              </div>
-            );
-
-            return (
-              <>
-                {/* Sticky Header */}
-                <DialogHeader className="px-6 pt-6 pb-4 border-b bg-gradient-to-br from-primary/5 to-transparent">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-muted text-muted-foreground">
-                          <Hash className="h-3 w-3" /> {refNum}
-                        </span>
-                        <Badge variant="secondary" className="text-[11px]">{req.category}</Badge>
-                        <Badge className={cn("text-[11px]", cfg.color)}>
-                          <StatusIcon className="h-3 w-3 mr-1" />
-                          {cfg.label}
-                        </Badge>
-                      </div>
-                      <DialogTitle className="text-lg leading-tight">
-                        {fields.fullName || req.title}
-                      </DialogTitle>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Submitted {format(new Date(req.created_at), "MMM d, yyyy 'at' h:mm a")}
-                      </p>
-                    </div>
+              const InfoRow = ({
+                icon: Icon,
+                label,
+                value,
+              }: {
+                icon: typeof User;
+                label: string;
+                value?: string | null;
+              }) => (
+                <div className="flex items-start gap-3 py-2">
+                  <div className="mt-0.5 rounded-lg bg-muted p-2">
+                    <Icon className="h-4 w-4 text-muted-foreground" />
                   </div>
-                </DialogHeader>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      {label}
+                    </p>
+                    <p className="break-words text-sm font-medium">
+                      {value || '—'}
+                    </p>
+                  </div>
+                </div>
+              );
 
-                {/* Scrollable body */}
-                <div className="overflow-y-auto px-6 py-5 space-y-4" style={{ maxHeight: 'calc(92vh - 200px)' }}>
-                  {/* Status timeline */}
-                  <div className="flex items-center gap-1 sm:gap-2">
-                    {(['pending', 'in_progress', 'completed'] as const).map((s, idx) => {
-                      const order = { pending: 0, in_progress: 1, completed: 2, rejected: -1 };
-                      const current = order[req.status];
-                      const isDone = req.status !== 'rejected' && idx <= current;
-                      const cfg2 = statusConfig[s];
-                      return (
-                        <div key={s} className="flex items-center gap-1 sm:gap-2 flex-1">
-                          <div className={cn(
-                            "h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-semibold transition-colors",
-                            isDone ? cfg2.color : 'bg-muted text-muted-foreground'
-                          )}>
-                            {idx + 1}
-                          </div>
-                          <span className={cn("text-[11px] font-medium hidden sm:inline", isDone ? 'text-foreground' : 'text-muted-foreground')}>
-                            {cfg2.label}
+              const SectionCard = ({
+                title,
+                icon: Icon,
+                children,
+                testId,
+              }: {
+                title: string;
+                icon: typeof User;
+                children: React.ReactNode;
+                testId?: string;
+              }) => (
+                <div
+                  data-testid={testId}
+                  className="rounded-xl border bg-card p-4"
+                >
+                  <div className="mb-2 flex items-center gap-2">
+                    <Icon className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-semibold">{title}</h3>
+                  </div>
+                  {children}
+                </div>
+              );
+
+              return (
+                <>
+                  {/* Sticky Header */}
+                  <DialogHeader className="border-b bg-gradient-to-br from-primary/5 to-transparent px-6 pb-4 pt-6">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                            <Hash className="h-3 w-3" /> {refNum}
                           </span>
-                          {idx < 2 && <div className={cn("flex-1 h-0.5 rounded", isDone && idx < current ? 'bg-success' : 'bg-muted')} />}
-                        </div>
-                      );
-                    })}
-                    {req.status === 'rejected' && (
-                      <Badge className={cn("ml-2", statusConfig.rejected.color)}>Rejected</Badge>
-                    )}
-                  </div>
-
-                  {/* Two-column grid */}
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {/* Applicant Info */}
-                    <SectionCard title="Applicant Information" icon={User}>
-                      <div className="divide-y">
-                        <InfoRow icon={User} label="Full Name" value={fields.fullName} />
-                        <InfoRow icon={Cake} label="Birth Date" value={fields.birthDate} />
-                        <InfoRow icon={Cake} label="Age" value={fields.age} />
-                        <InfoRow icon={UsersIcon} label="Gender" value={fields.gender} />
-                        <InfoRow icon={UsersIcon} label="Civil Status" value={fields.civilStatus} />
-                        <InfoRow icon={Phone} label="Contact Number" value={fields.contact} />
-                        <InfoRow icon={Home} label="Address / Barangay" value={fields.address || req.location} />
-                      </div>
-                    </SectionCard>
-
-                    {/* Request Info */}
-                    <SectionCard title="Request Information" icon={FileText}>
-                      <div className="divide-y">
-                        <InfoRow icon={FileText} label="Request Type" value={req.category} />
-                        <InfoRow icon={FileText} label="Title" value={req.title} />
-                        <InfoRow icon={FileText} label="Purpose" value={fields.purpose} />
-                        <InfoRow icon={Briefcase} label="Occupation" value={fields.occupation} />
-                        <InfoRow icon={Calendar} label="Submitted" value={format(new Date(req.created_at), 'MMM d, yyyy h:mm a')} />
-                        <InfoRow icon={MapPin} label="Location" value={req.location} />
-                      </div>
-                    </SectionCard>
-                  </div>
-
-                  {/* Extras / raw description */}
-                  {extras.length > 0 && (
-                    <SectionCard title="Additional Details" icon={FileText}>
-                      <ul className="text-sm space-y-1 text-muted-foreground">
-                        {extras.map((e, i) => <li key={i} className="break-words">• {e}</li>)}
-                      </ul>
-                    </SectionCard>
-                  )}
-
-                  {/* Media */}
-                  {items.length > 0 && (
-                    <SectionCard title={`Attached Media (${items.length})`} icon={FileText}>
-                      <MediaGallery items={items} />
-                      {firstImage && <div className="mt-3"><ImageAnalysis imageUrl={firstImage} /></div>}
-                    </SectionCard>
-                  )}
-
-                  {/* AI validation */}
-                  {(() => {
-                    const el = (req.ai_validation_elements ?? {}) as Record<string, any>;
-                    const vs = req.ai_validation_status || 'pending';
-                    const vColor = vs === 'valid' ? 'bg-success text-success-foreground'
-                      : vs === 'suspicious' ? 'bg-warning text-warning-foreground'
-                      : vs === 'rejected' ? 'bg-destructive text-destructive-foreground'
-                      : 'bg-muted text-muted-foreground';
-                    const authLabel: Record<string, string> = {
-                      likely_authentic: 'Likely authentic photo',
-                      likely_ai_generated: 'Likely AI-generated image',
-                      uncertain: 'Uncertain',
-                      no_image: 'No image attached',
-                    };
-                    const reviewLabel: Record<string, string> = {
-                      pending: 'Awaiting admin review',
-                      approved: 'Verified by admin',
-                      rejected: 'Marked invalid by admin',
-                      needs_verification: 'Needs further verification',
-                    };
-                    return (
-                      <SectionCard title="AI Validation (assistive only)" icon={CheckCircle}>
-                        <div className="flex flex-wrap items-center gap-2 mb-3">
-                          <Badge className={cn('text-[11px]', vColor)}>
-                            {vs === 'pending' ? 'Not yet validated' : vs.toUpperCase()}
+                          <Badge variant="secondary" className="text-[11px]">
+                            {req.category}
                           </Badge>
-                          {req.ai_validation_confidence != null && (
-                            <Badge variant="secondary" className="text-[11px]">
-                              Confidence {req.ai_validation_confidence}%
-                            </Badge>
-                          )}
-                          <Badge variant="outline" className="text-[11px]">
-                            {reviewLabel[req.admin_review_status] ?? req.admin_review_status}
+                          <Badge className={cn('text-[11px]', cfg.color)}>
+                            <StatusIcon className="mr-1 h-3 w-3" />
+                            {cfg.label}
                           </Badge>
-                          {req.ai_validated_at && (
-                            <span className="text-[11px] text-muted-foreground">
-                              {format(new Date(req.ai_validated_at), 'MMM d, h:mm a')}
-                            </span>
-                          )}
                         </div>
-                        {req.ai_validation_reason && (
-                          <p className="text-sm mb-3">{req.ai_validation_reason}</p>
+                        <DialogTitle className="text-lg leading-tight">
+                          {fields.fullName || req.title}
+                        </DialogTitle>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Submitted{' '}
+                          {format(
+                            new Date(req.created_at),
+                            "MMM d, yyyy 'at' h:mm a"
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </DialogHeader>
+
+                  {/* Scrollable body */}
+                  <div
+                    className="space-y-4 overflow-y-auto px-6 py-5"
+                    style={{ maxHeight: 'calc(92vh - 200px)' }}
+                  >
+                    {/* Autonomous AI Verification Decision Card (No Human-in-the-Loop) */}
+                    <SectionCard
+                      title="Autonomous AI Verification & Auto-Decision (No Human-in-the-Loop)"
+                      icon={ShieldCheck}
+                      testId="autonomous-ai-decision-card"
+                    >
+                      <div className="mb-3 flex flex-wrap items-center gap-2">
+                        <Badge
+                          data-testid="dialog-ai-verdict-badge"
+                          className={cn(
+                            'text-xs font-bold',
+                            isRejected
+                              ? 'bg-destructive text-destructive-foreground'
+                              : 'bg-success text-success-foreground'
+                          )}
+                        >
+                          {isRejected
+                            ? 'AI AUTO-REJECTED'
+                            : 'AI AUTO-APPROVED'}
+                        </Badge>
+                        {req.ai_validation_confidence != null && (
+                          <Badge variant="secondary" className="text-xs">
+                            AI Confidence{' '}
+                            {Math.round(
+                              req.ai_validation_confidence <= 1
+                                ? req.ai_validation_confidence * 100
+                                : req.ai_validation_confidence
+                            )}
+                            %
+                          </Badge>
                         )}
-                        <div className="grid sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
-                          {el.description && <p><strong className="text-foreground">Description:</strong> {el.description}</p>}
-                          {el.location && <p><strong className="text-foreground">Location:</strong> {el.location}</p>}
-                          {el.image && <p><strong className="text-foreground">Image:</strong> {el.image}</p>}
-                          {el.image_authenticity && (
-                            <p><strong className="text-foreground">Image check:</strong> {authLabel[el.image_authenticity] ?? el.image_authenticity}</p>
-                          )}
-                        </div>
-                        {Array.isArray(el.recommended_actions) && el.recommended_actions.length > 0 && (
+                        <Badge variant="outline" className="text-xs">
+                          {isRejected
+                            ? 'Rejected Automatically (Blurred / Non-4-Class)'
+                            : `Verified Class: ${
+                                (el.matched_four_class as string) ||
+                                req.ai_category ||
+                                req.category.replace(/^Report:\s*/i, '')
+                              }`}
+                        </Badge>
+                        {req.ai_validated_at && (
+                          <span className="text-[11px] text-muted-foreground">
+                            Processed{' '}
+                            {format(
+                              new Date(req.ai_validated_at),
+                              'MMM d, h:mm a'
+                            )}
+                          </span>
+                        )}
+                      </div>
+
+                      <div
+                        className={cn(
+                          'rounded-lg border p-3 text-sm',
+                          isRejected
+                            ? 'border-destructive/30 bg-destructive/10 text-destructive'
+                            : 'border-success/30 bg-success/10 text-foreground'
+                        )}
+                      >
+                        <p className="font-semibold">
+                          {req.ai_validation_reason ||
+                            (isRejected
+                              ? 'Automatically rejected by AI: Blurred image or report does not match the 4 supported community concern classes.'
+                              : 'Automatically approved by AI: Clear image verified under one of the 4 supported community concern classes.')}
+                        </p>
+                      </div>
+
+                      <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                        <p>
+                          <strong className="text-foreground">
+                            Supported 4-Class Check:
+                          </strong>{' '}
+                          {isRejected
+                            ? 'Failed (Outside 4 Classes or Unclear)'
+                            : `Passed (${
+                                (el.matched_four_class as string) ||
+                                req.ai_category ||
+                                req.category
+                              })`}
+                        </p>
+                        <p>
+                          <strong className="text-foreground">
+                            Image Blur &amp; Clarity Check:
+                          </strong>{' '}
+                          {el.image_clarity === 'blurred_or_unreadable'
+                            ? 'Failed — Very Blurred / Unreadable Photo'
+                            : el.image_clarity === 'no_image'
+                            ? 'Failed — No Photo Attached'
+                            : 'Passed — Clear & Readable'}
+                        </p>
+                      </div>
+
+                      {Array.isArray(el.recommended_actions) &&
+                        el.recommended_actions.length > 0 && (
                           <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
-                            <p className="text-xs font-semibold text-primary mb-1.5">AI suggested next steps</p>
-                            <ol className="list-decimal pl-4 space-y-1 text-xs text-foreground">
-                              {el.recommended_actions.map((a: string, i: number) => <li key={i}>{a}</li>)}
+                            <p className="mb-1.5 text-xs font-semibold text-primary">
+                              AI Dispatched Action Plan
+                            </p>
+                            <ol className="list-decimal space-y-1 pl-4 text-xs text-foreground">
+                              {(el.recommended_actions as string[]).map(
+                                (a, i) => (
+                                  <li key={i}>{a}</li>
+                                )
+                              )}
                             </ol>
                           </div>
                         )}
-                        {vs === 'rejected' && (
-                          <p className="mt-3 text-xs rounded-lg bg-destructive/10 text-destructive p-2">
-                            Auto-flagged as unrelated/invalid — the resident was notified. Confirm with "Mark invalid" or restore with "Verify report".
-                          </p>
-                        )}
-                        {Array.isArray(el.knowledge_used) && el.knowledge_used.length > 0 && (
-                          <p className="text-[11px] text-muted-foreground mt-2">
-                            Knowledge used: {el.knowledge_used.join(', ')}
-                          </p>
-                        )}
-                        <div className="flex flex-wrap gap-2 mt-4">
-                          <Button size="sm" variant="outline" disabled={isUpdating || vs !== 'pending'}
-                            onClick={async () => {
-                              setIsUpdating(true);
-                              const { error } = await supabase.functions.invoke('validate-report', { body: { reportId: req.id } });
-                              setIsUpdating(false);
-                              if (error) toast.error('AI validation is unavailable right now');
-                              else { toast.success('AI validation finished'); fetchRequests(); }
-                            }}>
-                            <RefreshCw className="h-4 w-4 mr-1" /> Run AI validation
-                          </Button>
-                          <Button size="sm" className="bg-success hover:bg-success/90 text-success-foreground"
-                            disabled={isUpdating} onClick={() => setReview(req.id, 'approved')}>
-                            <CheckCircle className="h-4 w-4 mr-1" /> Verify report
-                          </Button>
-                          <Button size="sm" variant="secondary" disabled={isUpdating}
-                            onClick={() => setReview(req.id, 'needs_verification')}>
-                            Needs verification
-                          </Button>
-                          <Button size="sm" variant="destructive" disabled={isUpdating}
-                            onClick={() => setReview(req.id, 'rejected')}>
-                            <XCircle className="h-4 w-4 mr-1" /> Mark invalid
-                          </Button>
-                        </div>
-                        <p className="text-[11px] text-muted-foreground mt-3">
-                          AI results are assistive. The final decision is always made by municipal personnel.
-                        </p>
-                      </SectionCard>
-                    );
-                  })()}
 
-                  {/* Map */}
-                  {req.latitude != null && req.longitude != null && (
-                    <SectionCard title="Pinned Location" icon={MapPin}>
-                      <LocationPicker
-                        readOnly
-                        value={{ lat: Number(req.latitude), lng: Number(req.longitude) }}
-                        onChange={() => {}}
-                        height="220px"
+                      <div className="mt-3 flex items-center justify-between border-t pt-3">
+                        <span className="text-[11px] text-muted-foreground">
+                          Autonomous Mode: AI automatically approves or rejects
+                          reports without manual human-in-the-loop review.
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          data-testid="rerun-ai-decision-btn"
+                          disabled={isUpdating}
+                          onClick={() => handleRerunSingleAiDecision(req)}
+                        >
+                          <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                          Re-Run AI Auto-Decision
+                        </Button>
+                      </div>
+                    </SectionCard>
+
+                    {/* Two-column grid */}
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <SectionCard title="Reporter Information" icon={User}>
+                        <div className="divide-y">
+                          <InfoRow
+                            icon={User}
+                            label="Reporter Name"
+                            value={fields.fullName || req.reporter_name}
+                          />
+                          <InfoRow
+                            icon={Phone}
+                            label="Contact Number"
+                            value={fields.contact}
+                          />
+                          <InfoRow
+                            icon={Home}
+                            label="Barangay Location"
+                            value={fields.address || req.location}
+                          />
+                        </div>
+                      </SectionCard>
+
+                      <SectionCard title="Report Information" icon={FileText}>
+                        <div className="divide-y">
+                          <InfoRow
+                            icon={FileText}
+                            label="Detected Category"
+                            value={req.category}
+                          />
+                          <InfoRow
+                            icon={FileText}
+                            label="Title"
+                            value={req.title}
+                          />
+                          <InfoRow
+                            icon={Calendar}
+                            label="Submitted"
+                            value={format(
+                              new Date(req.created_at),
+                              'MMM d, yyyy h:mm a'
+                            )}
+                          />
+                          <InfoRow
+                            icon={MapPin}
+                            label="Location"
+                            value={req.location}
+                          />
+                        </div>
+                      </SectionCard>
+                    </div>
+
+                    {extras.length > 0 && (
+                      <SectionCard title="Report Details" icon={FileText}>
+                        <ul className="space-y-1 text-sm text-muted-foreground">
+                          {extras.map((e, i) => (
+                            <li key={i} className="break-words">
+                              • {e}
+                            </li>
+                          ))}
+                        </ul>
+                      </SectionCard>
+                    )}
+
+                    {/* Attached Media */}
+                    {items.length > 0 && (
+                      <SectionCard
+                        title={`Attached Media (${items.length})`}
+                        icon={FileText}
+                      >
+                        <MediaGallery items={items} />
+                        {firstImage && (
+                          <div className="mt-3">
+                            <ImageAnalysis imageUrl={firstImage} />
+                          </div>
+                        )}
+                      </SectionCard>
+                    )}
+
+                    {/* Map */}
+                    {req.latitude != null && req.longitude != null && (
+                      <SectionCard title="Pinned GPS Location" icon={MapPin}>
+                        <LocationPicker
+                          readOnly
+                          value={{
+                            lat: Number(req.latitude),
+                            lng: Number(req.longitude),
+                          }}
+                          onChange={() => {}}
+                          height="220px"
+                        />
+                      </SectionCard>
+                    )}
+
+                    {/* Admin Remarks */}
+                    <SectionCard title="Field Action Remarks" icon={MessageSquare}>
+                      <Textarea
+                        value={adminNotes}
+                        onChange={(e) => setAdminNotes(e.target.value)}
+                        placeholder="Record field maintenance updates or resolution notes..."
+                        rows={3}
+                        className="resize-none"
                       />
                     </SectionCard>
-                  )}
+                  </div>
 
-                  {/* Status update */}
-                  <SectionCard title="Update Status" icon={RefreshCw}>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {(['pending', 'in_progress', 'completed', 'rejected'] as const).map((status) => {
-                        const c = statusConfig[status];
-                        const Icon = c.icon;
-                        const active = req.status === status;
-                        return (
-                          <button
-                            key={status}
-                            disabled={isUpdating || active}
-                            onClick={() => setPendingStatus(status)}
-                            className={cn(
-                              "relative flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed",
-                              active ? `${c.color} border-transparent shadow-md` : 'border-border bg-card hover:border-primary/40'
-                            )}
+                  {/* Sticky Action Bar (No manual Approve/Reject gates — only Field Resolution & Remarks) */}
+                  <div className="flex flex-wrap items-center justify-end gap-2 border-t bg-card/95 px-4 py-3 backdrop-blur sm:px-6">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mr-auto text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="mr-1 h-4 w-4" /> Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            Delete this report?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteRequest(req.id)}
                           >
-                            <Icon className={cn("h-5 w-5", active ? '' : 'text-muted-foreground')} />
-                            <span className="text-xs font-semibold">{c.label}</span>
-                            {active && <span className="absolute top-1 right-1 text-[9px]">●</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </SectionCard>
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
 
-                  {/* Admin Remarks */}
-                  <SectionCard title="Admin Remarks" icon={MessageSquare}>
-                    <Textarea
-                      value={adminNotes}
-                      onChange={(e) => setAdminNotes(e.target.value)}
-                      placeholder="Write notes, instructions, or rejection reason for this request..."
-                      rows={4}
-                      className="resize-none"
-                    />
-                    {req.admin_notes && req.admin_notes !== adminNotes && (
-                      <p className="text-[11px] text-muted-foreground mt-2">
-                        Previous: <span className="italic">"{req.admin_notes}"</span>
-                      </p>
-                    )}
-                  </SectionCard>
-                </div>
-
-                {/* Sticky Action Bar */}
-                <div className="border-t bg-card/95 backdrop-blur px-4 sm:px-6 py-3 flex flex-wrap items-center gap-2 justify-end">
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive mr-auto">
-                        <Trash2 className="h-4 w-4 mr-1" /> Delete
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedRequest(null)}
+                    >
+                      <X className="mr-1 h-4 w-4" /> Close
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={saveRemarksOnly}
+                      disabled={isUpdating}
+                    >
+                      {isUpdating ? (
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="mr-1 h-4 w-4" />
+                      )}
+                      Save Remarks
+                    </Button>
+                    {!isRejected && req.status !== 'completed' && (
+                      <Button
+                        size="sm"
+                        data-testid="mark-resolved-btn"
+                        className="bg-success text-success-foreground hover:bg-success/90"
+                        onClick={() => markReportResolved(req.id)}
+                        disabled={isUpdating}
+                      >
+                        <CheckCircle className="mr-1 h-4 w-4" /> Mark Resolved
                       </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete this request?</AlertDialogTitle>
-                        <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => deleteRequest(req.id)}>Delete</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-
-                  <Button variant="outline" size="sm" onClick={() => setSelectedRequest(null)}>
-                    <X className="h-4 w-4 mr-1" /> Close
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={saveRemarksOnly} disabled={isUpdating}>
-                    {isUpdating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
-                    Save Remarks
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => setPendingStatus('rejected')}
-                    disabled={isUpdating || req.status === 'rejected'}
-                  >
-                    <XCircle className="h-4 w-4 mr-1" /> Reject
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-success hover:bg-success/90 text-success-foreground"
-                    onClick={() => setPendingStatus('completed')}
-                    disabled={isUpdating || req.status === 'completed'}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-1" /> Approve
-                  </Button>
-                </div>
-              </>
-            );
-          })()}
+                    )}
+                  </div>
+                </>
+              );
+            })()}
         </DialogContent>
       </Dialog>
-
-      {/* Status change confirmation */}
-      <AlertDialog open={!!pendingStatus} onOpenChange={(o) => { if (!o) { setPendingStatus(null); setRejectReason(''); } }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {pendingStatus === 'completed' && 'Approve this request?'}
-              {pendingStatus === 'rejected' && 'Reject this request?'}
-              {pendingStatus === 'in_progress' && 'Mark as processing?'}
-              {pendingStatus === 'pending' && 'Set status to pending?'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingStatus === 'completed' && 'The applicant will be notified that their request has been approved. A reference number will be generated.'}
-              {pendingStatus === 'rejected' && 'Please provide a reason. This will be saved as the admin remark and visible to the applicant.'}
-              {(pendingStatus === 'pending' || pendingStatus === 'in_progress') && 'The status of this request will be updated immediately.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {pendingStatus === 'rejected' && (
-            <Textarea
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="Reason for rejection (required)..."
-              rows={3}
-              className="mt-2"
-            />
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isUpdating}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={isUpdating || (pendingStatus === 'rejected' && !rejectReason.trim())}
-              onClick={() => {
-                if (!selectedRequest || !pendingStatus) return;
-                const notes = pendingStatus === 'rejected'
-                  ? (adminNotes ? `${adminNotes}\n\nRejection reason: ${rejectReason}` : `Rejection reason: ${rejectReason}`)
-                  : adminNotes;
-                if (pendingStatus === 'rejected') setAdminNotes(notes);
-                updateStatus(selectedRequest.id, pendingStatus, notes, true);
-              }}
-            >
-              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </AdminLayout>
   );
 };

@@ -64,6 +64,23 @@ export async function inspectCapturedImageQuality(
         }
         const luminanceStdDev = Math.sqrt(varianceSum / pixelCount);
 
+        // Compute spatial gradient sharpness score to detect blurred photos
+        let edgeSum = 0;
+        let edgeCount = 0;
+        for (let y = 1; y < sampleSize - 1; y++) {
+          for (let x = 1; x < sampleSize - 1; x++) {
+            const p = y * sampleSize + x;
+            const gx = Math.abs(luminances[p + 1] - luminances[p - 1]);
+            const gy = Math.abs(
+              luminances[p + sampleSize] - luminances[p - sampleSize]
+            );
+            edgeSum += gx + gy;
+            edgeCount++;
+          }
+        }
+        const edgeSharpnessScore =
+          edgeCount > 0 ? edgeSum / edgeCount : luminanceStdDev;
+
         URL.revokeObjectURL(objectUrl);
         resolve({
           width,
@@ -71,6 +88,7 @@ export async function inspectCapturedImageQuality(
           sizeBytes: blob.size,
           meanLuminance: Math.round(meanLuminance * 10) / 10,
           luminanceStdDev: Math.round(luminanceStdDev * 10) / 10,
+          edgeSharpnessScore: Math.round(edgeSharpnessScore * 10) / 10,
         });
       } catch {
         URL.revokeObjectURL(objectUrl);

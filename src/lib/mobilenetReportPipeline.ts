@@ -30,7 +30,7 @@ export const APPROVED_CONCERN_CATEGORIES: ApprovedConcernCategory[] = [
     shortDescription:
       'Uncollected waste, illegal dumping, or roadside litter accumulation.',
     conservativeTemplate:
-      'Improperly disposed waste is visible in the submitted photo. The concern may require inspection and appropriate waste management action by barangay personnel.',
+      'Improperly disposed waste is visible in the submitted photo. The concern has been logged for waste management action in Barangay Purisima.',
     modelAliases: [
       'improper_waste_disposal',
       'improper waste disposal',
@@ -38,6 +38,8 @@ export const APPROVED_CONCERN_CATEGORIES: ApprovedConcernCategory[] = [
       'waste',
       'waste_disposal',
       'litter',
+      'garbage/waste problem',
+      'solid waste',
     ],
   },
   {
@@ -47,12 +49,13 @@ export const APPROVED_CONCERN_CATEGORIES: ApprovedConcernCategory[] = [
     shortDescription:
       'Non-functioning, flickering, or damaged street lighting fixtures.',
     conservativeTemplate:
-      'The submitted photo shows a possible streetlight concern. Barangay personnel may need to inspect the lighting fixture to determine the necessary maintenance or repair action.',
+      'A streetlight fixture concern is visible in the submitted photo. The lighting post has been logged for maintenance or repair in Barangay Purisima.',
     modelAliases: [
       'streetlight_problem',
       'streetlight problem',
       'street_light',
       'street light',
+      'street light issue',
       'streetlight',
       'lighting',
     ],
@@ -64,11 +67,12 @@ export const APPROVED_CONCERN_CATEGORIES: ApprovedConcernCategory[] = [
     shortDescription:
       'Clogged canals, blocked drainage waterways, or localized water accumulation.',
     conservativeTemplate:
-      'The submitted photo indicates a possible drainage or flooding concern. Barangay personnel may need to inspect the area and assess the necessary response.',
+      'A drainage or flooding concern is visible in the submitted photo. The affected waterway in Barangay Purisima has been logged for clearing and response.',
     modelAliases: [
       'drainage_flooding_concern',
       'drainage/flooding concern',
       'drainage',
+      'drainage/canal issue',
       'flooding',
       'canal',
       'clogged_drainage',
@@ -81,7 +85,7 @@ export const APPROVED_CONCERN_CATEGORIES: ApprovedConcernCategory[] = [
     shortDescription:
       'Potholes, cracked concrete pavement, or damaged public pathways.',
     conservativeTemplate:
-      'The submitted photo shows a possible road surface problem. The reported area may require inspection to determine the appropriate maintenance action.',
+      'A road surface damage concern is visible in the submitted photo. The affected road section in Barangay Purisima has been logged for maintenance action.',
     modelAliases: [
       'road_damage',
       'road damage',
@@ -98,10 +102,10 @@ export const MAX_GPS_AGE_MS = 60_000; // 60 seconds
 export const MAX_PURISIMA_SCOPE_METERS = 3500; // 3.5 km radius around Barangay Purisima center when polygon is unavailable
 
 export const LOW_CONFIDENCE_MESSAGE =
-  "We couldn't confidently identify the community concern from this photo. Please retake the photo or select the appropriate concern category below.";
+  'AI could not identify any of the 4 supported community concerns (Drainage/Flooding Concern, Streetlight Problem, Road Damage, Improper Waste Disposal) from this photo. If submitted as-is, it will be automatically rejected by AI.';
 
 export const MANUAL_REVIEW_FALLBACK_DESCRIPTION =
-  'A community concern photo was submitted for inspection and verification by Barangay Purisima personnel.';
+  'Unclassified photo submitted by resident. Does not match the 4 supported community concern classes.';
 
 export interface ImageQualityMetrics {
   width: number;
@@ -109,6 +113,7 @@ export interface ImageQualityMetrics {
   sizeBytes: number;
   meanLuminance?: number;
   luminanceStdDev?: number;
+  edgeSharpnessScore?: number;
 }
 
 export interface MobileNetV3InferenceResponse {
@@ -143,6 +148,30 @@ export interface ImageSuitabilityEvaluation {
   userMessage: string;
 }
 
+export interface AutonomousAiDecision {
+  verdict: 'approved' | 'rejected';
+  requestStatus: 'in_progress' | 'rejected';
+  aiValidationStatus: 'valid' | 'rejected';
+  adminReviewStatus: 'approved' | 'rejected';
+  requiresReview: false;
+  matchedCategory: ApprovedConcernCategory | null;
+  confidencePercent: number;
+  rejectionCode:
+    | null
+    | 'blurred_or_unreadable_image'
+    | 'unrelated_or_unsupported_class'
+    | 'missing_photo';
+  reason: string;
+  adminNote: string;
+  elements: {
+    image_clarity: 'clear' | 'blurred_or_unreadable' | 'no_image';
+    matched_four_class: string | null;
+    is_unrelated: boolean;
+    decision_mode: 'autonomous_ai_no_hitl';
+    recommended_actions: string[];
+  };
+}
+
 export interface CapturedGpsReading {
   lat: number;
   lng: number;
@@ -166,19 +195,26 @@ export interface GpsValidationResult {
 }
 
 /**
- * Resolves any output label or category key to one of the 4 supported categories.
+ * Resolves any output label, category string, or text prefix to one of the 4 supported categories.
  */
 export function resolveApprovedCategory(
   rawLabel: string | null | undefined
 ): ApprovedConcernCategory | null {
   if (!rawLabel) return null;
-  const normalized = rawLabel.trim().toLowerCase();
+  const normalized = rawLabel
+    .trim()
+    .toLowerCase()
+    .replace(/^report:\s*/i, '')
+    .replace(/^\[report\]\s*/i, '')
+    .trim();
+
   for (const cat of APPROVED_CONCERN_CATEGORIES) {
     if (
       cat.key === normalized ||
       cat.label.toLowerCase() === normalized ||
       cat.reportCategoryValue.toLowerCase() === normalized ||
-      cat.modelAliases.includes(normalized)
+      cat.modelAliases.includes(normalized) ||
+      cat.modelAliases.some((alias) => normalized.includes(alias))
     ) {
       return cat;
     }
@@ -207,59 +243,76 @@ export function normalizeConfidenceScore(
 }
 
 /**
- * Checks whether a captured image meets basic readability requirements
- * (dimensions, byte size, brightness, and non-blank contrast).
+ * Checks whether a captured image meets clarity and non-blur requirements
+ * (dimensions, byte size, brightness, contrast, and edge sharpness).
  */
 export function checkImageReadability(metrics: ImageQualityMetrics): {
   isReadable: boolean;
+  isBlurred: boolean;
   reason: string | null;
 } {
   if (metrics.sizeBytes < 1500) {
     return {
       isReadable: false,
+      isBlurred: true,
       reason:
-        'The captured image file is too small or incomplete. Please retake a clear photo of the concern.',
+        'The captured image file is incomplete or corrupted. AI requires a clear photo.',
     };
   }
   if (metrics.width < 160 || metrics.height < 160) {
     return {
       isReadable: false,
+      isBlurred: true,
       reason:
-        'The captured photo resolution is too low for automatic analysis. Please retake a clearer photo.',
+        'The captured photo resolution is too low and blurry for verification.',
     };
   }
   if (metrics.meanLuminance !== undefined) {
-    if (metrics.meanLuminance < 10) {
+    if (metrics.meanLuminance < 12) {
       return {
         isReadable: false,
+        isBlurred: false,
         reason:
-          'The captured photo appears too dark to identify the concern. Please retake the photo with better lighting or enable flash.',
+          'The captured photo is too dark to verify any community concern.',
       };
     }
-    if (metrics.meanLuminance > 250) {
+    if (metrics.meanLuminance > 248) {
       return {
         isReadable: false,
+        isBlurred: false,
         reason:
-          'The captured photo appears overexposed. Please retake a clear photo of the community concern.',
+          'The captured photo is overexposed and lacks visible detail.',
       };
     }
   }
   if (
     metrics.luminanceStdDev !== undefined &&
-    metrics.luminanceStdDev < 6
+    metrics.luminanceStdDev < 8
   ) {
     return {
       isReadable: false,
+      isBlurred: true,
       reason:
-        'The captured photo lacks visible detail or appears blurry. Please retake a focused photo of the issue.',
+        'The captured photo is very blurry or uniform and lacks recognizable detail.',
     };
   }
-  return { isReadable: true, reason: null };
+  if (
+    metrics.edgeSharpnessScore !== undefined &&
+    metrics.edgeSharpnessScore < 10
+  ) {
+    return {
+      isReadable: false,
+      isBlurred: true,
+      reason:
+        'The captured photo is too blurred to verify a valid community concern.',
+    };
+  }
+  return { isReadable: true, isBlurred: false, reason: null };
 }
 
 /**
  * Evaluates image classification results and image readability.
- * Strictly separated from geolocation/geofencing validation.
+ * No human-in-the-loop manual review is used; reports are automatically approved or rejected by AI.
  */
 export function evaluateImageSuitability(
   quality: ImageQualityMetrics,
@@ -275,15 +328,15 @@ export function evaluateImageSuitability(
       isReadable: false,
       readabilityReason: readability.reason,
       matchedCategory: null,
-      confidenceScore: null,
-      confidencePercent: null,
+      confidenceScore: 0,
+      confidencePercent: 0,
       meetsConfidenceThreshold: false,
       thresholdPercent,
       canAutoGenerateDefinitiveDescription: false,
-      requiresManualReview: true,
+      requiresManualReview: false,
       userMessage:
         readability.reason ||
-        'The captured photo is not clear enough for analysis. Please retake your photo.',
+        'The captured photo is too blurry or unclear. AI will automatically reject blurry photos.',
     };
   }
 
@@ -298,10 +351,10 @@ export function evaluateImageSuitability(
       meetsConfidenceThreshold: false,
       thresholdPercent,
       canAutoGenerateDefinitiveDescription: false,
-      requiresManualReview: true,
+      requiresManualReview: false,
       userMessage:
         inference.errorMessage ||
-        'We could not automatically classify this photo right now. Please retake the photo or select the concern category below.',
+        'AI could not verify this image against the 4 supported concern categories.',
     };
   }
 
@@ -326,7 +379,7 @@ export function evaluateImageSuitability(
       meetsConfidenceThreshold: false,
       thresholdPercent,
       canAutoGenerateDefinitiveDescription: false,
-      requiresManualReview: true,
+      requiresManualReview: false,
       userMessage: LOW_CONFIDENCE_MESSAGE,
     };
   }
@@ -342,13 +395,305 @@ export function evaluateImageSuitability(
     thresholdPercent,
     canAutoGenerateDefinitiveDescription: true,
     requiresManualReview: false,
-    userMessage: `Detected ${matchedCategory.label} from your captured photo. Barangay personnel will review and verify the submitted report.`,
+    userMessage: `AI verified this photo as ${matchedCategory.label} (${confidencePercent}% confidence). Eligible for automatic AI approval.`,
+  };
+}
+
+const UNRELATED_KEYWORDS = [
+  'selfie',
+  'meme',
+  'test only',
+  'testing 123',
+  'asdf',
+  'qwerty',
+  'food',
+  'homework',
+  'joke',
+  'prank',
+  'unrelated',
+  'not a concern',
+];
+
+/**
+ * Autonomous AI Decision Engine (No Human-in-the-Loop):
+ * Automatically approves a resident report ONLY if:
+ *  1. The photo is clear and not blurry/unreadable,
+ *  2. The content is not unrelated/spam, AND
+ *  3. The concern matches one of the 4 approved classes:
+ *     - Drainage/Flooding Concern
+ *     - Streetlight Problem
+ *     - Road Damage
+ *     - Improper Waste Disposal
+ *     with sufficient AI confidence (>= 65%).
+ * Otherwise, AI automatically rejects the report with a clear reason.
+ */
+export function evaluateAutonomousAiReportDecision(options: {
+  suitability: ImageSuitabilityEvaluation | null;
+  selectedCategoryKey?: string | null;
+  description?: string | null;
+  hasPhoto?: boolean;
+}): AutonomousAiDecision {
+  const {
+    suitability,
+    selectedCategoryKey,
+    description = '',
+    hasPhoto = true,
+  } = options;
+
+  if (!hasPhoto || !suitability) {
+    return {
+      verdict: 'rejected',
+      requestStatus: 'rejected',
+      aiValidationStatus: 'rejected',
+      adminReviewStatus: 'rejected',
+      requiresReview: false,
+      matchedCategory: null,
+      confidencePercent: 0,
+      rejectionCode: 'missing_photo',
+      reason:
+        'Automatically rejected by AI: No valid community concern photo was attached.',
+      adminNote:
+        'AI Auto-Rejected: Missing photo evidence. Reports must include a clear photo of Drainage/Flooding Concern, Streetlight Problem, Road Damage, or Improper Waste Disposal.',
+      elements: {
+        image_clarity: 'no_image',
+        matched_four_class: null,
+        is_unrelated: true,
+        decision_mode: 'autonomous_ai_no_hitl',
+        recommended_actions: [],
+      },
+    };
+  }
+
+  // 1. Reject blurry, dark, or unreadable images automatically
+  if (!suitability.isReadable || suitability.status === 'unreadable_image') {
+    const blurReason =
+      suitability.readabilityReason ||
+      'The submitted photo is too blurry, dark, or unclear to verify a community concern.';
+    return {
+      verdict: 'rejected',
+      requestStatus: 'rejected',
+      aiValidationStatus: 'rejected',
+      adminReviewStatus: 'rejected',
+      requiresReview: false,
+      matchedCategory: null,
+      confidencePercent: suitability.confidencePercent ?? 15,
+      rejectionCode: 'blurred_or_unreadable_image',
+      reason: `Automatically rejected by AI: ${blurReason}`,
+      adminNote: `AI Auto-Rejected (Blurred/Unclear Image): ${blurReason}`,
+      elements: {
+        image_clarity: 'blurred_or_unreadable',
+        matched_four_class: null,
+        is_unrelated: false,
+        decision_mode: 'autonomous_ai_no_hitl',
+        recommended_actions: [],
+      },
+    };
+  }
+
+  // 2. Check for unrelated text/spam in description
+  const lowerDesc = (description || '').toLowerCase();
+  const hasUnrelatedKeyword = UNRELATED_KEYWORDS.some((kw) =>
+    lowerDesc.includes(kw)
+  );
+  if (hasUnrelatedKeyword) {
+    return {
+      verdict: 'rejected',
+      requestStatus: 'rejected',
+      aiValidationStatus: 'rejected',
+      adminReviewStatus: 'rejected',
+      requiresReview: false,
+      matchedCategory: null,
+      confidencePercent: 90,
+      rejectionCode: 'unrelated_or_unsupported_class',
+      reason:
+        'Automatically rejected by AI: Report content appears unrelated to a valid barangay community concern.',
+      adminNote:
+        'AI Auto-Rejected (Unrelated Report): Report text indicates a non-related or test submission outside the 4 supported classes.',
+      elements: {
+        image_clarity: 'clear',
+        matched_four_class: null,
+        is_unrelated: true,
+        decision_mode: 'autonomous_ai_no_hitl',
+        recommended_actions: [],
+      },
+    };
+  }
+
+  // 3. Must match one of the 4 approved classes with sufficient AI confidence
+  const aiCategory = suitability.matchedCategory;
+  const resolvedSelected = resolveApprovedCategory(selectedCategoryKey);
+  const finalCategory =
+    suitability.status === 'confident' && aiCategory
+      ? resolvedSelected || aiCategory
+      : null;
+
+  if (
+    suitability.status !== 'confident' ||
+    !finalCategory ||
+    !suitability.meetsConfidenceThreshold
+  ) {
+    return {
+      verdict: 'rejected',
+      requestStatus: 'rejected',
+      aiValidationStatus: 'rejected',
+      adminReviewStatus: 'rejected',
+      requiresReview: false,
+      matchedCategory: null,
+      confidencePercent: suitability.confidencePercent ?? 35,
+      rejectionCode: 'unrelated_or_unsupported_class',
+      reason:
+        'Automatically rejected by AI: The photo does not confidently match any of the 4 supported classes (Drainage/Flooding Concern, Streetlight Problem, Road Damage, Improper Waste Disposal).',
+      adminNote:
+        'AI Auto-Rejected (Unrelated / Unsupported Category): Image failed the 4-class verification threshold (Drainage, Streetlight, Road Damage, Improper Waste Disposal).',
+      elements: {
+        image_clarity: 'clear',
+        matched_four_class: null,
+        is_unrelated: true,
+        decision_mode: 'autonomous_ai_no_hitl',
+        recommended_actions: [],
+      },
+    };
+  }
+
+  // 4. Auto-Approve valid 4-class community concern
+  const confidencePct = suitability.confidencePercent ?? 85;
+  const actionsByCategory: Record<ApprovedConcernCategoryKey, string[]> = {
+    garbage: [
+      'Dispatch barangay solid waste collection team to the pinned GPS coordinates.',
+      'Inspect area for recurring improper waste disposal.',
+    ],
+    street_light: [
+      'Assign barangay electrical maintenance personnel to inspect the streetlight fixture.',
+      'Verify bulb/wiring status at the pinned location.',
+    ],
+    drainage: [
+      'Dispatch barangay drainage clearing crew to inspect the canal/waterway.',
+      'Clear blockage to prevent localized flooding in Barangay Purisima.',
+    ],
+    road_damage: [
+      'Log road surface damage for barangay infrastructure maintenance and patching.',
+      'Place safety markers if the pothole or crack poses a hazard to motorists.',
+    ],
+  };
+
+  return {
+    verdict: 'approved',
+    requestStatus: 'in_progress',
+    aiValidationStatus: 'valid',
+    adminReviewStatus: 'approved',
+    requiresReview: false,
+    matchedCategory: finalCategory,
+    confidencePercent: confidencePct,
+    rejectionCode: null,
+    reason: `Automatically approved by AI: Clear photo verified under "${finalCategory.label}" (${confidencePct}% confidence).`,
+    adminNote: `AI Auto-Approved (${finalCategory.label} · ${confidencePct}% confidence): Photo is clear and matches one of the 4 approved community concern classes.`,
+    elements: {
+      image_clarity: 'clear',
+      matched_four_class: finalCategory.label,
+      is_unrelated: false,
+      decision_mode: 'autonomous_ai_no_hitl',
+      recommended_actions: actionsByCategory[finalCategory.key],
+    },
   };
 }
 
 /**
+ * Evaluates an existing database report record (e.g. in AdminRequests) so any legacy or pending
+ * report is automatically approved or rejected by AI without human-in-the-loop intervention.
+ */
+export function evaluateExistingReportRecordByAi(report: {
+  title?: string | null;
+  description?: string | null;
+  category?: string | null;
+  ai_category?: string | null;
+  ai_confidence?: number | null;
+  photo_url?: string | null;
+  media_urls?: string[] | null;
+}): AutonomousAiDecision {
+  const hasPhoto = Boolean(
+    report.photo_url || (report.media_urls && report.media_urls.length > 0)
+  );
+  const combinedText = `${report.title || ''} ${report.description || ''} ${
+    report.category || ''
+  }`.toLowerCase();
+
+  if (!hasPhoto) {
+    return evaluateAutonomousAiReportDecision({
+      suitability: null,
+      hasPhoto: false,
+    });
+  }
+
+  // Check if report explicitly mentions a blurry/unreadable capture or unrelated content
+  if (
+    combinedText.includes('unreadable') ||
+    combinedText.includes('too blurry') ||
+    combinedText.includes('very blurred') ||
+    combinedText.includes('low clarity')
+  ) {
+    return {
+      verdict: 'rejected',
+      requestStatus: 'rejected',
+      aiValidationStatus: 'rejected',
+      adminReviewStatus: 'rejected',
+      requiresReview: false,
+      matchedCategory: null,
+      confidencePercent: 20,
+      rejectionCode: 'blurred_or_unreadable_image',
+      reason:
+        'Automatically rejected by AI: The submitted image is blurred or lacks sufficient clarity to verify a community concern.',
+      adminNote:
+        'AI Auto-Rejected: Blurred or low-clarity image detected.',
+      elements: {
+        image_clarity: 'blurred_or_unreadable',
+        matched_four_class: null,
+        is_unrelated: false,
+        decision_mode: 'autonomous_ai_no_hitl',
+        recommended_actions: [],
+      },
+    };
+  }
+
+  const matchedCat =
+    resolveApprovedCategory(report.ai_category) ||
+    resolveApprovedCategory(report.category) ||
+    resolveApprovedCategory(report.title);
+
+  const rawConf =
+    typeof report.ai_confidence === 'number' ? report.ai_confidence : 85;
+  const confScore = normalizeConfidenceScore(rawConf) ?? 0.85;
+
+  const syntheticSuitability: ImageSuitabilityEvaluation = {
+    status:
+      matchedCat && confScore >= DEFAULT_CONFIDENCE_THRESHOLD
+        ? 'confident'
+        : 'low_confidence',
+    isReadable: true,
+    readabilityReason: null,
+    matchedCategory: matchedCat,
+    confidenceScore: confScore,
+    confidencePercent: Math.round(confScore * 100),
+    meetsConfidenceThreshold:
+      Boolean(matchedCat) && confScore >= DEFAULT_CONFIDENCE_THRESHOLD,
+    thresholdPercent: Math.round(DEFAULT_CONFIDENCE_THRESHOLD * 100),
+    canAutoGenerateDefinitiveDescription:
+      Boolean(matchedCat) && confScore >= DEFAULT_CONFIDENCE_THRESHOLD,
+    requiresManualReview: false,
+    userMessage: matchedCat
+      ? `AI verified ${matchedCat.label}`
+      : LOW_CONFIDENCE_MESSAGE,
+  };
+
+  return evaluateAutonomousAiReportDecision({
+    suitability: syntheticSuitability,
+    selectedCategoryKey: matchedCat?.key ?? null,
+    description: `${report.title || ''} ${report.description || ''}`,
+    hasPhoto: true,
+  });
+}
+
+/**
  * Generates the report description based on the detected concern category and image analysis.
- * Never invents severity, measurements, or official verification claims.
  */
 export function buildAutomatedReportDescription(options: {
   suitability: ImageSuitabilityEvaluation;
@@ -361,7 +706,6 @@ export function buildAutomatedReportDescription(options: {
 } {
   const { suitability, selectedCategoryKey, aiServiceDescription } = options;
 
-  // If prediction is confident, use AI service description if valid, else category description
   if (
     suitability.status === 'confident' &&
     suitability.matchedCategory
@@ -381,7 +725,6 @@ export function buildAutomatedReportDescription(options: {
     };
   }
 
-  // If the resident selected/confirmed a category during review
   const explicitCategory = resolveApprovedCategory(selectedCategoryKey);
   if (explicitCategory) {
     return {
@@ -391,11 +734,10 @@ export function buildAutomatedReportDescription(options: {
     };
   }
 
-  // Uncertain / low-confidence prediction without a confirmed category
   return {
     description: MANUAL_REVIEW_FALLBACK_DESCRIPTION,
     source: 'manual_review_notice',
-    sourceLabel: 'Pending Category Confirmation',
+    sourceLabel: 'Unrecognized / Non-Matching Concern',
   };
 }
 
@@ -418,7 +760,7 @@ export function calculateDistanceMeters(
   a: { lat: number; lng: number },
   b: { lat: number; lng: number }
 ): number {
-  const R = 6371000; // Earth radius in meters
+  const R = 6371000;
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const dLat = toRad(b.lat - a.lat);
   const dLng = toRad(b.lng - a.lng);

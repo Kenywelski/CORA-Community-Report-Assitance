@@ -30,42 +30,80 @@ interface TrackedReport {
   location: string | null;
   admin_notes: string | null;
   action_taken: string | null;
+  ai_validation_status?: string | null;
+  ai_validation_reason?: string | null;
+  ai_validation_confidence?: number | null;
+  admin_review_status?: string | null;
 }
 
 const statusConfig: Record<Status, { icon: any; color: string; dot: string; label: string }> = {
-  pending: { icon: ClipboardList, color: 'bg-orange-500/15 text-orange-600 dark:text-orange-400', dot: 'bg-orange-500', label: 'Pending' },
-  under_review: { icon: FileSearch, color: 'bg-purple-500/15 text-purple-600 dark:text-purple-400', dot: 'bg-purple-500', label: 'Under Review' },
+  pending: { icon: ClipboardList, color: 'bg-orange-500/15 text-orange-600 dark:text-orange-400', dot: 'bg-orange-500', label: 'AI Processing' },
+  under_review: { icon: FileSearch, color: 'bg-teal-500/15 text-teal-700 dark:text-teal-400', dot: 'bg-teal-500', label: 'AI Verified' },
   assigned: { icon: UserCheck, color: 'bg-sky-500/15 text-sky-600 dark:text-sky-400', dot: 'bg-sky-500', label: 'Assigned' },
-  in_progress: { icon: Clock, color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400', dot: 'bg-blue-500', label: 'In Progress' },
+  in_progress: { icon: Clock, color: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500', label: 'AI Approved · Active' },
   completed: { icon: CheckCircle2, color: 'bg-green-500/15 text-green-600 dark:text-green-400', dot: 'bg-green-500', label: 'Resolved' },
-  rejected: { icon: XCircle, color: 'bg-destructive/10 text-destructive', dot: 'bg-destructive', label: 'Rejected' },
+  rejected: { icon: XCircle, color: 'bg-destructive/10 text-destructive', dot: 'bg-destructive', label: 'AI Rejected' },
   closed: { icon: Archive, color: 'bg-muted text-muted-foreground', dot: 'bg-muted-foreground', label: 'Closed' },
 };
 
 const FILTERS = [
   { key: 'all', label: 'All' },
-  { key: 'open', label: 'Open' },
+  { key: 'open', label: 'AI Approved / Open' },
   { key: 'completed', label: 'Resolved' },
-  { key: 'rejected', label: 'Rejected' },
+  { key: 'rejected', label: 'AI Rejected' },
 ] as const;
 
 const TrackTimeline = ({ r }: { r: TrackedReport }) => {
-  const steps = [
-    { label: 'Submitted', at: r.created_at, done: true },
-    { label: 'Acknowledged', at: r.response_at, done: !!r.response_at },
-    { label: 'Resolved', at: r.resolved_at, done: !!r.resolved_at },
-  ];
+  const isRejected = r.status === 'rejected' || r.ai_validation_status === 'rejected';
+  const isApproved =
+    !isRejected &&
+    (r.ai_validation_status === 'valid' ||
+      r.admin_review_status === 'approved' ||
+      ['in_progress', 'assigned', 'completed'].includes(r.status));
+
+  const steps = isRejected
+    ? [
+        { label: 'Submitted', at: r.created_at, done: true, rejected: false },
+        { label: 'AI Rejected', at: r.updated_at || r.created_at, done: true, rejected: true },
+        { label: 'Closed', at: r.updated_at || r.created_at, done: true, rejected: true },
+      ]
+    : [
+        { label: 'Submitted', at: r.created_at, done: true, rejected: false },
+        { label: 'AI Approved', at: r.response_at || r.created_at, done: isApproved, rejected: false },
+        { label: 'Resolved', at: r.resolved_at, done: !!r.resolved_at || r.status === 'completed', rejected: false },
+      ];
   return (
     <div className="flex items-center gap-1 mt-3">
       {steps.map((s, i) => (
         <div key={s.label} className="flex-1">
           <div className="flex items-center">
-            <div className={cn('h-2 w-2 rounded-full shrink-0', s.done ? 'bg-primary' : 'bg-muted')} />
+            <div
+              className={cn(
+                'h-2 w-2 rounded-full shrink-0',
+                s.rejected ? 'bg-destructive' : s.done ? 'bg-primary' : 'bg-muted'
+              )}
+            />
             {i < steps.length - 1 && (
-              <div className={cn('h-0.5 flex-1', steps[i + 1].done ? 'bg-primary' : 'bg-muted')} />
+              <div
+                className={cn(
+                  'h-0.5 flex-1',
+                  steps[i + 1].rejected
+                    ? 'bg-destructive/50'
+                    : steps[i + 1].done
+                    ? 'bg-primary'
+                    : 'bg-muted'
+                )}
+              />
             )}
           </div>
-          <p className={cn('text-[10px] mt-1', s.done ? 'text-foreground' : 'text-muted-foreground')}>{s.label}</p>
+          <p
+            className={cn(
+              'text-[10px] mt-1 font-medium',
+              s.rejected ? 'text-destructive' : s.done ? 'text-foreground' : 'text-muted-foreground'
+            )}
+          >
+            {s.label}
+          </p>
         </div>
       ))}
     </div>
@@ -86,7 +124,7 @@ const MyRequests = () => {
       if (!user) return [];
       const { data, error } = await supabase
         .from('service_requests')
-        .select('id,title,category,status,created_at,updated_at,response_at,resolved_at,location,admin_notes,action_taken')
+        .select('id,title,category,status,created_at,updated_at,response_at,resolved_at,location,admin_notes,action_taken,ai_validation_status,ai_validation_reason,ai_validation_confidence,admin_review_status')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(100);
@@ -283,10 +321,19 @@ const MyRequests = () => {
 
                       <TrackTimeline r={r} />
 
-                      {(r.action_taken || r.admin_notes) && (
-                        <div className="mt-3 rounded-lg bg-muted/60 p-2.5">
-                          <p className="text-[10px] font-medium text-muted-foreground mb-0.5">Latest update from the office</p>
-                          <p className="text-xs">{r.action_taken || r.admin_notes}</p>
+                      {(r.action_taken || r.admin_notes || r.ai_validation_reason) && (
+                        <div className={cn(
+                          'mt-3 rounded-lg p-2.5 border',
+                          r.status === 'rejected'
+                            ? 'bg-destructive/5 border-destructive/20'
+                            : 'bg-muted/60 border-border/60'
+                        )}>
+                          <p className="text-[10px] font-semibold text-muted-foreground mb-0.5">
+                            {r.status === 'rejected' ? 'AI Auto-Rejection Reason' : 'AI Verification & Office Update'}
+                          </p>
+                          <p className="text-xs leading-relaxed">
+                            {r.action_taken || r.admin_notes || r.ai_validation_reason}
+                          </p>
                         </div>
                       )}
 

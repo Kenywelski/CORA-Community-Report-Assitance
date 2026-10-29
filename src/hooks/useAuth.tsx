@@ -57,33 +57,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    let mounted = true;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, currentSession) => {
+      if (!mounted) return;
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
-      setIsLoading(false);
 
       if (currentSession?.user) {
         setTimeout(async () => {
-          await ensureUserProfile(currentSession.user);
-          await checkAdminRole(currentSession.user.id);
+          try {
+            await ensureUserProfile(currentSession.user);
+            await checkAdminRole(currentSession.user.id);
+          } finally {
+            if (mounted) setIsLoading(false);
+          }
         }, 0);
       } else {
         setIsAdmin(false);
+        setIsLoading(false);
       }
     });
 
     supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
+      if (!mounted) return;
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
-      setIsLoading(false);
 
       if (currentSession?.user) {
-        await ensureUserProfile(currentSession.user);
-        await checkAdminRole(currentSession.user.id);
+        try {
+          await ensureUserProfile(currentSession.user);
+          await checkAdminRole(currentSession.user.id);
+        } finally {
+          if (mounted) setIsLoading(false);
+        }
+      } else {
+        if (mounted) setIsLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signInWithGoogle = async () => {

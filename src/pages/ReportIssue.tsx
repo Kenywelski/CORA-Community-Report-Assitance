@@ -28,6 +28,7 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
+  XCircle,
 } from 'lucide-react';
 import { LocationPicker } from '@/components/LocationPicker';
 import {
@@ -41,6 +42,7 @@ import {
 import {
   APPROVED_CONCERN_CATEGORIES,
   ApprovedConcernCategoryKey,
+  AutonomousAiDecision,
   CapturedGpsReading,
   DEFAULT_CONFIDENCE_THRESHOLD,
   GpsValidationResult,
@@ -49,6 +51,7 @@ import {
   LOW_CONFIDENCE_MESSAGE,
   MobileNetV3InferenceResponse,
   buildAutomatedReportDescription,
+  evaluateAutonomousAiReportDecision,
   evaluateImageSuitability,
   resolveApprovedCategory,
   validateCapturedGpsLocation,
@@ -87,7 +90,6 @@ const ReportIssue = () => {
     useState<MobileNetV3InferenceResponse | null>(null);
   const [suitability, setSuitability] =
     useState<ImageSuitabilityEvaluation | null>(null);
-  const [manualReviewRequested, setManualReviewRequested] = useState(false);
 
   // Selected / Predicted Category & Description State
   const [selectedCategoryKey, setSelectedCategoryKey] = useState<
@@ -117,7 +119,7 @@ const ReportIssue = () => {
   const [isPublic, setIsPublic] = useState(true);
   const [usedVoice, setUsedVoice] = useState(false);
 
-  // Submission & Idempotency State (prevents accidental double submissions)
+  // Submission & Autonomous AI Decision State
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submissionLockRef = useRef(false);
   const activeReportUUIDRef = useRef<string>(crypto.randomUUID());
@@ -125,6 +127,8 @@ const ReportIssue = () => {
     null
   );
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
+  const [finalAiDecision, setFinalAiDecision] =
+    useState<AutonomousAiDecision | null>(null);
 
   // Acquire fresh device GPS coordinates
   const requestFreshGpsLocation =
@@ -217,11 +221,11 @@ const ReportIssue = () => {
       setCapturedAtIso(new Date(captureTimeMs).toISOString());
 
       // Reset per-capture overrides
-      setManualReviewRequested(false);
       setIsCategoryOverridden(false);
       setShowCategorySelector(false);
       setIsEditingDescription(false);
       setResidentEditedDescription(false);
+      setFinalAiDecision(null);
       activeReportUUIDRef.current = crypto.randomUUID();
 
       // 1. Acquire / verify actual device GPS reading
@@ -239,7 +243,7 @@ const ReportIssue = () => {
         setGpsError(payload.gpsError);
       }
 
-      // 2. Inspect captured image readability
+      // 2. Inspect captured image readability and blur
       const quality = await inspectCapturedImageQuality(photo);
       setQualityMetrics(quality);
 
@@ -379,23 +383,23 @@ const ReportIssue = () => {
     setUsedVoice(true);
   };
 
+  // Compute live autonomous AI decision for the current capture
+  const currentAutonomousDecision = evaluateAutonomousAiReportDecision({
+    suitability,
+    selectedCategoryKey: selectedCategoryKey || null,
+    description,
+    hasPhoto: Boolean(photoPreviewUrl || uploadedPhotoUrl),
+  });
+
   const handleSubmitReport = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Prevent duplicate submissions on accidental double-click
     if (isSubmitting || submissionLockRef.current || step === 'submitted') {
       return;
     }
 
     if (!photoPreviewUrl && !uploadedPhotoUrl) {
       toast.error('Please capture a photo of the community concern first.');
-      return;
-    }
-
-    if (suitability?.status === 'unreadable_image' && !manualReviewRequested) {
-      toast.error(
-        'The captured photo is unclear. Please retake a clearer photo or select the concern category below.'
-      );
       return;
     }
 
@@ -411,15 +415,6 @@ const ReportIssue = () => {
       return;
     }
 
-    const activeCategory = resolveApprovedCategory(selectedCategoryKey);
-    if (!activeCategory && !manualReviewRequested) {
-      toast.error(
-        'Please confirm the community concern category before submitting.'
-      );
-      setShowCategorySelector(true);
-      return;
-    }
-
     submissionLockRef.current = true;
     setIsSubmitting(true);
 
@@ -430,20 +425,31 @@ const ReportIssue = () => {
 
       const reportId = activeReportUUIDRef.current;
       const createdAt = new Date().toISOString();
+
+      // Autonomous AI Decision (No Human-in-the-Loop):
+      // Automatically approves clear 4-class reports; automatically rejects blurred or unrelated reports.
+      const decision = evaluateAutonomousAiReportDecision({
+        suitability,
+        selectedCategoryKey: selectedCategoryKey || null,
+        description,
+        hasPhoto: Boolean(photoPreviewUrl || uploadedPhotoUrl),
+      });
+
       const categoryLabel =
-        activeCategory?.label || 'Pending Manual Classification';
+        decision.matchedCategory?.label ||
+        resolveApprovedCategory(selectedCategoryKey)?.label ||
+        'Unrecognized / Rejected Report';
+
       const finalDescriptionText =
         description.trim() ||
-        activeCategory?.conservativeTemplate ||
-        'A community concern photo was submitted for verification by Barangay Purisima personnel.';
+        decision.matchedCategory?.conservativeTemplate ||
+        decision.reason;
 
       const metadataLines = [
-        `AI Classification: ${
-          suitability?.status === 'confident'
-            ? `${categoryLabel} (${suitability.confidencePercent}% confidence)`
-            : suitability?.status === 'low_confidence'
-            ? `Low Confidence (${suitability.confidencePercent ?? 0}% — Resident Reviewed)`
-            : 'Resident Category Confirmation'
+        `Autonomous AI Decision: ${
+          decision.verdict === 'approved'
+            ? `Auto-Approved (${categoryLabel} · ${decision.confidencePercent}% confidence)`
+            : `Auto-Rejected (${decision.reason})`
         }`,
         isCategoryOverridden
           ? `Category Correction: Resident updated category to ${categoryLabel}`
@@ -472,11 +478,20 @@ const ReportIssue = () => {
         title: `[REPORT] ${categoryLabel}`,
         description: `${finalDescriptionText}\n\n${metadataLines}`,
         category: `Report: ${categoryLabel}`,
-        ai_category: suitability?.matchedCategory?.label ?? categoryLabel,
-        ai_confidence: suitability?.confidencePercent ?? null,
-        ai_reason: suitability?.userMessage ?? null,
-        ai_validation_status: 'pending',
-        requires_review: true,
+        status: decision.requestStatus,
+        ai_category: decision.matchedCategory?.label ?? null,
+        ai_confidence: decision.confidencePercent,
+        ai_reason: decision.reason,
+        ai_validation_status: decision.aiValidationStatus,
+        ai_validation_confidence: decision.confidencePercent,
+        ai_validation_reason: decision.reason,
+        ai_validated_at: createdAt,
+        ai_validation_elements: decision.elements,
+        admin_review_status: decision.adminReviewStatus,
+        admin_notes: decision.adminNote,
+        acknowledged_at: decision.verdict === 'approved' ? createdAt : null,
+        response_at: decision.verdict === 'approved' ? createdAt : null,
+        requires_review: false,
         location:
           'Barangay Purisima, Tago, Surigao del Sur' +
           (locationDetails.trim() ? `, ${locationDetails.trim()}` : ''),
@@ -489,7 +504,7 @@ const ReportIssue = () => {
             : [],
         media_types: uploadedPhotoUrl || photoPreviewUrl ? ['image'] : [],
         reporter_name: contactName.trim() || null,
-        is_public: isPublic,
+        is_public: decision.verdict === 'approved' ? isPublic : false,
       });
 
       if (error) {
@@ -505,17 +520,21 @@ const ReportIssue = () => {
 
       setSubmittedReportId(reportId);
       setSubmittedAt(createdAt);
+      setFinalAiDecision(decision);
       setStep('submitted');
       setIsSubmitting(false);
-      toast.success('Report submitted successfully!');
 
-      // Non-blocking background validation & routing for barangay admin review
-      supabase.functions
-        .invoke('validate-report', { body: { reportId } })
-        .catch(() => {});
-      supabase.functions
-        .invoke('route-complaint', { body: { report_id: reportId } })
-        .catch(() => {});
+      if (decision.verdict === 'approved') {
+        toast.success(
+          `Report automatically approved by AI under ${categoryLabel}!`
+        );
+        // Trigger automatic department routing for approved reports
+        supabase.functions
+          .invoke('route-complaint', { body: { report_id: reportId } })
+          .catch(() => {});
+      } else {
+        toast.error(decision.reason);
+      }
     } catch (err) {
       console.error(err);
       toast.error('An unexpected error occurred while submitting your report.');
@@ -533,7 +552,6 @@ const ReportIssue = () => {
     setQualityMetrics(null);
     setInferenceResult(null);
     setSuitability(null);
-    setManualReviewRequested(false);
     setSelectedCategoryKey('');
     setIsCategoryOverridden(false);
     setShowCategorySelector(false);
@@ -545,6 +563,7 @@ const ReportIssue = () => {
     setUsedVoice(false);
     setSubmittedReportId(null);
     setSubmittedAt(null);
+    setFinalAiDecision(null);
     setStep('capture');
     setCameraModalOpen(true);
     requestFreshGpsLocation();
@@ -590,7 +609,7 @@ const ReportIssue = () => {
                 {step === 'analyzing'
                   ? 'Analyzing Your Report'
                   : step === 'submitted'
-                  ? 'Report Submitted'
+                  ? 'AI Report Decision'
                   : 'Review Your Report'}
               </h1>
               <p className="mt-0.5 text-xs text-white/85 sm:text-sm">
@@ -619,7 +638,7 @@ const ReportIssue = () => {
                 AI is analyzing your report...
               </h2>
               <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-[#64748B] sm:text-sm">
-                Identifying the community concern category, preparing your report description, and verifying your Barangay Purisima location.
+                Checking image clarity, classifying against the 4 supported community concern classes, and verifying your Barangay Purisima location.
               </p>
 
               {photoPreviewUrl && (
@@ -692,10 +711,17 @@ const ReportIssue = () => {
                     </span>
                   </span>
                   {qualityMetrics && (
-                    <span>
+                    <span
+                      className={cn(
+                        'font-semibold',
+                        suitability.isReadable
+                          ? 'text-[#177A73]'
+                          : 'text-red-600'
+                      )}
+                    >
                       {suitability.isReadable
-                        ? 'Clear Photo Verified'
-                        : 'Low Image Clarity'}
+                        ? 'Clear Photo · Passed Blur Check'
+                        : 'Blurred / Unclear Image — Will Be Rejected by AI'}
                     </span>
                   )}
                 </div>
@@ -711,7 +737,7 @@ const ReportIssue = () => {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-[#177A73]">
-                      Step 2 · Concern Classification
+                      Step 2 · Concern Classification &amp; Autonomous AI Verdict
                     </p>
                     <h2 className="mt-0.5 text-lg font-bold text-[#142B38]">
                       Detected Category
@@ -722,144 +748,129 @@ const ReportIssue = () => {
                     data-testid="ai-analysis-status-badge"
                     className={cn(
                       'inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-bold',
-                      suitability.status === 'confident' || activeCategoryObj
-                        ? 'bg-[#EAF6F4] text-[#177A73]'
-                        : suitability.status === 'low_confidence'
-                        ? 'bg-amber-100 text-amber-900'
-                        : suitability.status === 'unreadable_image'
-                        ? 'bg-red-100 text-red-900'
-                        : 'bg-slate-100 text-[#142B38]'
+                      currentAutonomousDecision.verdict === 'approved'
+                        ? 'bg-emerald-100 text-emerald-900'
+                        : 'bg-red-100 text-red-900'
                     )}
                   >
-                    <Sparkles className="h-3.5 w-3.5" />
+                    {currentAutonomousDecision.verdict === 'approved' ? (
+                      <CheckCircle className="h-3.5 w-3.5 text-emerald-700" />
+                    ) : (
+                      <XCircle className="h-3.5 w-3.5 text-red-700" />
+                    )}
                     <span>
-                      {isCategoryOverridden
-                        ? 'Category Updated by Resident'
-                        : suitability.status === 'confident'
-                        ? 'AI-Detected Category'
-                        : suitability.status === 'low_confidence'
-                        ? 'Needs Category Confirmation'
-                        : suitability.status === 'unreadable_image'
-                        ? 'Retake Recommended'
-                        : 'Select Category'}
+                      {currentAutonomousDecision.verdict === 'approved'
+                        ? 'AI Auto-Approval Ready'
+                        : 'Will Be Auto-Rejected by AI'}
                     </span>
                   </span>
                 </div>
 
-                {/* Confident or Resident-Selected Category Display */}
-                {(suitability.status === 'confident' || activeCategoryObj) && (
-                  <div
-                    data-testid="confident-prediction-box"
-                    className="rounded-xl border border-[#177A73]/30 bg-[#EAF6F4]/60 p-4"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        {(() => {
-                          const catKey =
-                            activeCategoryObj?.key ||
-                            suitability.matchedCategory?.key ||
-                            'garbage';
-                          const Icon = CATEGORY_ICONS[catKey];
-                          return (
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#177A73] text-white">
-                              <Icon className="h-5 w-5" />
-                            </div>
-                          );
-                        })()}
-                        <div>
-                          <p className="text-xs font-medium text-[#64748B]">
-                            Identified Community Concern
-                          </p>
-                          <p
-                            data-testid="detected-concern-label"
-                            className="mt-0.5 text-base font-bold text-[#142B38]"
-                          >
-                            {activeCategoryObj?.label ||
-                              suitability.matchedCategory?.label}
-                          </p>
-                          {isCategoryOverridden &&
-                            suitability.matchedCategory && (
-                              <p className="mt-0.5 text-[11px] font-medium text-[#177A73]">
-                                Updated from{' '}
-                                {suitability.matchedCategory.label}
-                              </p>
-                            )}
-                        </div>
-                      </div>
-
-                      {suitability.confidencePercent !== null &&
-                        !isCategoryOverridden && (
-                          <div className="min-w-[175px]">
-                            <div className="flex items-center justify-between gap-3 text-xs">
-                              <span className="font-medium text-[#64748B]">
-                                Detection Confidence
-                              </span>
-                              <span
-                                data-testid="detected-confidence-value"
-                                className="font-bold text-[#177A73]"
-                              >
-                                {suitability.confidencePercent}%
-                              </span>
-                            </div>
-                            <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-white ring-1 ring-[#177A73]/20">
-                              <div
-                                className="h-full rounded-full bg-[#177A73] transition-all"
-                                style={{
-                                  width: `${
-                                    suitability.confidencePercent ?? 0
-                                  }%`,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Low-Confidence Banner */}
-                {suitability.status === 'low_confidence' &&
-                  !activeCategoryObj && (
+                {/* Confident 4-Class Prediction Box */}
+                {suitability.status === 'confident' &&
+                  suitability.matchedCategory && (
                     <div
-                      data-testid="low-confidence-banner"
-                      className="rounded-xl border border-amber-300 bg-amber-50/90 p-4 text-amber-950"
+                      data-testid="confident-prediction-box"
+                      className="rounded-xl border border-[#177A73]/30 bg-[#EAF6F4]/60 p-4"
                     >
-                      <div className="flex items-start gap-3">
-                        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-                        <div className="flex-1 space-y-2">
-                          <p className="text-sm font-bold leading-snug">
-                            {LOW_CONFIDENCE_MESSAGE}
-                          </p>
-                          <div className="flex flex-wrap gap-2 pt-1">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={handleRetakePhoto}
-                              className="rounded-lg border-amber-400 bg-white text-xs font-semibold text-amber-950 hover:bg-amber-100"
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          {(() => {
+                            const catKey =
+                              activeCategoryObj?.key ||
+                              suitability.matchedCategory?.key ||
+                              'garbage';
+                            const Icon = CATEGORY_ICONS[catKey];
+                            return (
+                              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#177A73] text-white">
+                                <Icon className="h-5 w-5" />
+                              </div>
+                            );
+                          })()}
+                          <div>
+                            <p className="text-xs font-medium text-[#64748B]">
+                              Identified Community Concern (4 Supported Classes)
+                            </p>
+                            <p
+                              data-testid="detected-concern-label"
+                              className="mt-0.5 text-base font-bold text-[#142B38]"
                             >
-                              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                              Retake Photo
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              data-testid="request-manual-review-btn"
-                              onClick={() => {
-                                setManualReviewRequested(true);
-                                setShowCategorySelector(true);
-                              }}
-                              className="rounded-lg bg-[#177A73] text-xs font-semibold text-white hover:bg-[#12625D]"
-                            >
-                              Choose Category Manually
-                            </Button>
+                              {activeCategoryObj?.label ||
+                                suitability.matchedCategory?.label}
+                            </p>
+                            {isCategoryOverridden &&
+                              suitability.matchedCategory && (
+                                <p className="mt-0.5 text-[11px] font-medium text-[#177A73]">
+                                  Updated from{' '}
+                                  {suitability.matchedCategory.label}
+                                </p>
+                              )}
                           </div>
                         </div>
+
+                        {suitability.confidencePercent !== null &&
+                          !isCategoryOverridden && (
+                            <div className="min-w-[175px]">
+                              <div className="flex items-center justify-between gap-3 text-xs">
+                                <span className="font-medium text-[#64748B]">
+                                  Detection Confidence
+                                </span>
+                                <span
+                                  data-testid="detected-confidence-value"
+                                  className="font-bold text-[#177A73]"
+                                >
+                                  {suitability.confidencePercent}%
+                                </span>
+                              </div>
+                              <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-white ring-1 ring-[#177A73]/20">
+                                <div
+                                  className="h-full rounded-full bg-[#177A73] transition-all"
+                                  style={{
+                                    width: `${
+                                      suitability.confidencePercent ?? 0
+                                    }%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
                       </div>
                     </div>
                   )}
 
-                {/* Unreadable Image Banner */}
+                {/* Non-matching / Unrelated Image Warning (Will Auto-Reject) */}
+                {(suitability.status === 'low_confidence' ||
+                  suitability.status === 'model_unavailable') && (
+                  <div
+                    data-testid="low-confidence-banner"
+                    className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-950"
+                  >
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                      <div className="flex-1 space-y-2">
+                        <p className="text-sm font-bold leading-snug">
+                          Unrelated or Unrecognized Concern — Automatic AI Rejection
+                        </p>
+                        <p className="text-xs leading-relaxed text-red-800">
+                          {LOW_CONFIDENCE_MESSAGE}
+                        </p>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleRetakePhoto}
+                            className="rounded-lg bg-[#F36B3F] text-xs font-semibold text-white hover:bg-[#dc5a30]"
+                          >
+                            <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                            Retake Clear Photo of Concern
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Blurred / Unreadable Image Banner (Will Auto-Reject) */}
                 {suitability.status === 'unreadable_image' && (
                   <div
                     data-testid="unreadable-image-banner"
@@ -869,7 +880,7 @@ const ReportIssue = () => {
                       <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
                       <div className="flex-1 space-y-2">
                         <p className="text-sm font-bold">
-                          Photo Needs Better Clarity
+                          Blurred or Unclear Photo — Automatic AI Rejection
                         </p>
                         <p className="text-xs leading-relaxed text-red-800">
                           {suitability.userMessage}
@@ -882,19 +893,7 @@ const ReportIssue = () => {
                             className="rounded-lg bg-[#F36B3F] text-xs font-semibold text-white hover:bg-[#dc5a30]"
                           >
                             <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                            Retake Photo
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setManualReviewRequested(true);
-                              setShowCategorySelector(true);
-                            }}
-                            className="rounded-lg border-red-300 bg-white text-xs font-semibold text-red-900"
-                          >
-                            Select Category Manually
+                            Retake Clear Photo
                           </Button>
                         </div>
                       </div>
@@ -902,74 +901,75 @@ const ReportIssue = () => {
                   </div>
                 )}
 
-                {/* Category Selection / Override Options */}
-                {showCategorySelector ||
-                suitability.status === 'model_unavailable' ||
-                (!activeCategoryObj &&
-                  suitability.status !== 'confident') ? (
-                  <div className="space-y-2.5 pt-1">
-                    <p className="text-xs font-bold text-[#142B38]">
-                      {activeCategoryObj
-                        ? 'Select the correct category if the detected category is inaccurate:'
-                        : 'Select the community concern category:'}
-                    </p>
-                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                      {APPROVED_CONCERN_CATEGORIES.map((cat) => {
-                        const Icon = CATEGORY_ICONS[cat.key];
-                        const isSelected = selectedCategoryKey === cat.key;
-                        return (
-                          <button
-                            key={cat.key}
-                            type="button"
-                            data-testid={`select-category-${cat.key}`}
-                            onClick={() => handleSelectCategoryOverride(cat.key)}
-                            className={cn(
-                              'flex items-center gap-3 rounded-xl border p-3.5 text-left transition-all',
-                              isSelected
-                                ? 'border-[#177A73] bg-[#EAF6F4] ring-2 ring-[#177A73]/25'
-                                : 'border-[#E2E8F0] bg-white hover:border-[#177A73]/40 hover:bg-[#F8FAFC]'
-                            )}
-                          >
-                            <div
-                              className={cn(
-                                'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
-                                isSelected
-                                  ? 'bg-[#177A73] text-white'
-                                  : 'bg-[#EAF6F4] text-[#177A73]'
-                              )}
-                            >
-                              <Icon className="h-4 w-4" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-bold text-[#142B38]">
-                                {cat.label}
-                              </p>
-                              <p className="truncate text-[11px] text-[#64748B]">
-                                {cat.shortDescription}
-                              </p>
-                            </div>
-                            {isSelected && (
-                              <CheckCircle className="h-4 w-4 shrink-0 text-[#177A73]" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between border-t border-[#E2E8F0] pt-3 text-xs">
-                    <span className="text-[#64748B]">
-                      Need to change the detected category?
-                    </span>
-                    <button
-                      type="button"
-                      data-testid="change-category-btn"
-                      onClick={() => setShowCategorySelector(true)}
-                      className="font-semibold text-[#177A73] hover:underline"
-                    >
-                      Change Category
-                    </button>
-                  </div>
+                {/* Category Correction Among the 4 Supported Classes (only when photo is clear and confident) */}
+                {suitability.status === 'confident' && (
+                  <>
+                    {showCategorySelector ? (
+                      <div className="space-y-2.5 pt-1">
+                        <p className="text-xs font-bold text-[#142B38]">
+                          Select one of the 4 supported community concern classes:
+                        </p>
+                        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                          {APPROVED_CONCERN_CATEGORIES.map((cat) => {
+                            const Icon = CATEGORY_ICONS[cat.key];
+                            const isSelected = selectedCategoryKey === cat.key;
+                            return (
+                              <button
+                                key={cat.key}
+                                type="button"
+                                data-testid={`select-category-${cat.key}`}
+                                onClick={() =>
+                                  handleSelectCategoryOverride(cat.key)
+                                }
+                                className={cn(
+                                  'flex items-center gap-3 rounded-xl border p-3.5 text-left transition-all',
+                                  isSelected
+                                    ? 'border-[#177A73] bg-[#EAF6F4] ring-2 ring-[#177A73]/25'
+                                    : 'border-[#E2E8F0] bg-white hover:border-[#177A73]/40 hover:bg-[#F8FAFC]'
+                                )}
+                              >
+                                <div
+                                  className={cn(
+                                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
+                                    isSelected
+                                      ? 'bg-[#177A73] text-white'
+                                      : 'bg-[#EAF6F4] text-[#177A73]'
+                                  )}
+                                >
+                                  <Icon className="h-4 w-4" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-bold text-[#142B38]">
+                                    {cat.label}
+                                  </p>
+                                  <p className="truncate text-[11px] text-[#64748B]">
+                                    {cat.shortDescription}
+                                  </p>
+                                </div>
+                                {isSelected && (
+                                  <CheckCircle className="h-4 w-4 shrink-0 text-[#177A73]" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between border-t border-[#E2E8F0] pt-3 text-xs">
+                        <span className="text-[#64748B]">
+                          Need to switch among the 4 supported categories?
+                        </span>
+                        <button
+                          type="button"
+                          data-testid="change-category-btn"
+                          onClick={() => setShowCategorySelector(true)}
+                          className="font-semibold text-[#177A73] hover:underline"
+                        >
+                          Change Category
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -1313,7 +1313,7 @@ const ReportIssue = () => {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Submitting Report...
+                    Running AI Auto-Verification...
                   </>
                 ) : (
                   <>
@@ -1326,22 +1326,34 @@ const ReportIssue = () => {
           </form>
         )}
 
-        {/* REPORT SUBMITTED CONFIRMATION */}
+        {/* REPORT SUBMITTED CONFIRMATION (Shows Autonomous AI Approval or Rejection) */}
         {step === 'submitted' && (
           <Card
             data-testid="report-submitted-confirmation"
             className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-sm"
           >
             <CardContent className="p-6 text-center sm:p-8">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-[#177A73]">
-                <CheckCircle className="h-9 w-9" />
-              </div>
+              {finalAiDecision?.verdict === 'rejected' ? (
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100 text-red-600">
+                  <XCircle className="h-9 w-9" />
+                </div>
+              ) : (
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-[#177A73]">
+                  <CheckCircle className="h-9 w-9" />
+                </div>
+              )}
 
-              <h2 className="mt-4 text-2xl font-bold text-[#142B38]">
-                Report Submitted Successfully
+              <h2
+                data-testid="submitted-verdict-heading"
+                className="mt-4 text-2xl font-bold text-[#142B38]"
+              >
+                {finalAiDecision?.verdict === 'rejected'
+                  ? 'Report Automatically Rejected by AI'
+                  : 'Report Automatically Approved by AI'}
               </h2>
               <p className="mx-auto mt-1.5 max-w-md text-sm text-[#64748B]">
-                Your community concern has been sent to Barangay Purisima administrators for verification.
+                {finalAiDecision?.reason ||
+                  'Your community concern has been automatically verified and approved by AI for barangay action.'}
               </p>
 
               <div className="mx-auto mt-6 max-w-md space-y-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4 text-left text-xs sm:text-sm">
@@ -1359,8 +1371,9 @@ const ReportIssue = () => {
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-[#64748B]">Category:</span>
                   <span className="font-bold text-[#142B38]">
-                    {activeCategoryObj?.label ||
-                      'Pending Manual Classification'}
+                    {finalAiDecision?.matchedCategory?.label ||
+                      activeCategoryObj?.label ||
+                      'Unrecognized / Outside 4 Classes'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -1382,7 +1395,7 @@ const ReportIssue = () => {
                 )}
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-[#64748B]">
-                    Date Submitted:
+                    Date Processed:
                   </span>
                   <span className="text-[#142B38]">
                     {submittedAt
@@ -1392,11 +1405,23 @@ const ReportIssue = () => {
                 </div>
                 <div className="flex items-center justify-between pt-1">
                   <span className="font-medium text-[#64748B]">
-                    Review Status:
+                    AI Automatic Decision:
                   </span>
-                  <span className="inline-flex items-center rounded-md bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-900">
-                    Pending Review
-                  </span>
+                  {finalAiDecision?.verdict === 'rejected' ? (
+                    <span
+                      data-testid="submitted-ai-verdict-badge"
+                      className="inline-flex items-center rounded-md bg-red-100 px-2.5 py-0.5 text-xs font-bold text-red-900"
+                    >
+                      Auto-Rejected by AI
+                    </span>
+                  ) : (
+                    <span
+                      data-testid="submitted-ai-verdict-badge"
+                      className="inline-flex items-center rounded-md bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-900"
+                    >
+                      Auto-Approved by AI
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -1415,7 +1440,9 @@ const ReportIssue = () => {
                   onClick={resetForNewReport}
                   className="min-h-11 rounded-xl border-[#E2E8F0] px-6 font-semibold text-[#142B38]"
                 >
-                  Submit Another Report
+                  {finalAiDecision?.verdict === 'rejected'
+                    ? 'Retake & Submit Valid Photo'
+                    : 'Submit Another Report'}
                 </Button>
                 <Button
                   type="button"

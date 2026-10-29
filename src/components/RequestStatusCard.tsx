@@ -36,8 +36,8 @@ export const RequestStatusCard = () => {
 
   const stats = [
     { icon: ListChecks, label: "Total Reports", value: reports.length, color: "text-foreground", bg: "bg-muted" },
-    { icon: ClipboardList, label: "Pending", value: reports.filter((report) => report.status === 'pending').length, color: "text-warning", bg: "bg-warning/10" },
-    { icon: Clock, label: "Under Review", value: reports.filter((report) => ['under_review', 'assigned', 'in_progress'].includes(report.status)).length, color: "text-primary", bg: "bg-primary/10" },
+    { icon: ClipboardList, label: "AI Rejected", value: reports.filter((report) => report.status === 'rejected').length, color: "text-destructive", bg: "bg-destructive/10" },
+    { icon: Clock, label: "AI Approved", value: reports.filter((report) => ['under_review', 'assigned', 'in_progress'].includes(report.status)).length, color: "text-primary", bg: "bg-primary/10" },
     { icon: CheckCircle2, label: "Resolved", value: reports.filter((report) => report.status === 'completed').length, color: "text-success", bg: "bg-success/10" },
   ];
 

@@ -12,12 +12,25 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+const FOUR_SUPPORTED_CLASSES = [
+  "Drainage/Flooding Concern",
+  "Streetlight Problem",
+  "Road Damage",
+  "Improper Waste Disposal",
+];
+
 const SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
-    status: { type: "string", enum: ["valid", "suspicious", "rejected"] },
+    status: { type: "string", enum: ["valid", "rejected"] },
     confidence: { type: "integer" },
+    matched_class: {
+      type: ["string", "null"],
+      enum: [...FOUR_SUPPORTED_CLASSES, null],
+    },
+    is_blurred: { type: "boolean" },
+    is_unrelated: { type: "boolean" },
     reason: { type: "string" },
     description_assessment: { type: "string" },
     location_assessment: { type: "string" },
@@ -28,11 +41,13 @@ const SCHEMA = {
     },
     knowledge_used: { type: "array", items: { type: "string" } },
     recommended_actions: { type: "array", items: { type: "string" } },
-    is_unrelated: { type: "boolean" },
   },
   required: [
     "status",
     "confidence",
+    "matched_class",
+    "is_blurred",
+    "is_unrelated",
     "reason",
     "description_assessment",
     "location_assessment",
@@ -40,7 +55,6 @@ const SCHEMA = {
     "image_authenticity",
     "knowledge_used",
     "recommended_actions",
-    "is_unrelated",
   ],
 };
 
@@ -88,7 +102,7 @@ serve(async (req) => {
     const { data: report, error: fetchErr } = await svc
       .from("service_requests")
       .select(
-        "id, user_id, title, description, category, location, latitude, longitude, photo_url, media_urls, media_types, ai_validation_status",
+        "id, user_id, title, description, category, location, latitude, longitude, photo_url, media_urls, media_types, ai_validation_status, status",
       )
       .eq("id", reportId)
       .maybeSingle();
@@ -96,19 +110,9 @@ serve(async (req) => {
     if (fetchErr) throw fetchErr;
     if (!report) return json({ error: "Report not found" }, 404);
 
-    // One-shot: only a freshly submitted report may be validated. Prevents
-    // clients from re-running or manipulating an existing verdict.
-    if (report.ai_validation_status !== "pending") {
-      return json({
-        status: report.ai_validation_status,
-        alreadyValidated: true,
-      });
-    }
-
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // --- Knowledge retrieval (Settings -> Knowledge) ---
     const { data: knowledge } = await svc
       .from("municipal_knowledge")
       .select("title, category, content, tags")
@@ -128,11 +132,6 @@ serve(async (req) => {
       .slice(0, 12)
       .map(({ k }) => `### ${k.title} (${k.category})\n${k.content}`);
 
-    const { data: categories } = await svc
-      .from("complaint_categories")
-      .select("name, description")
-      .eq("is_active", true);
-
     const knowledgeBlock = scored.length
       ? scored.join("\n\n")
       : "No specific municipal knowledge entries matched this report.";
@@ -146,35 +145,34 @@ serve(async (req) => {
     if (!imageUrls.length && report.photo_url) imageUrls.push(report.photo_url);
     const usedImages = imageUrls.slice(0, 3);
 
-    const instructions = `You are the validation agent of the Municipality of Cortes complaint system.
-Decide whether a submitted resident report is a plausible community/municipal concern.
+    const instructions = `You are the Autonomous AI Verification Agent for Barangay Purisima, Tago, Surigao del Sur (CORA).
+There is NO human-in-the-loop review. You must make the final automatic decision to either APPROVE ("valid") or REJECT ("rejected") the resident's report.
 
-Rules:
-- Use SEMANTIC, CONTEXTUAL judgement. Photos may be taken from different angles, distances, lighting or times.
-- NEVER require an exact match between image and description. Only flag when the image clearly has no reasonable relation to the reported issue.
-- "valid": description describes a community/municipal concern, the location is plausible, and any image reasonably supports it.
-- "suspicious": there are significant inconsistencies (e.g. image shows an entirely unrelated subject), or the report lacks enough information to proceed.
-- "rejected": only when the submission clearly fails the municipality's reporting requirements (spam, gibberish, abusive, or clearly not a municipal concern).
-- You assist administrators; you never make the final decision. When unsure, prefer "suspicious" over "rejected".
-- Also judge whether the photo looks like a real photograph or AI-generated/manipulated. Uncertainty is normal — do not assume fake.
-- confidence is 0-100 for how sure you are of your verdict.
-- recommended_actions: if the report is valid or suspicious, give 3-5 short, concrete next steps for municipal personnel (e.g. which office to forward to, inspection, coordination with the barangay). Base office names ONLY on the knowledge base; if unknown, say "appropriate municipal office". Empty array if rejected.
-- is_unrelated: true ONLY when the text and/or image is clearly not a community concern (memes, selfies, food, random scenery, gibberish, spam, test messages) or the image is clearly AI-generated and unrelated.
-- Write reason and assessments in clear, short English (1-2 sentences each).
+Strict Verification Rules:
+1. Supported Four Classes ONLY:
+   - "Drainage/Flooding Concern" (clogged canals, drainage blockages, standing floodwater)
+   - "Streetlight Problem" (broken, unlit, flickering, or damaged street lighting fixtures)
+   - "Road Damage" (potholes, cracked concrete pavement, damaged roads)
+   - "Improper Waste Disposal" (uncollected garbage, illegal dumping, roadside litter)
+2. Image Quality & Blur Check:
+   - If no image is attached, OR the attached image is very blurred, pitch dark, unreadable, or manipulated/fake, you MUST set "is_blurred": true and "status": "rejected".
+3. Relevance Check:
+   - If the image or report does NOT clearly belong to one of the four supported classes above (e.g., selfies, memes, indoor objects, random scenery, unrelated complaints, spam), you MUST set "is_unrelated": true, "matched_class": null, and "status": "rejected".
+4. Automatic Approval:
+   - If the photo is clear (not blurred) AND shows a real concern matching one of the 4 classes (${FOUR_SUPPORTED_CLASSES.join(", ")}), set "status": "valid", "is_blurred": false, "is_unrelated": false, and set "matched_class" to that exact class.
+5. Write a clear, concise 1-2 sentence "reason" explaining why the report was automatically approved or automatically rejected.
 
-Approved municipal knowledge base (the only authoritative reference):
-${knowledgeBlock}
-
-Official report categories: ${(categories ?? []).map((c) => c.name).join(", ") || "n/a"}`;
+Approved knowledge base:
+${knowledgeBlock}`;
 
     const content: unknown[] = [
       {
         type: "input_text",
-        text: `Report for validation:
+        text: `Report for autonomous AI decision:
 Title: ${report.title}
 Category: ${report.category}
-Location / specific place: ${report.location ?? "not provided"}${
-          report.latitude ? ` (map pin: ${report.latitude}, ${report.longitude})` : ""
+Location: ${report.location ?? "not provided"}${
+          report.latitude ? ` (GPS: ${report.latitude}, ${report.longitude})` : ""
         }
 Description: ${report.description}
 Images attached: ${usedImages.length}`,
@@ -199,7 +197,7 @@ Images attached: ${usedImages.length}`,
         text: {
           format: {
             type: "json_schema",
-            name: "report_validation",
+            name: "autonomous_report_decision",
             strict: true,
             schema: SCHEMA,
           },
@@ -210,10 +208,6 @@ Images attached: ${usedImages.length}`,
     if (!res.ok) {
       const errText = await res.text();
       console.error("AI gateway error", res.status, errText);
-      await svc
-        .from("service_requests")
-        .update({ ai_validation_status: "pending", ai_validation_reason: "AI validation unavailable — queued for review." })
-        .eq("id", reportId);
       return json({ error: "AI validation unavailable", status: "pending" }, res.status === 429 || res.status === 402 ? res.status : 503);
     }
 
@@ -226,58 +220,90 @@ Images attached: ${usedImages.length}`,
       return json({ error: "AI validation unavailable", status: "pending" }, 503);
     }
 
-    const status = ["valid", "suspicious", "rejected"].includes(parsed.status as string)
-      ? (parsed.status as string)
-      : "suspicious";
-    const confidence = Math.max(0, Math.min(100, Number(parsed.confidence) || 50));
+    const isRejected =
+      parsed.status === "rejected" ||
+      parsed.is_blurred === true ||
+      parsed.is_unrelated === true ||
+      !parsed.matched_class ||
+      usedImages.length === 0;
+
+    const finalAiStatus = isRejected ? "rejected" : "valid";
+    const finalRequestStatus = isRejected ? "rejected" : "in_progress";
+    const finalAdminReviewStatus = isRejected ? "rejected" : "approved";
+    const confidence = Math.max(0, Math.min(100, Number(parsed.confidence) || 85));
+    const nowIso = new Date().toISOString();
 
     const elements = {
       description: parsed.description_assessment ?? null,
       location: parsed.location_assessment ?? null,
       image: parsed.image_assessment ?? null,
-      image_authenticity: parsed.image_authenticity ?? (usedImages.length ? "uncertain" : "no_image"),
+      image_authenticity: parsed.image_authenticity ?? (usedImages.length ? "likely_authentic" : "no_image"),
+      image_clarity: parsed.is_blurred ? "blurred_or_unreadable" : usedImages.length ? "clear" : "no_image",
+      matched_four_class: parsed.matched_class ?? null,
       images_analyzed: usedImages.length,
       knowledge_used: parsed.knowledge_used ?? [],
       recommended_actions: Array.isArray(parsed.recommended_actions) ? parsed.recommended_actions : [],
       is_unrelated: parsed.is_unrelated === true,
+      decision_mode: "autonomous_ai_no_hitl",
     };
-    const autoFlagged = status === "rejected" || (parsed.is_unrelated === true && confidence >= 70);
-    const finalStatus = autoFlagged ? "rejected" : status;
+
+    const autoReason = (parsed.reason as string) ??
+      (isRejected
+        ? "Automatically rejected by AI: Image is blurred or report does not match the 4 supported community concern classes."
+        : `Automatically approved by AI under ${parsed.matched_class}.`);
 
     const { error: updateErr } = await svc
       .from("service_requests")
       .update({
-        ai_validation_status: finalStatus,
-        ai_validation_reason: (parsed.reason as string) ?? null,
+        status: finalRequestStatus,
+        ai_validation_status: finalAiStatus,
+        ai_validation_reason: autoReason,
         ai_validation_confidence: confidence,
-        ai_validated_at: new Date().toISOString(),
+        ai_validated_at: nowIso,
         ai_validation_elements: elements,
-        requires_review: finalStatus !== "valid",
+        admin_review_status: finalAdminReviewStatus,
+        admin_notes: isRejected
+          ? `AI Auto-Rejected: ${autoReason}`
+          : `AI Auto-Approved (${parsed.matched_class}): ${autoReason}`,
+        acknowledged_at: isRejected ? null : nowIso,
+        response_at: isRejected ? null : nowIso,
+        requires_review: false,
       })
       .eq("id", reportId);
     if (updateErr) throw updateErr;
 
     await svc.from("ai_logs").insert({
       report_id: reportId,
-      action: "validate_report",
-      decision: finalStatus,
+      action: "autonomous_validate_report",
+      decision: finalAiStatus,
       confidence,
-      reasoning: (parsed.reason as string) ?? null,
-      actor: "validation_agent",
+      reasoning: autoReason,
+      actor: "autonomous_ai_agent",
       metadata: elements,
     });
 
-    if (autoFlagged && report.user_id) {
+    if (report.user_id) {
       await svc.from("notifications").insert({
         user_id: report.user_id,
-        type: "report_invalid",
-        title: "Your report could not be verified",
-        body: `"${report.title}" was flagged as not valid: ${parsed.reason ?? "the text or image is unrelated to a community concern"}. Please resubmit with accurate details and a clear photo. Municipal staff will still review it.`,
+        type: isRejected ? "report_invalid" : "report_approved",
+        title: isRejected
+          ? "Your report was automatically rejected by AI"
+          : "Your report was automatically approved by AI",
+        body: isRejected
+          ? `"${report.title}" was automatically rejected: ${autoReason}`
+          : `"${report.title}" matched ${parsed.matched_class} and was automatically approved for barangay action.`,
         link: "/my-requests",
       });
     }
 
-    return json({ status: finalStatus, confidence, reason: parsed.reason ?? null, elements });
+    return json({
+      status: finalAiStatus,
+      request_status: finalRequestStatus,
+      confidence,
+      reason: autoReason,
+      elements,
+      requires_review: false,
+    });
   } catch (error) {
     console.error("validate-report error:", error);
     return json({ error: (error as Error).message ?? "Validation failed", status: "pending" }, 500);
