@@ -56,11 +56,14 @@ import { Input } from '@/components/ui/input';
 import type { Tables } from '@/integrations/supabase/types';
 import {
   APPROVED_CONCERN_CATEGORIES,
+  ApprovedConcernCategoryKey,
+  TRAINED_CLASS_REFERENCES,
   evaluateExistingReportRecordByAi,
   inspectCapturedImageQuality,
   runMobileNetV3Classification,
   evaluateImageSuitability,
   evaluateAutonomousAiReportDecision,
+  resolveApprovedCategory,
   DEFAULT_CONFIDENCE_THRESHOLD,
 } from '@/lib/mobilenetClassifyServiceBridge';
 
@@ -153,6 +156,9 @@ const AdminRequests = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
   const [aiFilter, setAiFilter] = useState<'all' | 'valid' | 'rejected'>('all');
+  const [classFilter, setClassFilter] = useState<
+    'all' | ApprovedConcernCategoryKey
+  >('all');
 
   /**
    * Autonomous AI Enforcement (No Human-in-the-Loop):
@@ -427,6 +433,14 @@ const AdminRequests = () => {
       return effectiveAi === aiFilter;
     })
     .filter((r) => {
+      if (classFilter === 'all') return true;
+      const resolved =
+        resolveApprovedCategory(r.ai_category) ||
+        resolveApprovedCategory(r.category) ||
+        resolveApprovedCategory(r.title);
+      return resolved?.key === classFilter;
+    })
+    .filter((r) => {
       const q = search.toLowerCase().trim();
       if (!q) return true;
       return (
@@ -458,7 +472,7 @@ const AdminRequests = () => {
       {/* Autonomous AI Policy Banner */}
       <Card
         data-testid="autonomous-ai-policy-banner"
-        className="mb-6 border-primary/25 bg-primary/5"
+        className="mb-4 border-primary/25 bg-primary/5"
       >
         <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
@@ -470,7 +484,7 @@ const AdminRequests = () => {
             </div>
             <p className="text-xs leading-relaxed text-muted-foreground">
               AI automatically <strong>approves</strong> clear photos matching
-              the 4 supported classes (
+              the 4 trained reference classes (
               {APPROVED_CONCERN_CATEGORIES.map((c) => c.label).join(', ')}) and
               automatically <strong>rejects</strong> blurred, unclear, or
               non-related reports.
@@ -490,6 +504,88 @@ const AdminRequests = () => {
             )}
             Re-Verify All with AI
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Trained 4-Class Reference Filter Strip (Drainage, Streetlight, Road, Waste) */}
+      <Card
+        data-testid="admin-reference-class-filter"
+        className="mb-6 border-border"
+      >
+        <CardContent className="p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-primary">
+                Trained 4-Class Reference Prototypes (Drainage · Streetlight · Road · Waste)
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Click any reference class card below to filter resident reports by that trained concern class:
+              </p>
+            </div>
+            {classFilter !== 'all' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setClassFilter('all')}
+                className="h-7 text-xs"
+              >
+                Show All 4 Classes
+              </Button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {TRAINED_CLASS_REFERENCES.map((ref) => {
+              const isSelected = classFilter === ref.key;
+              const matchCount = requests.filter((r) => {
+                const resolved =
+                  resolveApprovedCategory(r.ai_category) ||
+                  resolveApprovedCategory(r.category) ||
+                  resolveApprovedCategory(r.title);
+                return resolved?.key === ref.key;
+              }).length;
+
+              return (
+                <button
+                  key={ref.key}
+                  type="button"
+                  data-testid={`admin-class-filter-${ref.key}`}
+                  onClick={() =>
+                    setClassFilter((prev) =>
+                      prev === ref.key ? 'all' : ref.key
+                    )
+                  }
+                  className={cn(
+                    'flex items-center gap-3 rounded-xl border p-2.5 text-left transition-all',
+                    isSelected
+                      ? 'border-primary bg-primary/10 ring-2 ring-primary/25'
+                      : 'border-border bg-card hover:border-primary/40 hover:bg-muted/40'
+                  )}
+                >
+                  <img
+                    src={ref.referenceImageUrl}
+                    alt={ref.categoryLabel}
+                    className="h-12 w-14 shrink-0 rounded-lg object-cover ring-1 ring-black/10"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="truncate text-xs font-bold text-foreground">
+                        {ref.shortFilterLabel}
+                      </span>
+                      <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                        {matchCount}
+                      </Badge>
+                    </div>
+                    <p className="truncate text-[11px] font-medium text-muted-foreground">
+                      {ref.categoryLabel}
+                    </p>
+                    <p className="truncate text-[10px] text-primary">
+                      {ref.problemTitle}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </CardContent>
       </Card>
 

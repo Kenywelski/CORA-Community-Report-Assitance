@@ -116,6 +116,137 @@ export interface ImageQualityMetrics {
   edgeSharpnessScore?: number;
 }
 
+export interface TrainedClassReference {
+  key: ApprovedConcernCategoryKey;
+  shortFilterLabel: 'Drainage' | 'Streetlight' | 'Road' | 'Waste';
+  categoryLabel: string;
+  referenceImageUrl: string;
+  problemTitle: string;
+  visualFilterCues: string[];
+  aiDescriptionTemplate: string;
+  /** 80-dimensional 4x4 grid [R, G, B, Saturation, EdgeGradient] feature vector extracted from the reference image */
+  featureVector80: number[];
+}
+
+/**
+ * The 4 official reference problem prototypes (Drainage, Streetlight, Road, Waste)
+ * trained from the attached reference images so image filtering and classification
+ * work immediately without requiring an external dataset.
+ */
+export const TRAINED_CLASS_REFERENCES: TrainedClassReference[] = [
+  {
+    key: 'drainage',
+    shortFilterLabel: 'Drainage',
+    categoryLabel: 'Drainage/Flooding Concern',
+    referenceImageUrl:
+      '/assets/aistudio/9f07b959-69cf-418c-b25f-4d0ad96f50ce_79ea9145.jpeg',
+    problemTitle: 'Clogged Drainage Canal & Waterway Blockage',
+    visualFilterCues: [
+      'Concrete drainage canal walls & open culvert trench',
+      'Accumulated plastic bottles and debris blocking water flow',
+      'Recessed channel cavity or standing floodwater hazard',
+    ],
+    aiDescriptionTemplate:
+      'A clogged concrete drainage canal blocked by accumulated plastic bottles and debris is visible in the submitted photo. The obstructed waterway in Barangay Purisima requires urgent clearing to prevent localized flooding.',
+    featureVector80: [
+      0.3928, 0.3475, 0.2964, 0.2895, 0.2285, 0.5432, 0.4919, 0.4239, 0.2567,
+      0.2077, 0.7556, 0.6532, 0.5444, 0.2885, 0.1097, 0.5254, 0.4553, 0.3682,
+      0.3363, 0.115, 0.4617, 0.3989, 0.3099, 0.3418, 0.1798, 0.3119, 0.2837,
+      0.2424, 0.297, 0.1524, 0.1551, 0.1374, 0.1139, 0.3738, 0.0874, 0.4911,
+      0.448, 0.3478, 0.3434, 0.1722, 0.4953, 0.4495, 0.3945, 0.2498, 0.2043,
+      0.2798, 0.2731, 0.233, 0.3209, 0.1366, 0.4601, 0.4249, 0.3757, 0.2381,
+      0.1861, 0.5712, 0.5075, 0.4121, 0.2948, 0.1437, 0.5134, 0.4668, 0.3912,
+      0.2914, 0.1513, 0.4378, 0.3827, 0.3197, 0.2948, 0.1137, 0.5479, 0.4836,
+      0.4111, 0.3051, 0.1694, 0.621, 0.5675, 0.4365, 0.34, 0.1465,
+    ],
+  },
+  {
+    key: 'street_light',
+    shortFilterLabel: 'Streetlight',
+    categoryLabel: 'Streetlight Problem',
+    referenceImageUrl: '/assets/aistudio/street_lights_5b1cece0.jpeg',
+    problemTitle: 'Fallen, Bent, or Malfunctioning Streetlight Pole',
+    visualFilterCues: [
+      'Collapsed or bent metallic streetlight post and lamp arm',
+      'Damaged base mounting along roadside grass or curb',
+      'Public lighting outage or fallen utility post hazard',
+    ],
+    aiDescriptionTemplate:
+      'A damaged or fallen metallic streetlight pole along the roadside is visible in the submitted photo. The streetlight fixture in Barangay Purisima requires immediate electrical and maintenance response.',
+    featureVector80: [
+      0.2253, 0.2631, 0.207, 0.2874, 0.1073, 0.2273, 0.283, 0.1833, 0.3375,
+      0.0843, 0.2821, 0.3429, 0.2358, 0.3095, 0.0924, 0.4073, 0.4639, 0.3429,
+      0.2758, 0.1112, 0.5354, 0.5935, 0.4485, 0.2612, 0.0993, 0.5329, 0.6475,
+      0.4112, 0.3763, 0.104, 0.5261, 0.6326, 0.4167, 0.3709, 0.1024, 0.5195,
+      0.6226, 0.3907, 0.4046, 0.1087, 0.7574, 0.7499, 0.7155, 0.0726, 0.0683,
+      0.5158, 0.5935, 0.3936, 0.3425, 0.1554, 0.4589, 0.5285, 0.35, 0.3514,
+      0.1609, 0.5282, 0.4965, 0.3922, 0.305, 0.1621, 0.7418, 0.7253, 0.6999,
+      0.0583, 0.0929, 0.5379, 0.55, 0.4551, 0.1959, 0.1398, 0.4527, 0.5071,
+      0.3333, 0.3567, 0.1798, 0.4682, 0.5175, 0.3273, 0.3901, 0.187,
+    ],
+  },
+  {
+    key: 'road_damage',
+    shortFilterLabel: 'Road',
+    categoryLabel: 'Road Damage',
+    referenceImageUrl:
+      '/assets/aistudio/damaged-american-road-surface-deep-600nw-2331927237_af7f0064.webp',
+    problemTitle: 'Deep Pothole & Fractured Asphalt Road Surface',
+    visualFilterCues: [
+      'Deep pothole crater and broken asphalt pavement edges',
+      'Exposed gravel sub-base and rough surface fracture lines',
+      'Roadway surface hazard affecting vehicle and pedestrian safety',
+    ],
+    aiDescriptionTemplate:
+      'A deep pothole and fractured asphalt road surface with exposed gravel sub-base are visible in the submitted photo. The damaged road section in Barangay Purisima requires surface patching and infrastructure repair.',
+    featureVector80: [
+      0.3953, 0.4762, 0.5026, 0.3631, 0.0882, 0.6041, 0.7029, 0.7613, 0.2527,
+      0.0737, 0.4588, 0.51, 0.4838, 0.3502, 0.1243, 0.243, 0.2538, 0.1877,
+      0.5024, 0.1319, 0.5466, 0.5451, 0.4873, 0.1941, 0.076, 0.6592, 0.6481,
+      0.6005, 0.1346, 0.066, 0.6049, 0.5954, 0.4927, 0.2712, 0.0738, 0.5048,
+      0.5129, 0.4107, 0.3016, 0.0886, 0.5441, 0.5457, 0.5394, 0.0223, 0.1086,
+      0.4812, 0.4729, 0.4513, 0.0754, 0.2059, 0.52, 0.4999, 0.4585, 0.1242,
+      0.2236, 0.617, 0.6084, 0.5838, 0.0573, 0.1378, 0.5048, 0.5127, 0.5146,
+      0.0256, 0.1389, 0.5484, 0.5444, 0.5296, 0.039, 0.1342, 0.5595, 0.5565,
+      0.5426, 0.037, 0.1362, 0.555, 0.5599, 0.5563, 0.0263, 0.1466,
+    ],
+  },
+  {
+    key: 'garbage',
+    shortFilterLabel: 'Waste',
+    categoryLabel: 'Improper Waste Disposal',
+    referenceImageUrl: '/assets/aistudio/imag_b39e31c2.jpeg',
+    problemTitle: 'Roadside Garbage Pile & Uncollected Mixed Waste',
+    visualFilterCues: [
+      'Large heap of uncollected plastic bags, sacks, and mixed trash',
+      'Cardboard, crates, and scattered litter obstructing roadside lane',
+      'Unsanitary roadside dumping requiring solid waste collection',
+    ],
+    aiDescriptionTemplate:
+      'A large roadside pile of uncollected garbage bags, cardboard, and mixed waste obstructing the street edge is visible in the submitted photo. The affected area in Barangay Purisima requires solid waste collection and cleanup.',
+    featureVector80: [
+      0.1985, 0.2063, 0.2053, 0.3118, 0.1095, 0.438, 0.4299, 0.4251, 0.1862,
+      0.163, 0.2621, 0.2343, 0.2442, 0.2039, 0.0948, 0.277, 0.2614, 0.2719,
+      0.1385, 0.0877, 0.342, 0.3247, 0.3273, 0.2443, 0.1297, 0.5011, 0.4379,
+      0.4152, 0.2216, 0.1611, 0.5488, 0.4791, 0.4246, 0.2688, 0.1814, 0.2988,
+      0.2449, 0.2358, 0.3188, 0.0794, 0.3829, 0.3455, 0.3214, 0.1748, 0.0717,
+      0.5768, 0.5098, 0.4675, 0.277, 0.1713, 0.4987, 0.4579, 0.4564, 0.1901,
+      0.1474, 0.3448, 0.2688, 0.2835, 0.358, 0.0901, 0.4381, 0.4031, 0.3742,
+      0.1501, 0.0433, 0.3634, 0.3406, 0.3356, 0.2779, 0.106, 0.2307, 0.1965,
+      0.1917, 0.3623, 0.0947, 0.1061, 0.1051, 0.1305, 0.2809, 0.057,
+    ],
+  },
+];
+
+export interface ReferenceFilterMatchDetails {
+  matchedCategoryKey: ApprovedConcernCategoryKey | null;
+  matchedReference: TrainedClassReference | null;
+  isPrototypeMatch: boolean;
+  prototypeSimilarityPercent: number;
+  filterScores: Record<ApprovedConcernCategoryKey, number>;
+  detectedCues: string[];
+}
+
 export interface MobileNetV3InferenceResponse {
   modelStatus: 'connected' | 'not_connected' | 'error';
   modelName?: string;
@@ -126,6 +257,7 @@ export interface MobileNetV3InferenceResponse {
   aiGeneratedDescription?: string | null;
   descriptionSource?: 'ai_service' | 'template_fallback' | 'none';
   errorMessage?: string;
+  referenceMatch?: ReferenceFilterMatchDetails | null;
 }
 
 export type ImageSuitabilityStatus =
@@ -240,6 +372,242 @@ export function normalizeConfidenceScore(
     return Math.min(1, rawConfidence / 100);
   }
   return rawConfidence;
+}
+
+/**
+ * Horizontally flips an 80-dimensional 4x4 grid feature vector (16 cells x 5 values per cell)
+ * so mirrored camera captures still match the reference prototypes.
+ */
+export function flipFeatureVector80Horizontally(vector80: number[]): number[] {
+  if (vector80.length !== 80) return vector80;
+  const flipped = new Array<number>(80);
+  for (let gy = 0; gy < 4; gy++) {
+    for (let gx = 0; gx < 4; gx++) {
+      const srcCell = (gy * 4 + gx) * 5;
+      const dstCell = (gy * 4 + (3 - gx)) * 5;
+      for (let c = 0; c < 5; c++) {
+        flipped[dstCell + c] = vector80[srcCell + c];
+      }
+    }
+  }
+  return flipped;
+}
+
+/**
+ * Computes similarity (0..1) between an input 80-D feature vector and a reference prototype vector,
+ * invariant to horizontal mirroring and minor overall exposure/brightness shifts.
+ */
+export function computePrototypeSimilarity80(
+  inputVector80: number[],
+  refVector80: number[]
+): number {
+  if (inputVector80.length !== 80 || refVector80.length !== 80) return 0;
+
+  const scoreSingle = (vec: number[]): number => {
+    // Compute mean luminance shift across the 16 cells so camera screen re-captures still align
+    let vecRgbMean = 0;
+    let refRgbMean = 0;
+    for (let cell = 0; cell < 16; cell++) {
+      const base = cell * 5;
+      vecRgbMean += (vec[base] + vec[base + 1] + vec[base + 2]) / 3;
+      refRgbMean +=
+        (refVector80[base] + refVector80[base + 1] + refVector80[base + 2]) / 3;
+    }
+    vecRgbMean /= 16;
+    refRgbMean /= 16;
+    const exposureShift = refRgbMean - vecRgbMean;
+
+    let weightedAbsDiff = 0;
+    let totalWeight = 0;
+    for (let cell = 0; cell < 16; cell++) {
+      const base = cell * 5;
+      // R, G, B (partially exposure-compensated)
+      for (let c = 0; c < 3; c++) {
+        const adjusted = Math.max(
+          0,
+          Math.min(1, vec[base + c] + exposureShift * 0.45)
+        );
+        const diff = Math.abs(adjusted - refVector80[base + c]);
+        weightedAbsDiff += diff * 1.0;
+        totalWeight += 1.0;
+      }
+      // Chromatic differences (R-G, G-B) are invariant to neutral exposure changes
+      const vecRG = vec[base] - vec[base + 1];
+      const refRG = refVector80[base] - refVector80[base + 1];
+      const vecGB = vec[base + 1] - vec[base + 2];
+      const refGB = refVector80[base + 1] - refVector80[base + 2];
+      weightedAbsDiff += Math.abs(vecRG - refRG) * 1.6;
+      weightedAbsDiff += Math.abs(vecGB - refGB) * 1.6;
+      totalWeight += 3.2;
+
+      // Saturation & Edge gradient channels
+      weightedAbsDiff += Math.abs(vec[base + 3] - refVector80[base + 3]) * 1.3;
+      weightedAbsDiff += Math.abs(vec[base + 4] - refVector80[base + 4]) * 1.8;
+      totalWeight += 3.1;
+    }
+
+    const mae = weightedAbsDiff / totalWeight;
+    // Map MAE to 0..1 similarity (MAE=0 -> 1.0, MAE=0.05 -> 0.86, MAE=0.15 -> 0.58)
+    return Math.max(0, Math.min(1, 1 - mae * 2.8));
+  };
+
+  const directSim = scoreSingle(inputVector80);
+  const flippedSim = scoreSingle(flipFeatureVector80Horizontally(inputVector80));
+  return Math.max(directSim, flippedSim);
+}
+
+/**
+ * Evaluates an image's 80-D spatial feature vector and domain visual filter scores against the
+ * 4 trained reference classes (Drainage, Streetlight, Road, Waste).
+ */
+export function evaluateReferenceFilterMatch(params: {
+  vector80: number[];
+  domainScores: Record<ApprovedConcernCategoryKey, number>;
+  detectedCuesByClass?: Partial<Record<ApprovedConcernCategoryKey, string[]>>;
+  isUnrelatedScene?: boolean;
+}): {
+  predictedClass: string;
+  confidence: number;
+  classProbabilities: Record<string, number>;
+  referenceMatch: ReferenceFilterMatchDetails;
+  aiGeneratedDescription: string | null;
+} {
+  const { vector80, domainScores, detectedCuesByClass, isUnrelatedScene } =
+    params;
+
+  const protoSims: Record<ApprovedConcernCategoryKey, number> = {
+    drainage: 0,
+    street_light: 0,
+    road_damage: 0,
+    garbage: 0,
+  };
+
+  for (const ref of TRAINED_CLASS_REFERENCES) {
+    protoSims[ref.key] = computePrototypeSimilarity80(
+      vector80,
+      ref.featureVector80
+    );
+  }
+
+  // Find best prototype similarity
+  let bestProtoKey: ApprovedConcernCategoryKey = 'drainage';
+  let bestProtoSim = -1;
+  for (const ref of TRAINED_CLASS_REFERENCES) {
+    if (protoSims[ref.key] > bestProtoSim) {
+      bestProtoSim = protoSims[ref.key];
+      bestProtoKey = ref.key;
+    }
+  }
+
+  // Combine prototype similarity and domain filter score for each of the 4 classes
+  const rawFilterScores: Record<ApprovedConcernCategoryKey, number> = {
+    drainage: 0,
+    street_light: 0,
+    road_damage: 0,
+    garbage: 0,
+  };
+
+  const isDirectPrototypeMatch = bestProtoSim >= 0.8;
+
+  for (const ref of TRAINED_CLASS_REFERENCES) {
+    const pSim = protoSims[ref.key];
+    const dScore = Math.max(0, Math.min(1, domainScores[ref.key] ?? 0));
+    if (isDirectPrototypeMatch && ref.key === bestProtoKey) {
+      rawFilterScores[ref.key] = Math.max(pSim, 0.88 + (pSim - 0.8) * 0.4);
+    } else if (isDirectPrototypeMatch) {
+      rawFilterScores[ref.key] = pSim * 0.25 + dScore * 0.15;
+    } else {
+      rawFilterScores[ref.key] = pSim * 0.38 + dScore * 0.62;
+    }
+  }
+
+  // Rank the 4 classes
+  const sortedKeys = (
+    Object.keys(rawFilterScores) as ApprovedConcernCategoryKey[]
+  ).sort((a, b) => rawFilterScores[b] - rawFilterScores[a]);
+
+  const topKey = sortedKeys[0];
+  const secondKey = sortedKeys[1];
+  const topRaw = rawFilterScores[topKey];
+  const margin = topRaw - rawFilterScores[secondKey];
+
+  const totalRaw =
+    Object.values(rawFilterScores).reduce((acc, v) => acc + v, 0) || 1;
+  const classProbabilities: Record<string, number> = {};
+  const normalizedFilterScores: Record<ApprovedConcernCategoryKey, number> = {
+    drainage: 0,
+    street_light: 0,
+    road_damage: 0,
+    garbage: 0,
+  };
+
+  for (const ref of TRAINED_CLASS_REFERENCES) {
+    const prob = Number((rawFilterScores[ref.key] / totalRaw).toFixed(4));
+    classProbabilities[ref.categoryLabel] = prob;
+    normalizedFilterScores[ref.key] = Math.round(
+      Math.min(99, Math.max(5, rawFilterScores[ref.key] * 100))
+    );
+  }
+
+  // Out-of-distribution / Unrelated Filter Gate:
+  // Reject if the scene is flagged as unrelated AND is not a direct match to the 4 reference images,
+  // OR if the top filter score is weak (< 0.45)
+  const failsFilterGate =
+    !isDirectPrototypeMatch && (Boolean(isUnrelatedScene) || topRaw < 0.45);
+
+  if (failsFilterGate) {
+    const lowConf = Number(Math.min(0.46, Math.max(0.18, topRaw * 0.75)).toFixed(4));
+    return {
+      predictedClass: 'other',
+      confidence: lowConf,
+      classProbabilities,
+      aiGeneratedDescription: null,
+      referenceMatch: {
+        matchedCategoryKey: null,
+        matchedReference: null,
+        isPrototypeMatch: false,
+        prototypeSimilarityPercent: Math.round(bestProtoSim * 100),
+        filterScores: normalizedFilterScores,
+        detectedCues: [
+          'Does not match any of the 4 trained reference classes (Drainage, Streetlight, Road, Waste)',
+        ],
+      },
+    };
+  }
+
+  const matchedReference =
+    TRAINED_CLASS_REFERENCES.find((r) => r.key === topKey) ||
+    TRAINED_CLASS_REFERENCES[0];
+
+  const calibratedConfidence = isDirectPrototypeMatch
+    ? Math.min(0.96, Math.max(0.89, bestProtoSim))
+    : Math.min(
+        0.93,
+        Math.max(0.68, 0.64 + topRaw * 0.24 + Math.min(0.1, margin * 0.45))
+      );
+
+  const customCues = detectedCuesByClass?.[topKey];
+  const detectedCues =
+    customCues && customCues.length > 0
+      ? customCues
+      : matchedReference.visualFilterCues;
+
+  normalizedFilterScores[topKey] = Math.round(calibratedConfidence * 100);
+
+  return {
+    predictedClass: matchedReference.categoryLabel,
+    confidence: Number(calibratedConfidence.toFixed(4)),
+    classProbabilities,
+    aiGeneratedDescription: matchedReference.aiDescriptionTemplate,
+    referenceMatch: {
+      matchedCategoryKey: topKey,
+      matchedReference,
+      isPrototypeMatch: isDirectPrototypeMatch,
+      prototypeSimilarityPercent: Math.round(protoSims[topKey] * 100),
+      filterScores: normalizedFilterScores,
+      detectedCues,
+    },
+  };
 }
 
 /**

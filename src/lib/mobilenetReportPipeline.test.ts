@@ -4,11 +4,14 @@ import {
   APPROVED_CONCERN_CATEGORIES,
   LOW_CONFIDENCE_MESSAGE,
   MANUAL_REVIEW_FALLBACK_DESCRIPTION,
+  TRAINED_CLASS_REFERENCES,
   buildAutomatedReportDescription,
   checkImageReadability,
   evaluateAutonomousAiReportDecision,
   evaluateExistingReportRecordByAi,
   evaluateImageSuitability,
+  evaluateReferenceFilterMatch,
+  flipFeatureVector80Horizontally,
   resolveApprovedCategory,
   validateCapturedGpsLocation,
 } from './mobilenetReportPipeline';
@@ -39,6 +42,60 @@ test('resolveApprovedCategory maps class labels to the 4 supported categories', 
   );
   assert.equal(resolveApprovedCategory('road_damage')?.key, 'road_damage');
   assert.equal(resolveApprovedCategory('unrelated_class'), null);
+});
+
+test('TRAINED_CLASS_REFERENCES and evaluateReferenceFilterMatch accurately classify the 4 attached reference images and filter out unrelated scenes', () => {
+  assert.equal(TRAINED_CLASS_REFERENCES.length, 4);
+
+  // Verify each of the 4 reference prototypes (Drainage, Streetlight, Road, Waste) matches its exact class
+  for (const ref of TRAINED_CLASS_REFERENCES) {
+    const exactMatch = evaluateReferenceFilterMatch({
+      vector80: ref.featureVector80,
+      domainScores: {
+        drainage: 0.25,
+        street_light: 0.25,
+        road_damage: 0.25,
+        garbage: 0.25,
+      },
+    });
+    assert.equal(exactMatch.predictedClass, ref.categoryLabel);
+    assert.ok(exactMatch.confidence >= 0.89);
+    assert.equal(exactMatch.referenceMatch.matchedCategoryKey, ref.key);
+    assert.equal(exactMatch.referenceMatch.isPrototypeMatch, true);
+    assert.equal(
+      exactMatch.referenceMatch.matchedReference?.referenceImageUrl,
+      ref.referenceImageUrl
+    );
+
+    // Also verify horizontally mirrored camera capture of the reference image matches
+    const flippedVec = flipFeatureVector80Horizontally(ref.featureVector80);
+    const flippedMatch = evaluateReferenceFilterMatch({
+      vector80: flippedVec,
+      domainScores: {
+        drainage: 0.2,
+        street_light: 0.2,
+        road_damage: 0.2,
+        garbage: 0.2,
+      },
+    });
+    assert.equal(flippedMatch.predictedClass, ref.categoryLabel);
+    assert.ok(flippedMatch.confidence >= 0.89);
+  }
+
+  // Verify an unrelated uniform/blank scene is filtered out as 'other' with low confidence
+  const unrelatedUniform = evaluateReferenceFilterMatch({
+    vector80: new Array(80).fill(0.5),
+    domainScores: {
+      drainage: 0.05,
+      street_light: 0.05,
+      road_damage: 0.05,
+      garbage: 0.05,
+    },
+    isUnrelatedScene: true,
+  });
+  assert.equal(unrelatedUniform.predictedClass, 'other');
+  assert.ok(unrelatedUniform.confidence < 0.5);
+  assert.equal(unrelatedUniform.referenceMatch.matchedCategoryKey, null);
 });
 
 test('checkImageReadability flags dark, very blurred, or low-resolution captures without exposing technical model names', () => {
@@ -231,3 +288,4 @@ test('validateCapturedGpsLocation enforces <=100m accuracy, <=60s freshness, and
   assert.equal(validReading.isAccurate, true);
   assert.equal(validReading.isWithinBarangayScope, true);
 });
+

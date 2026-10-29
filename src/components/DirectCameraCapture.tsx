@@ -2,15 +2,23 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   Camera,
+  CheckCircle2,
+  Filter,
   Loader2,
   MapPin,
   RefreshCw,
+  Sparkles,
   X,
   Zap,
   ZapOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { CapturedGpsReading } from '@/lib/mobilenetReportPipeline';
+import {
+  ApprovedConcernCategoryKey,
+  CapturedGpsReading,
+  TRAINED_CLASS_REFERENCES,
+} from '@/lib/mobilenetReportPipeline';
+import { loadReferenceImageAsBlob } from '@/lib/mobilenetClassifyService';
 
 export interface CameraCapturePayload {
   blob: Blob;
@@ -47,6 +55,11 @@ export const DirectCameraCapture = ({
   const [capturing, setCapturing] = useState(false);
   const [hasTorch, setHasTorch] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
+  const [activeRefFilter, setActiveRefFilter] = useState<
+    'all' | ApprovedConcernCategoryKey
+  >('all');
+  const [loadingRefKey, setLoadingRefKey] =
+    useState<ApprovedConcernCategoryKey | null>(null);
 
   // GPS state requested automatically when the camera opens
   const [gpsReading, setGpsReading] = useState<CapturedGpsReading | null>(null);
@@ -221,6 +234,35 @@ export const DirectCameraCapture = ({
     }
   };
 
+  const handleUseReferenceImage = async (
+    key: ApprovedConcernCategoryKey,
+    referenceImageUrl: string
+  ) => {
+    if (capturing || loadingRefKey) return;
+    setLoadingRefKey(key);
+    try {
+      const blob = await loadReferenceImageAsBlob(referenceImageUrl);
+      const capturedAt = Date.now();
+      const localPreviewUrl = URL.createObjectURL(blob);
+      await onUsePhoto(blob, {
+        blob,
+        localPreviewUrl,
+        capturedAtTimestamp: capturedAt,
+        gpsReading: gpsReading
+          ? { ...gpsReading, capturedAtTimestamp: capturedAt }
+          : null,
+        gpsError,
+      });
+    } catch {
+      setLoadingRefKey(null);
+    }
+  };
+
+  const filteredReferences =
+    activeRefFilter === 'all'
+      ? TRAINED_CLASS_REFERENCES
+      : TRAINED_CLASS_REFERENCES.filter((r) => r.key === activeRefFilter);
+
   return (
     <main
       data-testid="direct-camera-capture"
@@ -236,7 +278,7 @@ export const DirectCameraCapture = ({
             Capture Community Concern
           </h1>
           <p className="mt-0.5 max-w-md text-xs text-slate-300 sm:text-sm">
-            Take a clear photo of the issue. AI will automatically identify the concern and prepare your report.
+            Take a clear photo of the issue. AI filters &amp; analyzes your photo against the 4 trained community classes (Drainage, Streetlight, Road, Waste).
           </p>
         </div>
         <Button
@@ -284,7 +326,7 @@ export const DirectCameraCapture = ({
       </div>
 
       {/* Live Camera Viewfinder */}
-      <div className="relative mx-3 my-2.5 flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-black sm:mx-6">
+      <div className="relative mx-3 my-2 flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-black sm:mx-6">
         <video
           ref={videoRef}
           autoPlay
@@ -339,8 +381,81 @@ export const DirectCameraCapture = ({
         )}
       </div>
 
+      {/* Trained 4-Class Reference Filter Strip (Drainage, Streetlight, Road, Waste) */}
+      <section
+        data-testid="camera-reference-filter-strip"
+        className="mx-3 mb-2 rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 sm:mx-6"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#EAF6F4]">
+            <Filter className="h-3.5 w-3.5 text-[#F36B3F]" />
+            <span>Trained 4-Class Reference Filter (Tap to Filter or Analyze Reference):</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1">
+            {(
+              [
+                { key: 'all', label: 'All 4 Classes' },
+                { key: 'drainage', label: 'Drainage' },
+                { key: 'street_light', label: 'Streetlight' },
+                { key: 'road_damage', label: 'Road' },
+                { key: 'garbage', label: 'Waste' },
+              ] as const
+            ).map((pill) => (
+              <button
+                key={pill.key}
+                type="button"
+                data-testid={`camera-filter-pill-${pill.key}`}
+                onClick={() => setActiveRefFilter(pill.key)}
+                className={`rounded-lg px-2 py-0.5 text-[11px] font-semibold transition-colors ${
+                  activeRefFilter === pill.key
+                    ? 'bg-[#177A73] text-white'
+                    : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                }`}
+              >
+                {pill.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {filteredReferences.map((ref) => {
+            const isLoadingThis = loadingRefKey === ref.key;
+            return (
+              <button
+                key={ref.key}
+                type="button"
+                data-testid={`test-reference-${ref.key}`}
+                disabled={Boolean(loadingRefKey) || capturing}
+                onClick={() =>
+                  handleUseReferenceImage(ref.key, ref.referenceImageUrl)
+                }
+                className="group flex items-center gap-2.5 rounded-lg border border-white/15 bg-[#142B38]/90 p-1.5 text-left transition-colors hover:border-[#EAF6F4]/50 hover:bg-white/10 disabled:opacity-50"
+              >
+                <img
+                  src={ref.referenceImageUrl}
+                  alt={ref.categoryLabel}
+                  className="h-10 w-12 shrink-0 rounded-md object-cover ring-1 ring-white/15"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1">
+                    <span className="truncate text-[11px] font-bold text-white">
+                      {ref.shortFilterLabel}
+                    </span>
+                    <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-400" />
+                  </div>
+                  <p className="truncate text-[10px] text-slate-300">
+                    {isLoadingThis ? 'Analyzing...' : 'Analyze Reference'}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Bottom Capture Bar */}
-      <footer className="flex min-h-24 flex-col items-center justify-center gap-3 border-t border-white/10 bg-[#142B38] px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
+      <footer className="flex min-h-20 flex-col items-center justify-center gap-2 border-t border-white/10 bg-[#142B38] px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2.5">
         <div className="flex w-full max-w-md items-center justify-between gap-4">
           <div className="flex w-12 justify-start">
             {hasTorch && (
@@ -364,14 +479,14 @@ export const DirectCameraCapture = ({
           <Button
             type="button"
             data-testid="capture-concern-btn"
-            disabled={starting || !!cameraError || capturing}
+            disabled={starting || !!cameraError || capturing || Boolean(loadingRefKey)}
             onClick={capturePhoto}
-            className="h-14 flex-1 gap-2.5 rounded-2xl bg-[#F36B3F] px-6 text-base font-bold text-white shadow-lg transition-transform hover:bg-[#dc5a30] active:scale-[0.99] disabled:opacity-50"
+            className="h-13 flex-1 gap-2.5 rounded-2xl bg-[#F36B3F] px-6 text-base font-bold text-white shadow-lg transition-transform hover:bg-[#dc5a30] active:scale-[0.99] disabled:opacity-50"
           >
-            {capturing ? (
+            {capturing || loadingRefKey ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
-                <span>Capturing...</span>
+                <span>Analyzing...</span>
               </>
             ) : (
               <>

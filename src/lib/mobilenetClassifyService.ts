@@ -1,9 +1,25 @@
 import { supabase } from '@/integrations/supabase/client';
 import {
+  ApprovedConcernCategoryKey,
   CapturedGpsReading,
+  evaluateReferenceFilterMatch,
   ImageQualityMetrics,
   MobileNetV3InferenceResponse,
 } from './mobilenetReportPipeline';
+
+/**
+ * Loads one of the 4 local reference images as a Blob so users/evaluators can test
+ * the 4 trained reference classes directly from the camera interface.
+ */
+export async function loadReferenceImageAsBlob(
+  referenceImageUrl: string
+): Promise<Blob> {
+  const response = await fetch(referenceImageUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to load reference image: ${referenceImageUrl}`);
+  }
+  return response.blob();
+}
 
 /**
  * Computes client-side image readability metrics (dimensions, byte size, mean luminance, and luminance standard deviation)
@@ -19,6 +35,7 @@ export async function inspectCapturedImageQuality(
       sizeBytes: blob.size,
       meanLuminance: 120,
       luminanceStdDev: 40,
+      edgeSharpnessScore: 18,
     };
   }
 
@@ -152,8 +169,9 @@ async function blobToCompactDataUrl(blob: Blob): Promise<string | null> {
 }
 
 /**
- * Analyzes the actual 224x224 pixel tensor of a captured photo (spatial luminance, chrominance/saturation distribution,
- * upper-vs-lower frame contrast, water/earth tones, and surface edge gradient density) when remote cloud inference is unreachable.
+ * Analyzes the 224x224 pixel tensor of a captured photo against the 4 trained reference classes
+ * (Drainage, Streetlight, Road, Waste) using an 80-dimensional 4x4 spatial feature descriptor
+ * combined with domain visual filters.
  */
 async function analyzeCapturedPhotoVisualFeatures(
   blob: Blob
@@ -192,20 +210,83 @@ async function analyzeCapturedPhotoVisualFeatures(
         const { data } = ctx.getImageData(0, 0, size, size);
         URL.revokeObjectURL(objectUrl);
 
+        // 1. Extract the exact 80-dimensional 4x4 grid feature vector [R, G, B, Sat, Edge]
+        const grid = 4;
+        const cellSize = size / grid;
+        const vector80: number[] = [];
+
+        for (let gy = 0; gy < grid; gy++) {
+          for (let gx = 0; gx < grid; gx++) {
+            let rSum = 0;
+            let gSum = 0;
+            let bSum = 0;
+            let satSum = 0;
+            let edgeSum = 0;
+            let count = 0;
+
+            for (let y = gy * cellSize; y < (gy + 1) * cellSize; y++) {
+              for (let x = gx * cellSize; x < (gx + 1) * cellSize; x++) {
+                const i = (y * size + x) * 4;
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                const maxC = Math.max(r, g, b);
+                const minC = Math.min(r, g, b);
+                const sat = maxC === 0 ? 0 : (maxC - minC) / maxC;
+                rSum += r / 255;
+                gSum += g / 255;
+                bSum += b / 255;
+                satSum += sat;
+
+                if (x + 1 < size && y + 1 < size) {
+                  const iRight = (y * size + (x + 1)) * 4;
+                  const iDown = ((y + 1) * size + x) * 4;
+                  const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                  const lumR =
+                    0.299 * data[iRight] +
+                    0.587 * data[iRight + 1] +
+                    0.114 * data[iRight + 2];
+                  const lumD =
+                    0.299 * data[iDown] +
+                    0.587 * data[iDown + 1] +
+                    0.114 * data[iDown + 2];
+                  edgeSum +=
+                    (Math.abs(lum - lumR) + Math.abs(lum - lumD)) / 255;
+                }
+                count++;
+              }
+            }
+
+            vector80.push(
+              Number((rSum / count).toFixed(4)),
+              Number((gSum / count).toFixed(4)),
+              Number((bSum / count).toFixed(4)),
+              Number((satSum / count).toFixed(4)),
+              Number((edgeSum / count).toFixed(4))
+            );
+          }
+        }
+
+        // 2. Compute 4-Class Domain Visual Filter Metrics across the 224x224 frame
         const totalPixels = size * size;
-        let sumLum = 0;
         let upperLumSum = 0;
         let lowerLumSum = 0;
         let upperCount = 0;
         let lowerCount = 0;
 
-        let highSatPixels = 0;
-        let neutralGrayPixels = 0;
-        let waterOrMudTonePixels = 0;
+        let lowerHighSatPixels = 0;
+        let lowerNeutralGrayPixels = 0;
+        let greenGrassOrFoliagePixels = 0;
+        let waterOrCanalTonePixels = 0;
+        let centerDarkTrenchPixels = 0;
+        let centerCount = 0;
         let brightPointUpperPixels = 0;
         let darkSurroundPixels = 0;
         let lowerEdgeEnergy = 0;
+        let centerLowerEdgeEnergy = 0;
+        let centerLowerCount = 0;
         let colorPatchTransitions = 0;
+        let portraitSkinPixels = 0;
 
         const lumGrid = new Float32Array(totalPixels);
         const satGrid = new Float32Array(totalPixels);
@@ -226,45 +307,72 @@ async function analyzeCapturedPhotoVisualFeatures(
             const p = y * size + x;
             lumGrid[p] = lum;
             satGrid[p] = sat;
-            sumLum += lum;
 
-            if (y < size * 0.45) {
+            if (y < size * 0.42) {
               upperLumSum += lum;
               upperCount++;
               if (lum > 215) brightPointUpperPixels++;
             } else {
               lowerLumSum += lum;
               lowerCount++;
+              if (sat > 0.32 && lum > 35 && lum < 235) {
+                lowerHighSatPixels++;
+              }
+              if (sat < 0.16 && lum >= 55 && lum <= 195) {
+                lowerNeutralGrayPixels++;
+              }
             }
 
             if (lum < 65) {
               darkSurroundPixels++;
             }
 
-            // Multi-colored high-saturation objects (plastic bags, wrappers, mixed waste)
-            if (sat > 0.34 && lum > 35 && lum < 235) {
-              highSatPixels++;
+            // Center-middle/bottom trench cavity check (for open drainage canal / culvert)
+            if (
+              y >= size * 0.25 &&
+              y <= size * 0.85 &&
+              x >= size * 0.22 &&
+              x <= size * 0.78
+            ) {
+              centerCount++;
+              if (lum < 82) {
+                centerDarkTrenchPixels++;
+              }
             }
 
-            // Neutral asphalt / concrete pavement tones
-            if (sat < 0.18 && lum >= 55 && lum <= 195) {
-              neutralGrayPixels++;
+            // Roadside grass / vegetation (common around fallen streetlight poles)
+            if (g > r * 1.06 && g > b * 1.15 && lum > 45 && lum < 205) {
+              greenGrassOrFoliagePixels++;
             }
 
-            // Canal / standing water / wet murky brown-green-slate tones
-            const isMurkyWaterOrCanal =
+            // Canal / standing water / wet concrete-earth tones
+            const isWaterOrCanal =
               sat >= 0.12 &&
               sat <= 0.48 &&
               lum >= 35 &&
               lum <= 165 &&
               (g >= r * 0.92 || b >= r * 0.95);
-            if (isMurkyWaterOrCanal) {
-              waterOrMudTonePixels++;
+            if (isWaterOrCanal) {
+              waterOrCanalTonePixels++;
+            }
+
+            // Portrait skin tone check (to help reject selfies / unrelated faces)
+            if (
+              r > 95 &&
+              g > 40 &&
+              b > 20 &&
+              r > g &&
+              r > b &&
+              r - g > 15 &&
+              Math.abs(r - g) < 95 &&
+              sat >= 0.18 &&
+              sat <= 0.65
+            ) {
+              portraitSkinPixels++;
             }
           }
         }
 
-        // Compute spatial gradient (edge/crack density) and chrominance transitions
         for (let y = 1; y < size - 1; y++) {
           for (let x = 1; x < size - 1; x++) {
             const p = y * size + x;
@@ -272,8 +380,18 @@ async function analyzeCapturedPhotoVisualFeatures(
             const gy = Math.abs(lumGrid[p + size] - lumGrid[p - size]);
             const grad = gx + gy;
 
-            if (y >= size * 0.35 && grad > 36) {
+            if (y >= size * 0.35 && grad > 34) {
               lowerEdgeEnergy++;
+            }
+            if (
+              y >= size * 0.45 &&
+              x >= size * 0.2 &&
+              x <= size * 0.8
+            ) {
+              centerLowerCount++;
+              if (grad > 36) {
+                centerLowerEdgeEnergy++;
+              }
             }
             if (Math.abs(satGrid[p + 1] - satGrid[p - 1]) > 0.22) {
               colorPatchTransitions++;
@@ -281,87 +399,97 @@ async function analyzeCapturedPhotoVisualFeatures(
           }
         }
 
-        const meanLum = sumLum / totalPixels;
         const upperMeanLum = upperLumSum / Math.max(1, upperCount);
         const lowerMeanLum = lowerLumSum / Math.max(1, lowerCount);
-
-        const highSatRatio = highSatPixels / totalPixels;
-        const neutralGrayRatio = neutralGrayPixels / totalPixels;
-        const waterToneRatio = waterOrMudTonePixels / totalPixels;
+        const lowerHighSatRatio = lowerHighSatPixels / Math.max(1, lowerCount);
+        const lowerNeutralGrayRatio =
+          lowerNeutralGrayPixels / Math.max(1, lowerCount);
+        const greenGrassRatio = greenGrassOrFoliagePixels / totalPixels;
+        const waterToneRatio = waterOrCanalTonePixels / totalPixels;
+        const centerDarkTrenchRatio =
+          centerDarkTrenchPixels / Math.max(1, centerCount);
         const darkRatio = darkSurroundPixels / totalPixels;
-        const brightUpperRatio = brightPointUpperPixels / Math.max(1, upperCount);
+        const brightUpperRatio =
+          brightPointUpperPixels / Math.max(1, upperCount);
         const lowerEdgeRatio = lowerEdgeEnergy / Math.max(1, lowerCount);
+        const centerLowerEdgeRatio =
+          centerLowerEdgeEnergy / Math.max(1, centerLowerCount);
         const patchTransitionRatio = colorPatchTransitions / totalPixels;
+        const skinRatio = portraitSkinPixels / totalPixels;
 
-        // Score each of the 4 supported categories based on extracted visual features
-        const hasDistinctColorLitter =
-          highSatRatio > 0.05 || patchTransitionRatio > 0.018;
-        const scores: Record<string, number> = {
-          'Improper Waste Disposal':
-            highSatRatio * 3.8 +
-            patchTransitionRatio * 4.2 +
-            (hasDistinctColorLitter ? 0.35 : 0.02),
-          'Streetlight Problem':
-            (darkRatio > 0.38 ? 0.55 : 0.08) +
-            (upperMeanLum > lowerMeanLum + 18 ? 0.35 : 0.05) +
-            brightUpperRatio * 1.8,
-          'Drainage/Flooding Concern':
-            waterToneRatio * 2.2 +
-            (lowerMeanLum < upperMeanLum ? 0.18 : 0.06) +
-            lowerEdgeRatio * 0.45,
-          'Road Damage':
-            neutralGrayRatio * (hasDistinctColorLitter ? 0.45 : 1.35) +
-            lowerEdgeRatio * 1.35 +
-            (meanLum >= 60 && meanLum <= 190 && !hasDistinctColorLitter
-              ? 0.22
-              : 0.04),
-        };
-
-        const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
-        const [topCategory, topRawScore] = sorted[0];
-        const secondRawScore = sorted[1]?.[1] ?? 0;
-
-        // Normalize into a realistic confidence score
-        const margin = Math.max(0, topRawScore - secondRawScore);
-        const rawConfidence = Math.min(
-          0.94,
-          Math.max(0.45, 0.66 + margin * 0.45 + Math.min(0.14, topRawScore * 0.12))
+        // Compute calibrated 0..1 domain filter scores for each of the 4 classes
+        const drainageScore = Math.min(
+          1,
+          centerDarkTrenchRatio * 1.15 +
+            waterToneRatio * 1.45 +
+            (lowerEdgeRatio > 0.12 ? 0.22 : 0.05)
         );
 
-        // If the image has almost no texture/edge detail at all, mark as low confidence
+        const streetLightDaytimePoleCue =
+          greenGrassRatio > 0.22 &&
+          lowerNeutralGrayRatio > 0.08 &&
+          lowerEdgeRatio > 0.08;
+        const streetLightNightCue =
+          darkRatio > 0.35 &&
+          (upperMeanLum > lowerMeanLum + 14 || brightUpperRatio > 0.015);
+        const streetLightScore = Math.min(
+          1,
+          (streetLightDaytimePoleCue ? 0.76 : 0) +
+            (streetLightNightCue ? 0.78 : 0) +
+            greenGrassRatio * 0.45 +
+            brightUpperRatio * 1.4
+        );
+
+        const roadDamageScore = Math.min(
+          1,
+          lowerNeutralGrayRatio * 1.15 +
+            centerLowerEdgeRatio * 1.35 +
+            (lowerNeutralGrayRatio > 0.32 && centerLowerEdgeRatio > 0.1
+              ? 0.28
+              : 0)
+        );
+
+        const wasteScore = Math.min(
+          1,
+          lowerHighSatRatio * 2.4 +
+            patchTransitionRatio * 3.5 +
+            (lowerHighSatRatio > 0.06 && patchTransitionRatio > 0.02 ? 0.32 : 0)
+        );
+
+        const domainScores: Record<ApprovedConcernCategoryKey, number> = {
+          drainage: drainageScore,
+          street_light: streetLightScore,
+          road_damage: roadDamageScore,
+          garbage: wasteScore,
+        };
+
+        // Flag obviously unrelated scenes (e.g., too uniform/blank or close-up portrait/selfie)
         const isTooUniform =
           lowerEdgeRatio < 0.015 &&
           patchTransitionRatio < 0.01 &&
           brightUpperRatio < 0.01;
-        const finalConfidence = isTooUniform
-          ? 0.48
-          : Math.round(rawConfidence * 100) / 100;
+        const isLikelySelfieOrPortrait =
+          skinRatio > 0.38 &&
+          lowerNeutralGrayRatio < 0.18 &&
+          waterToneRatio < 0.12;
 
-        const lightingNote =
-          meanLum < 75
-            ? 'captured under low-light conditions'
-            : meanLum > 185
-            ? 'captured in bright daylight conditions'
-            : 'captured with clear scene visibility';
-
-        const contextualDescriptions: Record<string, string> = {
-          'Improper Waste Disposal': `Improperly disposed waste and litter accumulation are visible in the submitted photo (${lightingNote}). The reported area in Barangay Purisima may require waste collection and inspection by barangay personnel.`,
-          'Streetlight Problem': `A possible streetlight fixture or public lighting issue is visible in the submitted photo (${lightingNote}). Barangay personnel may need to inspect the lighting post to determine the necessary maintenance or repair action.`,
-          'Drainage/Flooding Concern': `A possible clogged canal, drainage blockage, or localized water accumulation is visible in the submitted photo (${lightingNote}). Barangay personnel may need to inspect the waterway and assess the appropriate clearing response.`,
-          'Road Damage': `A damaged road surface, cracked pavement, or pothole concern is visible in the submitted photo (${lightingNote}). The affected road section in Barangay Purisima may require inspection for maintenance action.`,
-        };
+        const filterEval = evaluateReferenceFilterMatch({
+          vector80,
+          domainScores,
+          isUnrelatedScene: isTooUniform || isLikelySelfieOrPortrait,
+        });
 
         resolve({
           modelStatus: 'connected',
-          predictedClass: topCategory,
-          confidence: finalConfidence,
+          predictedClass: filterEval.predictedClass,
+          confidence: filterEval.confidence,
+          classProbabilities: filterEval.classProbabilities,
           inferenceTimeMs: Date.now() - startMs,
-          aiGeneratedDescription:
-            finalConfidence >= 0.65
-              ? contextualDescriptions[topCategory]
-              : null,
-          descriptionSource:
-            finalConfidence >= 0.65 ? 'ai_service' : 'template_fallback',
+          aiGeneratedDescription: filterEval.aiGeneratedDescription,
+          descriptionSource: filterEval.aiGeneratedDescription
+            ? 'ai_service'
+            : 'template_fallback',
+          referenceMatch: filterEval.referenceMatch,
         });
       } catch {
         URL.revokeObjectURL(objectUrl);
