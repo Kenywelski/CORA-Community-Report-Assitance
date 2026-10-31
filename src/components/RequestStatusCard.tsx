@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from "@/components/ui/card";
 import { ClipboardList, Clock, CheckCircle2, ListChecks, ChevronRight, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useAppPreferences } from "@/lib/preferences";
 import { supabase } from "@/integrations/supabase/client";
 
 interface ReportSummary {
@@ -17,6 +18,7 @@ interface ReportSummary {
 export const RequestStatusCard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useAppPreferences();
   const { data: reports = [], isLoading, error, refetch } = useQuery({
     queryKey: ['my-reports', user?.id],
     queryFn: async (): Promise<ReportSummary[]> => {
@@ -35,19 +37,19 @@ export const RequestStatusCard = () => {
   });
 
   const stats = [
-    { icon: ListChecks, label: "Total Reports", value: reports.length, color: "text-foreground", bg: "bg-muted" },
-    { icon: ClipboardList, label: "AI Rejected", value: reports.filter((report) => report.status === 'rejected').length, color: "text-destructive", bg: "bg-destructive/10" },
-    { icon: Clock, label: "AI Approved", value: reports.filter((report) => ['under_review', 'assigned', 'in_progress'].includes(report.status)).length, color: "text-primary", bg: "bg-primary/10" },
-    { icon: CheckCircle2, label: "Resolved", value: reports.filter((report) => report.status === 'completed').length, color: "text-success", bg: "bg-success/10" },
+    { icon: ClipboardList, label: t.submitted, value: reports.filter((report) => report.status === 'pending').length, color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-500/10" },
+    { icon: ListChecks, label: t.underReview, value: reports.filter((report) => report.status === 'under_review').length, color: "text-primary", bg: "bg-primary/10" },
+    { icon: Clock, label: t.inProgress, value: reports.filter((report) => ['assigned', 'in_progress'].includes(report.status)).length, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10" },
+    { icon: CheckCircle2, label: t.resolve, value: reports.filter((report) => report.status === 'completed').length, color: "text-success", bg: "bg-success/10" },
   ];
 
   return (
     <section className="px-4">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">My Reports</h2>
+        <h2 className="text-lg font-semibold">{t.myReportsTitle}</h2>
         {user && (
           <button type="button" onClick={() => navigate('/my-requests')} className="flex items-center gap-1 text-sm font-medium text-primary">
-            View All <ChevronRight className="h-4 w-4" />
+            {t.viewAll} <ChevronRight className="h-4 w-4" />
           </button>
         )}
       </div>
@@ -55,8 +57,8 @@ export const RequestStatusCard = () => {
         <CardContent className="p-0">
           {!user ? (
             <div className="px-5 py-6 text-center">
-              <p className="font-medium">Sign in to track your reports</p>
-              <button type="button" onClick={() => navigate('/auth')} className="mt-2 text-sm font-medium text-primary">Sign In</button>
+              <p className="font-medium">{t.signInToTrack}</p>
+              <button type="button" onClick={() => navigate('/auth')} className="mt-2 text-sm font-medium text-primary">{t.signIn}</button>
             </div>
           ) : (
             <>
@@ -77,7 +79,7 @@ export const RequestStatusCard = () => {
                 })}
               </div>
               <div className="border-t border-border px-4 py-4">
-                <h3 className="mb-3 text-sm font-semibold">Recent Reports</h3>
+                <h3 className="mb-3 text-sm font-semibold">{t.recentReports}</h3>
                 {isLoading ? (
                   <Loader2 className="h-5 w-5 animate-spin text-primary" />
                 ) : error ? (
@@ -87,9 +89,9 @@ export const RequestStatusCard = () => {
                   </div>
                 ) : reports.length === 0 ? (
                   <div className="py-2">
-                    <p className="text-sm font-medium">No Reports Yet</p>
-                    <p className="mt-1 text-sm text-muted-foreground">You haven't submitted any community reports.</p>
-                    <button type="button" onClick={() => navigate('/report-issue')} className="mt-3 text-sm font-medium text-primary">Report an Issue</button>
+                    <p className="text-sm font-medium">{t.noReportsYet}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{t.noReportsDesc}</p>
+                    <button type="button" onClick={() => navigate('/report-issue')} className="mt-3 text-sm font-medium text-primary">{t.reportIssueBtn}</button>
                   </div>
                 ) : (
                   <div className="divide-y divide-border">

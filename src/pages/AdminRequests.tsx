@@ -48,7 +48,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { ImageAnalysis } from '@/components/ImageAnalysis';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { MediaGallery, MediaItem } from '@/components/MediaUpload';
 import { LocationPicker } from '@/components/LocationPicker';
@@ -69,17 +68,38 @@ import {
 
 type ServiceRequest = Tables<'service_requests'>;
 
+const REPORT_STATUS_OPTIONS: Array<{
+  value: ServiceRequest['status'];
+  label: string;
+}> = [
+  { value: 'pending', label: 'Submitted' },
+  { value: 'under_review', label: 'Under Review' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'completed', label: 'Resolved' },
+  { value: 'rejected', label: 'Rejected' },
+];
+
 const statusConfig: Record<
   string,
   { label: string; color: string; icon: typeof CheckCircle }
 > = {
   pending: {
-    label: 'AI Evaluating',
-    color: 'bg-primary/15 text-primary',
+    label: 'Submitted',
+    color: 'bg-orange-500/15 text-orange-600 dark:text-orange-400',
     icon: Sparkles,
   },
+  under_review: {
+    label: 'Under Review',
+    color: 'bg-teal-500/15 text-teal-700 dark:text-teal-400',
+    icon: ShieldCheck,
+  },
+  assigned: {
+    label: 'In Progress',
+    color: 'bg-primary text-primary-foreground',
+    icon: RefreshCw,
+  },
   in_progress: {
-    label: 'AI Approved · Active',
+    label: 'In Progress',
     color: 'bg-primary text-primary-foreground',
     icon: CheckCircle,
   },
@@ -89,7 +109,7 @@ const statusConfig: Record<
     icon: CheckCircle,
   },
   rejected: {
-    label: 'AI Auto-Rejected',
+    label: 'Rejected',
     color: 'bg-destructive text-destructive-foreground',
     icon: XCircle,
   },
@@ -258,14 +278,11 @@ const AdminRequests = () => {
       .order('created_at', { ascending: false });
 
     if (data) {
-      // Automatically process any pending or unvalidated report with AI (zero human-in-the-loop)
+      // Only auto-evaluate brand new records that have never been evaluated or manually adjusted
       const needsAutoDecision = data.filter(
         (r) =>
-          r.status === 'pending' ||
-          r.requires_review === true ||
-          !r.ai_validation_status ||
-          r.ai_validation_status === 'pending' ||
-          r.ai_validation_status === 'suspicious'
+          !r.admin_overridden &&
+          (!r.ai_validation_status || r.ai_validation_status === 'pending')
       );
 
       if (needsAutoDecision.length > 0) {
@@ -347,28 +364,59 @@ const AdminRequests = () => {
     }
   };
 
-  const markReportResolved = async (id: string) => {
+  const updateReportStatus = async (
+    id: string,
+    newStatus: ServiceRequest['status']
+  ) => {
     setIsUpdating(true);
     const nowIso = new Date().toISOString();
+    const patch: Tables<'service_requests'>['Update'] = {
+      status: newStatus,
+      updated_at: nowIso,
+      admin_overridden: true,
+      admin_review_status: newStatus,
+      requires_review: false,
+    };
+
+    if (newStatus === 'under_review' || newStatus === 'in_progress') {
+      patch.acknowledged_at = nowIso;
+      patch.response_at = nowIso;
+    }
+    if (newStatus === 'completed') {
+      patch.resolved_at = nowIso;
+    }
+    if (selectedRequest && selectedRequest.id === id && adminNotes) {
+      patch.admin_notes = adminNotes;
+    }
+
     const { error } = await supabase
       .from('service_requests')
-      .update({
-        status: 'completed',
-        resolved_at: nowIso,
-        admin_notes: adminNotes || undefined,
-      })
+      .update(patch)
       .eq('id', id);
 
     if (!error) {
-      toast.success('Report marked as Resolved');
-      await fetchRequests();
+      const label =
+        REPORT_STATUS_OPTIONS.find((o) => o.value === newStatus)?.label ||
+        newStatus;
+      toast.success(`Report status updated to ${label}`);
+      setRequests((prev) =>
+        prev.map((item) =>
+          item.id === id ? ({ ...item, ...patch } as ServiceRequest) : item
+        )
+      );
       setSelectedRequest((prev) =>
-        prev ? { ...prev, status: 'completed', resolved_at: nowIso } : null
+        prev && prev.id === id
+          ? ({ ...prev, ...patch } as ServiceRequest)
+          : prev
       );
     } else {
-      toast.error('Failed to update report');
+      toast.error('Failed to update report status');
     }
     setIsUpdating(false);
+  };
+
+  const markReportResolved = async (id: string) => {
+    await updateReportStatus(id, 'completed');
   };
 
   const saveRemarksOnly = async () => {
@@ -683,11 +731,13 @@ const AdminRequests = () => {
       <Card variant="elevated">
         <CardContent className="p-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-4 grid w-full grid-cols-4">
+            <TabsList className="mb-4 grid w-full grid-cols-3 sm:grid-cols-6 h-auto gap-1 p-1">
               <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="in_progress">AI Approved</TabsTrigger>
+              <TabsTrigger value="pending">Submitted</TabsTrigger>
+              <TabsTrigger value="under_review">Under Review</TabsTrigger>
+              <TabsTrigger value="in_progress">In Progress</TabsTrigger>
               <TabsTrigger value="completed">Resolved</TabsTrigger>
-              <TabsTrigger value="rejected">AI Rejected</TabsTrigger>
+              <TabsTrigger value="rejected">Rejected</TabsTrigger>
             </TabsList>
 
             <div className="max-h-[60vh] space-y-3 overflow-y-auto">
@@ -703,6 +753,9 @@ const AdminRequests = () => {
                   const isRejected =
                     req.ai_validation_status === 'rejected' ||
                     req.status === 'rejected';
+                  const currentStatusValue: ServiceRequest['status'] =
+                    req.status === 'assigned' ? 'in_progress' : req.status;
+
                   return (
                     <div
                       key={req.id}
@@ -710,8 +763,8 @@ const AdminRequests = () => {
                       className="cursor-pointer space-y-3 rounded-xl border p-4 transition-colors hover:bg-muted/50"
                       onClick={() => openRequestDetails(req)}
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex-1 min-w-0">
                           <div className="mb-1 flex flex-wrap items-center gap-2">
                             <Badge variant="secondary" className="text-xs">
                               {req.category}
@@ -755,15 +808,49 @@ const AdminRequests = () => {
                             )}
                           </p>
                         </div>
-                        {req.photo_url && (
-                          <div className="ml-3 h-12 w-12 overflow-hidden rounded-lg">
-                            <img
-                              src={req.photo_url}
-                              alt=""
-                              className="h-full w-full object-cover"
-                            />
+
+                        <div
+                          className="flex items-center gap-2.5 shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <label
+                              htmlFor={`status-select-${req.id}`}
+                              className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap"
+                            >
+                              Status:
+                            </label>
+                            <select
+                              id={`status-select-${req.id}`}
+                              data-testid={`report-status-select-${req.id}`}
+                              value={currentStatusValue}
+                              disabled={isUpdating}
+                              onChange={(e) =>
+                                updateReportStatus(
+                                  req.id,
+                                  e.target.value as ServiceRequest['status']
+                                )
+                              }
+                              className="h-8 rounded-lg border border-input bg-background px-2.5 text-xs font-semibold text-foreground shadow-xs transition-colors hover:border-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            >
+                              {REPORT_STATUS_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
                           </div>
-                        )}
+
+                          {req.photo_url && (
+                            <div className="h-12 w-12 overflow-hidden rounded-lg shrink-0">
+                              <img
+                                src={req.photo_url}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
                       {req.location && (
                         <p className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -806,10 +893,11 @@ const AdminRequests = () => {
                   : req.photo_url
                   ? [{ url: req.photo_url, type: 'image' as const }]
                   : [];
-              const firstImage = items.find((i) => i.type === 'image')?.url;
               const isRejected =
                 req.ai_validation_status === 'rejected' ||
                 req.status === 'rejected';
+              const dialogStatusValue: ServiceRequest['status'] =
+                req.status === 'assigned' ? 'in_progress' : req.status;
               const el = (req.ai_validation_elements ?? {}) as Record<
                 string,
                 unknown
@@ -1095,11 +1183,29 @@ const AdminRequests = () => {
                         icon={FileText}
                       >
                         <MediaGallery items={items} />
-                        {firstImage && (
-                          <div className="mt-3">
-                            <ImageAnalysis imageUrl={firstImage} />
-                          </div>
-                        )}
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-muted/30 p-3">
+                          <span className="text-xs font-semibold text-foreground">
+                            Adjust Report Status:
+                          </span>
+                          <select
+                            data-testid="dialog-media-status-select"
+                            value={dialogStatusValue}
+                            disabled={isUpdating}
+                            onChange={(e) =>
+                              updateReportStatus(
+                                req.id,
+                                e.target.value as ServiceRequest['status']
+                              )
+                            }
+                            className="h-9 min-w-[170px] rounded-lg border border-input bg-background px-3 text-xs font-semibold text-foreground shadow-xs transition-colors hover:border-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          >
+                            {REPORT_STATUS_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </SectionCard>
                     )}
 
@@ -1130,7 +1236,7 @@ const AdminRequests = () => {
                     </SectionCard>
                   </div>
 
-                  {/* Sticky Action Bar (No manual Approve/Reject gates — only Field Resolution & Remarks) */}
+                  {/* Sticky Action Bar */}
                   <div className="flex flex-wrap items-center justify-end gap-2 border-t bg-card/95 px-4 py-3 backdrop-blur sm:px-6">
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
@@ -1162,6 +1268,30 @@ const AdminRequests = () => {
                       </AlertDialogContent>
                     </AlertDialog>
 
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        Status:
+                      </span>
+                      <select
+                        data-testid="dialog-footer-status-select"
+                        value={dialogStatusValue}
+                        disabled={isUpdating}
+                        onChange={(e) =>
+                          updateReportStatus(
+                            req.id,
+                            e.target.value as ServiceRequest['status']
+                          )
+                        }
+                        className="h-9 rounded-lg border border-input bg-background px-3 text-xs font-semibold text-foreground shadow-xs transition-colors hover:border-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      >
+                        {REPORT_STATUS_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
                     <Button
                       variant="outline"
                       size="sm"
@@ -1182,17 +1312,6 @@ const AdminRequests = () => {
                       )}
                       Save Remarks
                     </Button>
-                    {!isRejected && req.status !== 'completed' && (
-                      <Button
-                        size="sm"
-                        data-testid="mark-resolved-btn"
-                        className="bg-success text-success-foreground hover:bg-success/90"
-                        onClick={() => markReportResolved(req.id)}
-                        disabled={isUpdating}
-                      >
-                        <CheckCircle className="mr-1 h-4 w-4" /> Mark Resolved
-                      </Button>
-                    )}
                   </div>
                 </>
               );

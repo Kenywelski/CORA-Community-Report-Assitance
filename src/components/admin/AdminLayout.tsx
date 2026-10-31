@@ -2,9 +2,9 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { LanguageThemeControls } from '@/lib/preferences';
 import { toast } from 'sonner';
 import { AdminSidebar } from './AdminSidebar';
-import { cn } from '@/lib/utils';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -40,14 +40,15 @@ export const AdminLayout = ({ children, title, subtitle }: AdminLayoutProps) => 
       {/* Main Content */}
       <main className="lg:ml-64 min-h-screen">
         {/* Header */}
-        <header className="h-14 lg:h-16 mt-14 lg:mt-0 border-b border-border bg-card/50 backdrop-blur-sm sticky top-14 lg:top-0 z-20">
-          <div className="h-full px-4 lg:px-6 flex items-center">
+        <header className="min-h-14 lg:h-16 mt-14 lg:mt-0 border-b border-border bg-card/70 backdrop-blur-sm sticky top-14 lg:top-0 z-20">
+          <div className="h-full px-4 lg:px-6 py-2 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-lg font-bold text-foreground">{title}</h1>
               {subtitle && (
                 <p className="text-sm text-muted-foreground">{subtitle}</p>
               )}
             </div>
+            <LanguageThemeControls variant="surface" />
           </div>
         </header>
 

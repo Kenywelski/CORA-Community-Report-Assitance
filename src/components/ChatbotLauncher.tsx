@@ -474,16 +474,7 @@ export const ChatbotLauncher = () => {
                 </div>
 
                 <div className="p-3 border-t bg-card/80 backdrop-blur shrink-0">
-                  <div className="flex items-end gap-2 bg-muted/60 rounded-2xl px-2 py-1.5 border border-border/60 focus-within:border-primary/50 focus-within:bg-muted transition-colors">
-                    <button
-                      type="button"
-                      className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors"
-                      aria-label="Attach image"
-                      title="Attach image (coming soon)"
-                      onClick={() => toast.info('Image uploads coming soon')}
-                    >
-                      <ImagePlus className="h-4 w-4" />
-                    </button>
+                  <div className="flex items-end gap-2 bg-muted/60 rounded-2xl px-3 py-1.5 border border-border/60 focus-within:border-primary/50 focus-within:bg-muted transition-colors">
                     <Textarea
                       ref={aiTextareaRef}
                       value={aiInput}
@@ -499,15 +490,6 @@ export const ChatbotLauncher = () => {
                       className="resize-none min-h-[38px] max-h-32 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-1 py-2 text-sm"
                       disabled={aiBusy}
                     />
-                    <button
-                      type="button"
-                      className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center transition-colors"
-                      aria-label="Voice input"
-                      title="Voice input (coming soon)"
-                      onClick={() => toast.info('Voice input coming soon')}
-                    >
-                      <Mic className="h-4 w-4" />
-                    </button>
                     <Button
                       onClick={() => sendAi()}
                       disabled={!aiInput.trim() || aiBusy}

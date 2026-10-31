@@ -5,26 +5,28 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useAppPreferences } from "@/lib/preferences";
 import { toast } from 'sonner';
-
-const actions = [
-  { icon: AlertCircle, label: "Report an Issue", path: "/report-issue", requiresAuth: false, primary: true },
-  { icon: ClipboardList, label: "My Reports", path: "/my-requests", requiresAuth: true },
-  { icon: Siren, label: "Emergency Contacts", path: "/emergency", requiresAuth: false },
-  { icon: MapPin, label: "Barangay Directory", path: "/directory", requiresAuth: false },
-  { icon: CalendarDays, label: "Community Programs", path: "/programs", requiresAuth: false },
-  { icon: Bell, label: "Announcements", path: "/updates", requiresAuth: false },
-];
 
 export const QuickServices = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useAppPreferences();
+
+  const actions = [
+    { icon: AlertCircle, label: t.reportIssueBtn, path: "/report-issue", requiresAuth: false, primary: true },
+    { icon: ClipboardList, label: t.myReports, path: "/my-requests", requiresAuth: true },
+    { icon: Siren, label: t.emergencyContacts, path: "/emergency", requiresAuth: false },
+    { icon: MapPin, label: t.barangayDirectory, path: "/directory", requiresAuth: false },
+    { icon: CalendarDays, label: t.barangayPrograms, path: "/programs", requiresAuth: false },
+    { icon: Bell, label: t.announcements, path: "/updates", requiresAuth: false },
+  ];
 
   const handleActionClick = (action: typeof actions[number]) => {
     if (action.requiresAuth && !user) {
       toast.error('You must be logged in to perform this action.', {
         action: {
-          label: 'Sign In',
+          label: t.signIn,
           onClick: () => navigate('/auth'),
         },
       });
@@ -35,13 +37,13 @@ export const QuickServices = () => {
 
   return (
     <section className="px-4">
-      <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+      <h2 className="text-lg font-semibold mb-4">{t.quickActionsTitle}</h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {actions.map((action, index) => {
           const Icon = action.icon;
           return (
             <button
-              key={action.label}
+              key={action.path}
               type="button"
               onClick={() => handleActionClick(action)}
               className={cn(

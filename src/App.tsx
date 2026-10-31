@@ -20,6 +20,7 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminFeedback from "./pages/AdminFeedback";
 import AdminAnnouncements from "./pages/AdminAnnouncements";
 import AdminPosts from "./pages/AdminPosts";
+import AdminPrograms from "./pages/AdminPrograms";
 import CommunityWall from "./pages/CommunityWall";
 import EmergencyContacts from "./pages/EmergencyContacts";
 import AdminEmergencyContacts from "./pages/AdminEmergencyContacts";
@@ -55,7 +56,9 @@ const App = () => (
             <Route path="/admin/requests" element={<AdminRequests />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/announcements" element={<AdminAnnouncements />} />
+            <Route path="/admin/offices" element={<AdminPosts />} />
             <Route path="/admin/posts" element={<AdminPosts />} />
+            <Route path="/admin/programs" element={<AdminPrograms />} />
             <Route path="/admin/feedback" element={<AdminFeedback />} />
             <Route path="/programs" element={<Programs />} />
             <Route path="/directory" element={<Directory />} />

@@ -2,23 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   Camera,
-  CheckCircle2,
-  Filter,
   Loader2,
-  MapPin,
   RefreshCw,
-  Sparkles,
   X,
   Zap,
   ZapOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  ApprovedConcernCategoryKey,
-  CapturedGpsReading,
-  TRAINED_CLASS_REFERENCES,
-} from '@/lib/mobilenetReportPipeline';
-import { loadReferenceImageAsBlob } from '@/lib/mobilenetClassifyService';
+import { CapturedGpsReading } from '@/lib/mobilenetReportPipeline';
 
 export interface CameraCapturePayload {
   blob: Blob;
@@ -55,15 +46,12 @@ export const DirectCameraCapture = ({
   const [capturing, setCapturing] = useState(false);
   const [hasTorch, setHasTorch] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
-  const [activeRefFilter, setActiveRefFilter] = useState<
-    'all' | ApprovedConcernCategoryKey
-  >('all');
-  const [loadingRefKey, setLoadingRefKey] =
-    useState<ApprovedConcernCategoryKey | null>(null);
 
-  // GPS state requested automatically when the camera opens
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+
+  // Silent background GPS acquisition when camera opens
   const [gpsReading, setGpsReading] = useState<CapturedGpsReading | null>(null);
-  const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
 
   const requestGpsLocation = useCallback(() => {
@@ -71,11 +59,9 @@ export const DirectCameraCapture = ({
       setGpsError(
         'Geolocation is not supported by this browser. Please enable location services.'
       );
-      setGpsLoading(false);
       return;
     }
 
-    setGpsLoading(true);
     setGpsError(null);
 
     navigator.geolocation.getCurrentPosition(
@@ -88,11 +74,9 @@ export const DirectCameraCapture = ({
           locationTimestamp: position.timestamp || now,
           capturedAtTimestamp: now,
         });
-        setGpsLoading(false);
         setGpsError(null);
       },
       (err) => {
-        setGpsLoading(false);
         if (err.code === err.PERMISSION_DENIED) {
           setGpsError(
             'Location permission was denied. Please allow GPS access and tap Retry GPS.'
@@ -115,7 +99,6 @@ export const DirectCameraCapture = ({
     );
   }, []);
 
-  // Automatically request GPS location when camera interface opens
   useEffect(() => {
     requestGpsLocation();
   }, [requestGpsLocation]);
@@ -123,6 +106,7 @@ export const DirectCameraCapture = ({
   useEffect(() => {
     let active = true;
     let currentStream: MediaStream | null = null;
+    let watchdogTimer: ReturnType<typeof setTimeout> | null = null;
     setStarting(true);
     setCameraError('');
     setHasTorch(false);
@@ -136,60 +120,228 @@ export const DirectCameraCapture = ({
       return;
     }
 
-    navigator.mediaDevices
-      .getUserMedia({
-        audio: false,
-        video: {
-          facingMode: { ideal: facingMode },
-          width: { ideal: 1280 },
-          height: { ideal: 960 },
-        },
-      })
-      .then((stream) => {
-        currentStream = stream;
-        if (!active) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
+    const isVideoFrameCompletelyBlack = (videoEl: HTMLVideoElement): boolean => {
+      try {
+        if (!videoEl.videoWidth || !videoEl.videoHeight) return true;
+        const sampleCanvas = document.createElement('canvas');
+        sampleCanvas.width = 16;
+        sampleCanvas.height = 16;
+        const ctx = sampleCanvas.getContext('2d');
+        if (!ctx) return false;
+        ctx.drawImage(videoEl, 0, 0, 16, 16);
+        const data = ctx.getImageData(0, 0, 16, 16).data;
+        let maxChannel = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          if (r > maxChannel) maxChannel = r;
+          if (g > maxChannel) maxChannel = g;
+          if (b > maxChannel) maxChannel = b;
         }
-        streamRef.current = stream;
-        const track = stream.getVideoTracks()[0];
+        return maxChannel < 3;
+      } catch {
+        return false;
+      }
+    };
+
+    const attachAndPlayStream = async (stream: MediaStream) => {
+      if (currentStream && currentStream !== stream) {
+        currentStream.getTracks().forEach((t) => t.stop());
+      }
+      currentStream = stream;
+      if (!active) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      streamRef.current = stream;
+
+      if (navigator.mediaDevices?.enumerateDevices) {
+        navigator.mediaDevices
+          .enumerateDevices()
+          .then((devices) => {
+            if (!active) return;
+            const inputs = devices.filter((d) => d.kind === 'videoinput');
+            setVideoDevices(inputs);
+          })
+          .catch(() => {});
+      }
+
+      const track = stream.getVideoTracks()[0];
+      try {
         setHasTorch(
           Boolean(
-            (track?.getCapabilities() as TorchCapabilities | undefined)?.torch
+            (track?.getCapabilities?.() as TorchCapabilities | undefined)?.torch
           )
         );
-        if (videoRef.current) videoRef.current.srcObject = stream;
-        setStarting(false);
-      })
-      .catch((err: Error) => {
+      } catch {
+        setHasTorch(false);
+      }
+
+      const videoEl = videoRef.current;
+      if (videoEl) {
+        videoEl.srcObject = stream;
+        videoEl.muted = true;
+        videoEl.playsInline = true;
+        videoEl.setAttribute('playsinline', 'true');
+        videoEl.setAttribute('webkit-playsinline', 'true');
+        try {
+          await videoEl.play();
+        } catch {
+          // Playback will also be triggered by onLoadedMetadata / onCanPlay
+        }
+      }
+      setStarting(false);
+    };
+
+    const startCameraStream = async () => {
+      const constraintCandidates: MediaStreamConstraints[] = [];
+
+      if (selectedDeviceId) {
+        constraintCandidates.push({
+          audio: false,
+          video: {
+            deviceId: { exact: selectedDeviceId },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        });
+      }
+
+      constraintCandidates.push(
+        {
+          audio: false,
+          video: {
+            facingMode: { ideal: facingMode },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        },
+        {
+          audio: false,
+          video: {
+            facingMode: facingMode,
+          },
+        },
+        {
+          audio: false,
+          video: true,
+        }
+      );
+
+      let lastErr: Error | null = null;
+      for (const constraints of constraintCandidates) {
         if (!active) return;
-        const isDenied =
-          err?.name === 'NotAllowedError' ||
-          err?.name === 'PermissionDeniedError';
-        setCameraError(
-          isDenied
-            ? 'Camera permission was denied. Please allow camera access in your browser address bar or settings, then tap Retry Camera.'
-            : 'Camera access is required to capture a photo of the community concern. Please ensure a camera is connected and not in use by another app.'
-        );
-        setStarting(false);
-      });
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          await attachAndPlayStream(stream);
+
+          // Watchdog: if camera track opened but is paused, 0x0, or an inactive black virtual camera, try recovering
+          watchdogTimer = setTimeout(async () => {
+            if (!active) return;
+            const v = videoRef.current;
+            if (!v) return;
+            if (v.paused) {
+              try {
+                await v.play();
+              } catch {
+                // ignore
+              }
+            }
+            if (v.videoWidth === 0 || isVideoFrameCompletelyBlack(v)) {
+              try {
+                const devices =
+                  await navigator.mediaDevices.enumerateDevices();
+                const inputs = devices.filter((d) => d.kind === 'videoinput');
+                const activeDeviceId = stream
+                  .getVideoTracks()[0]
+                  ?.getSettings?.()?.deviceId;
+                const alternative = inputs.find(
+                  (d) =>
+                    d.deviceId &&
+                    d.deviceId !== activeDeviceId &&
+                    !/virtual|obs|ir camera/i.test(d.label)
+                );
+                if (alternative) {
+                  const altStream = await navigator.mediaDevices.getUserMedia({
+                    audio: false,
+                    video: { deviceId: { exact: alternative.deviceId } },
+                  });
+                  await attachAndPlayStream(altStream);
+                } else if (v.videoWidth === 0) {
+                  const fallbackStream =
+                    await navigator.mediaDevices.getUserMedia({
+                      audio: false,
+                      video: true,
+                    });
+                  await attachAndPlayStream(fallbackStream);
+                }
+              } catch {
+                // keep existing stream if fallback fails
+              }
+            }
+          }, 1800);
+
+          return;
+        } catch (err) {
+          lastErr = err as Error;
+        }
+      }
+
+      if (!active) return;
+      const isDenied =
+        lastErr?.name === 'NotAllowedError' ||
+        lastErr?.name === 'PermissionDeniedError';
+      setCameraError(
+        isDenied
+          ? 'Camera permission was denied. Please allow camera access in your browser address bar or settings, then tap Retry Camera.'
+          : 'Camera access is required to capture a photo of the community concern. Please ensure a camera is connected and not in use by another app.'
+      );
+      setStarting(false);
+    };
+
+    void startCameraStream();
 
     return () => {
       active = false;
+      if (watchdogTimer) clearTimeout(watchdogTimer);
       currentStream?.getTracks().forEach((track) => track.stop());
       if (streamRef.current === currentStream) streamRef.current = null;
     };
-  }, [facingMode, cameraAttempt]);
+  }, [facingMode, selectedDeviceId, cameraAttempt]);
+
+  const handleSwitchCamera = () => {
+    if (videoDevices.length > 1) {
+      const currentTrackId = streamRef.current
+        ?.getVideoTracks()[0]
+        ?.getSettings?.()?.deviceId;
+      const currentIndex = videoDevices.findIndex(
+        (d) => d.deviceId === (selectedDeviceId || currentTrackId)
+      );
+      const nextIndex = (currentIndex + 1) % videoDevices.length;
+      const nextDevice = videoDevices[nextIndex];
+      if (nextDevice?.deviceId) {
+        setSelectedDeviceId(nextDevice.deviceId);
+        return;
+      }
+    }
+    setSelectedDeviceId(null);
+    setFacingMode((mode) => (mode === 'environment' ? 'user' : 'environment'));
+  };
 
   const capturePhoto = () => {
     const video = videoRef.current;
-    if (!video || !video.videoWidth || !video.videoHeight || capturing) return;
+    if (!video || capturing) return;
+
+    const width = video.videoWidth || video.clientWidth || 1280;
+    const height = video.videoHeight || video.clientHeight || 720;
+    if (!width || !height) return;
 
     setCapturing(true);
 
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = width;
+    canvas.height = height;
     const context = canvas.getContext('2d');
     if (!context) {
       setCapturing(false);
@@ -234,286 +386,149 @@ export const DirectCameraCapture = ({
     }
   };
 
-  const handleUseReferenceImage = async (
-    key: ApprovedConcernCategoryKey,
-    referenceImageUrl: string
-  ) => {
-    if (capturing || loadingRefKey) return;
-    setLoadingRefKey(key);
-    try {
-      const blob = await loadReferenceImageAsBlob(referenceImageUrl);
-      const capturedAt = Date.now();
-      const localPreviewUrl = URL.createObjectURL(blob);
-      await onUsePhoto(blob, {
-        blob,
-        localPreviewUrl,
-        capturedAtTimestamp: capturedAt,
-        gpsReading: gpsReading
-          ? { ...gpsReading, capturedAtTimestamp: capturedAt }
-          : null,
-        gpsError,
-      });
-    } catch {
-      setLoadingRefKey(null);
-    }
-  };
-
-  const filteredReferences =
-    activeRefFilter === 'all'
-      ? TRAINED_CLASS_REFERENCES
-      : TRAINED_CLASS_REFERENCES.filter((r) => r.key === activeRefFilter);
-
   return (
     <main
       data-testid="direct-camera-capture"
-      className="fixed inset-0 z-[70] flex min-h-[100dvh] flex-col bg-[#142B38] text-white"
+      className="fixed inset-0 z-[70] h-screen h-[100dvh] w-full overflow-hidden bg-black text-white select-none"
     >
-      {/* Top Header */}
-      <header className="flex items-start justify-between gap-4 border-b border-white/10 bg-[#142B38]/95 px-5 pb-3.5 pt-[max(1rem,env(safe-area-inset-top))]">
-        <div className="min-w-0">
-          <div className="inline-flex items-center gap-1.5 rounded-md bg-[#177A73]/40 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[#EAF6F4] ring-1 ring-white/15">
-            <span>Barangay Purisima · Report an Issue</span>
-          </div>
-          <h1 className="mt-1.5 text-lg font-bold tracking-tight sm:text-xl">
-            Capture Community Concern
-          </h1>
-          <p className="mt-0.5 max-w-md text-xs text-slate-300 sm:text-sm">
-            Take a clear photo of the issue. AI filters &amp; analyzes your photo against the 4 trained community classes (Drainage, Streetlight, Road, Waste).
-          </p>
+      {/* Full-Screen Live Camera Viewfinder */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        onLoadedMetadata={(e) => {
+          const el = e.currentTarget;
+          void el.play().catch(() => {});
+          setStarting(false);
+        }}
+        onCanPlay={(e) => {
+          void e.currentTarget.play().catch(() => {});
+          setStarting(false);
+        }}
+        onPlaying={() => {
+          setStarting(false);
+        }}
+        onClick={(e) => {
+          void e.currentTarget.play().catch(() => {});
+        }}
+        className="absolute inset-0 block h-full w-full object-cover"
+      />
+
+      {/* Floating Top Bar (Close & Flash only, like a native phone camera) */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
+        <div className="pointer-events-auto">
+          {hasTorch && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={torchOn ? 'Turn flash off' : 'Turn flash on'}
+              onClick={toggleTorch}
+              className="h-11 w-11 rounded-full bg-black/45 text-white backdrop-blur-md hover:bg-black/65 hover:text-white"
+            >
+              {torchOn ? (
+                <ZapOff className="h-5 w-5 text-amber-400" />
+              ) : (
+                <Zap className="h-5 w-5" />
+              )}
+            </Button>
+          )}
         </div>
+
         <Button
           type="button"
           variant="ghost"
           size="icon"
           aria-label="Cancel report"
           onClick={onCancel}
-          className="shrink-0 rounded-xl text-white hover:bg-white/10 hover:text-white"
+          className="pointer-events-auto h-11 w-11 rounded-full bg-black/45 text-white backdrop-blur-md hover:bg-black/65 hover:text-white"
         >
           <X className="h-5 w-5" />
         </Button>
-      </header>
-
-      {/* GPS Status Bar inside Camera View */}
-      <div className="mx-3 mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/15 bg-white/5 px-3.5 py-2 text-xs sm:mx-6">
-        <div className="flex min-w-0 items-center gap-2">
-          <MapPin className="h-4 w-4 shrink-0 text-[#EAF6F4]" />
-          {gpsLoading ? (
-            <span className="flex items-center gap-1.5 text-slate-200">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-[#EAF6F4]" />
-              <span>Detecting GPS coordinates in Barangay Purisima...</span>
-            </span>
-          ) : gpsReading ? (
-            <span className="truncate font-medium text-emerald-300">
-              GPS Ready: {gpsReading.lat.toFixed(5)}, {gpsReading.lng.toFixed(5)}{' '}
-              (±{Math.round(gpsReading.accuracyMeters)}m)
-            </span>
-          ) : (
-            <span className="text-amber-300">
-              {gpsError || 'GPS location permission is required for location verification.'}
-            </span>
-          )}
-        </div>
-        {(gpsError || !gpsReading) && !gpsLoading && (
-          <button
-            type="button"
-            onClick={requestGpsLocation}
-            data-testid="retry-gps-capture-btn"
-            className="shrink-0 rounded-lg bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-white/25"
-          >
-            Retry GPS
-          </button>
-        )}
       </div>
 
-      {/* Live Camera Viewfinder */}
-      <div className="relative mx-3 my-2 flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-black sm:mx-6">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className="h-full w-full object-cover"
-        />
-        {starting && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#142B38]/95">
-            <Loader2 className="h-8 w-8 animate-spin text-[#EAF6F4]" />
-            <p className="text-sm font-medium text-slate-200">
-              Opening camera...
+      {/* Camera Starting Indicator */}
+      {starting && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/90">
+          <Loader2 className="h-8 w-8 animate-spin text-white" />
+        </div>
+      )}
+
+      {/* Camera Permission Error Overlay */}
+      {cameraError && (
+        <div
+          data-testid="camera-permission-error"
+          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-black/95 px-6 text-center"
+        >
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#F36B3F]/20 text-[#F36B3F]">
+            <AlertCircle className="h-8 w-8" />
+          </div>
+          <div className="max-w-md space-y-1.5">
+            <h2 className="text-base font-bold text-white">
+              Camera Permission Required
+            </h2>
+            <p className="text-xs leading-relaxed text-slate-300 sm:text-sm">
+              {cameraError}
             </p>
           </div>
-        )}
-        {cameraError && (
-          <div
-            data-testid="camera-permission-error"
-            className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#142B38]/95 px-6 text-center"
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+            <Button
+              type="button"
+              data-testid="retry-camera-btn"
+              onClick={() => setCameraAttempt((attempt) => attempt + 1)}
+              className="rounded-full bg-[#177A73] px-5 text-white hover:bg-[#12625D]"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry Camera Access
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              className="rounded-full border-white/25 bg-transparent text-white hover:bg-white/10 hover:text-white"
+            >
+              Back
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Native Phone Camera Bottom Control Bar */}
+      <footer className="absolute inset-x-0 bottom-0 z-20 flex items-center justify-center bg-gradient-to-t from-black/80 via-black/40 to-transparent px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-8">
+        <div className="flex w-full max-w-sm items-center justify-between">
+          <div className="h-12 w-12" />
+
+          <button
+            type="button"
+            data-testid="capture-concern-btn"
+            aria-label="Capture photo"
+            disabled={starting || !!cameraError || capturing}
+            onClick={capturePhoto}
+            className="group relative flex h-20 w-20 items-center justify-center rounded-full border-4 border-white bg-white/15 p-1.5 shadow-2xl backdrop-blur-sm transition-transform active:scale-95 disabled:opacity-40"
           >
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F36B3F]/20 text-[#F36B3F]">
-              <AlertCircle className="h-8 w-8" />
-            </div>
-            <div className="max-w-md space-y-1.5">
-              <h2 className="text-base font-bold text-white">
-                Camera Permission Required
-              </h2>
-              <p className="text-xs leading-relaxed text-slate-300 sm:text-sm">
-                {cameraError}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
-              <Button
-                type="button"
-                data-testid="retry-camera-btn"
-                onClick={() => setCameraAttempt((attempt) => attempt + 1)}
-                className="rounded-xl bg-[#177A73] px-5 text-white hover:bg-[#12625D]"
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Retry Camera Access
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onCancel}
-                className="rounded-xl border-white/25 bg-transparent text-white hover:bg-white/10 hover:text-white"
-              >
-                Back
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Trained 4-Class Reference Filter Strip (Drainage, Streetlight, Road, Waste) */}
-      <section
-        data-testid="camera-reference-filter-strip"
-        className="mx-3 mb-2 rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 sm:mx-6"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#EAF6F4]">
-            <Filter className="h-3.5 w-3.5 text-[#F36B3F]" />
-            <span>Trained 4-Class Reference Filter (Tap to Filter or Analyze Reference):</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-1">
-            {(
-              [
-                { key: 'all', label: 'All 4 Classes' },
-                { key: 'drainage', label: 'Drainage' },
-                { key: 'street_light', label: 'Streetlight' },
-                { key: 'road_damage', label: 'Road' },
-                { key: 'garbage', label: 'Waste' },
-              ] as const
-            ).map((pill) => (
-              <button
-                key={pill.key}
-                type="button"
-                data-testid={`camera-filter-pill-${pill.key}`}
-                onClick={() => setActiveRefFilter(pill.key)}
-                className={`rounded-lg px-2 py-0.5 text-[11px] font-semibold transition-colors ${
-                  activeRefFilter === pill.key
-                    ? 'bg-[#177A73] text-white'
-                    : 'bg-white/10 text-slate-300 hover:bg-white/20'
-                }`}
-              >
-                {pill.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {filteredReferences.map((ref) => {
-            const isLoadingThis = loadingRefKey === ref.key;
-            return (
-              <button
-                key={ref.key}
-                type="button"
-                data-testid={`test-reference-${ref.key}`}
-                disabled={Boolean(loadingRefKey) || capturing}
-                onClick={() =>
-                  handleUseReferenceImage(ref.key, ref.referenceImageUrl)
-                }
-                className="group flex items-center gap-2.5 rounded-lg border border-white/15 bg-[#142B38]/90 p-1.5 text-left transition-colors hover:border-[#EAF6F4]/50 hover:bg-white/10 disabled:opacity-50"
-              >
-                <img
-                  src={ref.referenceImageUrl}
-                  alt={ref.categoryLabel}
-                  className="h-10 w-12 shrink-0 rounded-md object-cover ring-1 ring-white/15"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1">
-                    <span className="truncate text-[11px] font-bold text-white">
-                      {ref.shortFilterLabel}
-                    </span>
-                    <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-400" />
-                  </div>
-                  <p className="truncate text-[10px] text-slate-300">
-                    {isLoadingThis ? 'Analyzing...' : 'Analyze Reference'}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Bottom Capture Bar */}
-      <footer className="flex min-h-20 flex-col items-center justify-center gap-2 border-t border-white/10 bg-[#142B38] px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2.5">
-        <div className="flex w-full max-w-md items-center justify-between gap-4">
-          <div className="flex w-12 justify-start">
-            {hasTorch && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={torchOn ? 'Turn flash off' : 'Turn flash on'}
-                onClick={toggleTorch}
-                className="h-11 w-11 rounded-xl text-white hover:bg-white/10 hover:text-white"
-              >
-                {torchOn ? (
-                  <ZapOff className="h-5 w-5" />
-                ) : (
-                  <Zap className="h-5 w-5" />
-                )}
-              </Button>
-            )}
-          </div>
+            <span className="flex h-full w-full items-center justify-center rounded-full bg-white text-slate-900 transition-transform group-hover:scale-95">
+              {capturing ? (
+                <Loader2 className="h-7 w-7 animate-spin text-[#177A73]" />
+              ) : (
+                <Camera className="h-7 w-7 text-slate-900" />
+              )}
+            </span>
+          </button>
 
           <Button
             type="button"
-            data-testid="capture-concern-btn"
-            disabled={starting || !!cameraError || capturing || Boolean(loadingRefKey)}
-            onClick={capturePhoto}
-            className="h-13 flex-1 gap-2.5 rounded-2xl bg-[#F36B3F] px-6 text-base font-bold text-white shadow-lg transition-transform hover:bg-[#dc5a30] active:scale-[0.99] disabled:opacity-50"
+            variant="ghost"
+            size="icon"
+            aria-label="Switch camera"
+            onClick={handleSwitchCamera}
+            className="h-12 w-12 rounded-full bg-black/45 text-white backdrop-blur-md hover:bg-black/65 hover:text-white"
           >
-            {capturing || loadingRefKey ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" />
-                <span>Analyzing...</span>
-              </>
-            ) : (
-              <>
-                <Camera className="h-5 w-5" />
-                <span>Capture</span>
-              </>
-            )}
+            <RefreshCw className="h-5 w-5" />
           </Button>
-
-          <div className="flex w-12 justify-end">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label="Switch camera"
-              onClick={() =>
-                setFacingMode((mode) =>
-                  mode === 'environment' ? 'user' : 'environment'
-                )
-              }
-              className="h-11 w-11 rounded-xl text-white hover:bg-white/10 hover:text-white"
-            >
-              <RefreshCw className="h-5 w-5" />
-            </Button>
-          </div>
         </div>
       </footer>
     </main>
   );
 };
+

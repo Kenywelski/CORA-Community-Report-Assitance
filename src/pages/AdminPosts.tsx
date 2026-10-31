@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,19 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -31,423 +24,392 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Megaphone, 
-  Building2, 
-  AlertCircle,
-  Heart,
-  Clock
+import {
+  Building2,
+  Clock,
+  Edit2,
+  Loader2,
+  Mail,
+  MapPin,
+  Phone,
+  Plus,
+  Search,
+  Trash2,
+  UserCheck,
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import {
+  type BarangayOfficeItem,
+  deleteBarangayOffice,
+  loadBarangayOffices,
+  saveBarangayOffice,
+} from '@/lib/barangayContentStore';
 
-type PostType = 'report' | 'announcement' | 'project';
-
-interface Post {
-  id: string;
-  title: string;
-  content: string;
-  category: string | null;
-  post_type: PostType;
-  is_anonymous: boolean;
-  created_by: string | null;
-  created_by_role: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-const postTypeIcons: Record<string, React.ElementType> = {
-  report: AlertCircle,
-  announcement: Megaphone,
-  project: Building2,
+const emptyOfficeForm = {
+  id: '',
+  name: '',
+  head_or_role: '',
+  phone: '',
+  email: '',
+  location: 'Barangay Hall, Barangay Purisima, Tago, Surigao del Sur',
+  hours: 'Monday – Friday, 8:00 AM – 5:00 PM',
+  services_offered: '',
+  is_active: true,
 };
-
-const postTypeColors: Record<string, string> = {
-  report: 'bg-warning/10 text-warning border-warning/20',
-  announcement: 'bg-primary/10 text-primary border-primary/20',
-  project: 'bg-success/10 text-success border-success/20',
-};
-
-const categories = [
-  'Infrastructure',
-  'Health',
-  'Education',
-  'Environment',
-  'Public Safety',
-  'Social Services',
-  'Events',
-  'General',
-];
 
 const AdminPosts = () => {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<PostType>('announcement');
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [offices, setOffices] = useState<BarangayOfficeItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [editingPost, setEditingPost] = useState<Post | null>(null);
+  const [form, setForm] = useState(emptyOfficeForm);
 
-  // Form states
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [category, setCategory] = useState('');
-  const [postType, setPostType] = useState<PostType>('announcement');
-
-  // Fetch posts
-  const { data: posts, isLoading } = useQuery({
-    queryKey: ['admin-posts'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('posts')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data as Post[];
-    },
-  });
-
-  // Fetch likes count for each post
-  const { data: likesData } = useQuery({
-    queryKey: ['admin-post-likes'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('post_likes')
-        .select('post_id');
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const getLikesCount = (postId: string) => {
-    return likesData?.filter((like) => like.post_id === postId).length || 0;
-  };
-
-  // Create post mutation
-  const createMutation = useMutation({
-    mutationFn: async (data: { title: string; content: string; category: string; post_type: PostType }) => {
-      const { error } = await supabase.from('posts').insert({
-        title: data.title,
-        content: data.content,
-        category: data.category,
-        post_type: data.post_type,
-        is_anonymous: false,
-        created_by: user?.id,
-        created_by_role: 'admin',
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-posts'] });
-      setIsCreateOpen(false);
-      resetForm();
-      toast.success('Post created successfully!');
-    },
-    onError: () => toast.error('Failed to create post'),
-  });
-
-  // Update post mutation
-  const updateMutation = useMutation({
-    mutationFn: async (data: { id: string; title: string; content: string; category: string; post_type: PostType }) => {
-      const { error } = await supabase
-        .from('posts')
-        .update({
-          title: data.title,
-          content: data.content,
-          category: data.category,
-          post_type: data.post_type,
-        })
-        .eq('id', data.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-posts'] });
-      setIsEditOpen(false);
-      setEditingPost(null);
-      resetForm();
-      toast.success('Post updated successfully!');
-    },
-    onError: () => toast.error('Failed to update post'),
-  });
-
-  // Delete post mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('posts').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-posts'] });
-      setDeleteId(null);
-      toast.success('Post deleted successfully!');
-    },
-    onError: () => toast.error('Failed to delete post'),
-  });
-
-  const resetForm = () => {
-    setTitle('');
-    setContent('');
-    setCategory('');
-    setPostType('announcement');
-  };
-
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || !content.trim()) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-    createMutation.mutate({ title, content, category, post_type: postType });
-  };
-
-  const handleEdit = (post: Post) => {
-    setEditingPost(post);
-    setTitle(post.title);
-    setContent(post.content);
-    setCategory(post.category || '');
-    setPostType(post.post_type);
-    setIsEditOpen(true);
-  };
-
-  const handleUpdate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingPost || !title.trim() || !content.trim()) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-    updateMutation.mutate({ 
-      id: editingPost.id, 
-      title, 
-      content, 
-      category, 
-      post_type: postType 
+  useEffect(() => {
+    let mounted = true;
+    loadBarangayOffices().then((data) => {
+      if (!mounted) return;
+      setOffices(data);
+      setLoading(false);
     });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleOpenCreate = () => {
+    setForm(emptyOfficeForm);
+    setDialogOpen(true);
   };
 
-  const filteredPosts = posts?.filter((post) => {
-    if (activeTab === 'report') return post.post_type === 'report';
-    if (activeTab === 'announcement') return post.post_type === 'announcement';
-    if (activeTab === 'project') return post.post_type === 'project';
-    return true;
-  });
+  const handleOpenEdit = (office: BarangayOfficeItem) => {
+    setForm({
+      id: office.id,
+      name: office.name,
+      head_or_role: office.head_or_role,
+      phone: office.phone,
+      email: office.email,
+      location: office.location,
+      hours: office.hours,
+      services_offered: office.services_offered,
+      is_active: office.is_active,
+    });
+    setDialogOpen(true);
+  };
 
-  const PostForm = ({ onSubmit, isEdit = false }: { onSubmit: (e: React.FormEvent) => void; isEdit?: boolean }) => (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="postType">Post Type</Label>
-        <Select value={postType} onValueChange={(v) => setPostType(v as PostType)}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="announcement">Announcement</SelectItem>
-            <SelectItem value="project">Municipal Project</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="title">Title *</Label>
-        <Input
-          id="title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Enter post title"
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="category">Category</Label>
-        <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select category" />
-          </SelectTrigger>
-          <SelectContent>
-            {categories.map((cat) => (
-              <SelectItem key={cat} value={cat}>
-                {cat}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="content">Content *</Label>
-        <Textarea
-          id="content"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="Enter post content..."
-          rows={5}
-        />
-      </div>
-      <Button 
-        type="submit" 
-        className="w-full"
-        disabled={createMutation.isPending || updateMutation.isPending}
-      >
-        {isEdit ? 'Update Post' : 'Create Post'}
-      </Button>
-    </form>
-  );
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.phone.trim() || !form.location.trim()) {
+      toast.error('Please fill in the Office Name, Contact Number, and Location.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const updated = await saveBarangayOffice({
+        id: form.id || undefined,
+        name: form.name,
+        head_or_role: form.head_or_role || 'Barangay Office',
+        phone: form.phone,
+        email: form.email || 'purisima@tago.gov.ph',
+        location: form.location,
+        hours: form.hours || 'Monday – Friday, 8:00 AM – 5:00 PM',
+        services_offered: form.services_offered,
+        is_active: form.is_active,
+      });
+      setOffices(updated);
+      setDialogOpen(false);
+      toast.success(form.id ? 'Barangay office updated' : 'Barangay office added');
+    } catch {
+      toast.error('Failed to save barangay office');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleActive = async (office: BarangayOfficeItem) => {
+    const updated = await saveBarangayOffice({
+      ...office,
+      is_active: !office.is_active,
+    });
+    setOffices(updated);
+    toast.success(
+      !office.is_active
+        ? `${office.name} is now visible to residents`
+        : `${office.name} hidden from directory`
+    );
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    const updated = await deleteBarangayOffice(deleteId);
+    setOffices(updated);
+    setDeleteId(null);
+    toast.success('Barangay office deleted');
+  };
+
+  const filteredOffices = offices.filter((o) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return `${o.name} ${o.head_or_role} ${o.location} ${o.email} ${o.services_offered}`
+      .toLowerCase()
+      .includes(q);
+  });
 
   return (
-    <AdminLayout title="Community Posts" subtitle="Manage announcements, projects, and reports">
+    <AdminLayout
+      title="Barangay Offices"
+      subtitle="Manage official barangay offices, contact details, and operating hours for Barangay Purisima, Tago"
+    >
       <div className="space-y-6">
-        {/* Header Actions */}
-        <div className="flex justify-between items-center">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as PostType)}>
-            <TabsList>
-              <TabsTrigger value="announcement" className="gap-2">
-                <Megaphone className="h-4 w-4" />
-                Announcements
-              </TabsTrigger>
-              <TabsTrigger value="project" className="gap-2">
-                <Building2 className="h-4 w-4" />
-                Projects
-              </TabsTrigger>
-              <TabsTrigger value="report" className="gap-2">
-                <AlertCircle className="h-4 w-4" />
-                Reports
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search office name, focal person, or services..."
+              className="pl-9"
+            />
+          </div>
 
-          <Dialog open={isCreateOpen} onOpenChange={(open) => { setIsCreateOpen(open); if (!open) resetForm(); }}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                Create Post
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Post</DialogTitle>
-              </DialogHeader>
-              <PostForm onSubmit={handleCreate} />
-            </DialogContent>
-          </Dialog>
+          <Button onClick={handleOpenCreate} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Add Barangay Office
+          </Button>
         </div>
 
-        {/* Posts Grid */}
-        {isLoading ? (
-          <div className="text-center py-8 text-muted-foreground">Loading posts...</div>
-        ) : filteredPosts?.length === 0 ? (
+        {loading ? (
+          <div className="flex justify-center py-14">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : filteredOffices.length === 0 ? (
           <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
-              No {activeTab}s found. Create one to get started!
+            <CardContent className="py-10 text-center text-muted-foreground">
+              <Building2 className="h-9 w-9 mx-auto mb-3 opacity-50" />
+              No barangay offices found. Click &ldquo;Add Barangay Office&rdquo; to create one.
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4">
-            {filteredPosts?.map((post) => {
-              const Icon = postTypeIcons[post.post_type] || AlertCircle;
-              const likesCount = getLikesCount(post.id);
+          <div className="grid gap-4 md:grid-cols-2">
+            {filteredOffices.map((office) => (
+              <Card key={office.id} className="overflow-hidden">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2.5 rounded-xl bg-primary/10 text-primary shrink-0">
+                        <Building2 className="h-5 w-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <CardTitle className="text-base leading-snug">
+                            {office.name}
+                          </CardTitle>
+                          <Badge variant={office.is_active ? 'default' : 'secondary'}>
+                            {office.is_active ? 'Active' : 'Hidden'}
+                          </Badge>
+                        </div>
+                        {office.head_or_role && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                            <UserCheck className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span>{office.head_or_role}</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
 
-              return (
-                <Card key={post.id}>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3">
-                        <div className={cn(
-                          "p-2 rounded-xl",
-                          post.post_type === 'report' ? "bg-muted" : "bg-primary/10"
-                        )}>
-                          <Icon className={cn(
-                            "h-5 w-5",
-                            post.post_type === 'report' ? "text-muted-foreground" : "text-primary"
-                          )} />
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <CardTitle className="text-base">{post.title}</CardTitle>
-                            <Badge className={cn('text-xs', postTypeColors[post.post_type])}>
-                              {post.post_type === 'announcement' ? 'Announcement' : 
-                               post.post_type === 'project' ? 'Municipal Project' : 'Community Report'}
-                            </Badge>
-                            {post.is_anonymous && (
-                              <Badge variant="outline" className="text-xs">Anonymous</Badge>
-                            )}
-                          </div>
-                          {post.category && (
-                            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                              {post.category}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEdit(post)}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => setDeleteId(post.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Switch
+                        checked={office.is_active}
+                        onCheckedChange={() => handleToggleActive(office)}
+                        aria-label="Toggle active status"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleOpenEdit(office)}
+                        aria-label="Edit office"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setDeleteId(office.id)}
+                        aria-label="Delete office"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                      {post.content}
+                  </div>
+                </CardHeader>
+
+                <CardContent className="space-y-2 text-sm">
+                  {office.services_offered && (
+                    <p className="text-xs text-muted-foreground leading-relaxed bg-muted/60 rounded-lg p-2.5">
+                      {office.services_offered}
                     </p>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {format(new Date(post.created_at), 'MMM d, yyyy h:mm a')}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Heart className="h-3 w-3" />
-                        {likesCount} likes
-                      </span>
-                      <span className="text-xs">
-                        By: {post.created_by_role === 'admin' ? 'Admin' : post.is_anonymous ? 'Anonymous' : 'User'}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                  )}
+                  <div className="space-y-1.5 pt-1 text-xs">
+                    <p className="flex items-center gap-2 font-medium text-foreground">
+                      <Phone className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span>{office.phone}</span>
+                    </p>
+                    {office.email && (
+                      <p className="flex items-center gap-2 text-muted-foreground break-all">
+                        <Mail className="h-3.5 w-3.5 text-primary shrink-0" />
+                        <span>{office.email}</span>
+                      </p>
+                    )}
+                    <p className="flex items-start gap-2 text-muted-foreground">
+                      <MapPin className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                      <span>{office.location}</span>
+                    </p>
+                    <p className="flex items-center gap-2 text-muted-foreground">
+                      <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span>{office.hours}</span>
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
 
-        {/* Edit Dialog */}
-        <Dialog open={isEditOpen} onOpenChange={(open) => { setIsEditOpen(open); if (!open) { setEditingPost(null); resetForm(); } }}>
-          <DialogContent>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>Edit Post</DialogTitle>
+              <DialogTitle>
+                {form.id ? 'Edit Barangay Office' : 'Add Barangay Office'}
+              </DialogTitle>
             </DialogHeader>
-            <PostForm onSubmit={handleUpdate} isEdit />
+            <form onSubmit={handleSubmit} className="space-y-3.5">
+              <div className="space-y-1.5">
+                <Label htmlFor="office-name">Office Name *</Label>
+                <Input
+                  id="office-name"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="e.g., Office of the Punong Barangay"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="office-head">Office Head / Focal Person</Label>
+                <Input
+                  id="office-head"
+                  value={form.head_or_role}
+                  onChange={(e) =>
+                    setForm({ ...form, head_or_role: e.target.value })
+                  }
+                  placeholder="e.g., Barangay Secretary / BDRRMC Focal Person"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="office-phone">Contact Number *</Label>
+                  <Input
+                    id="office-phone"
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    placeholder="e.g., 0917-550-0101"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="office-email">Email Address</Label>
+                  <Input
+                    id="office-email"
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    placeholder="purisima@tago.gov.ph"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="office-location">Location / Purok *</Label>
+                <Input
+                  id="office-location"
+                  value={form.location}
+                  onChange={(e) =>
+                    setForm({ ...form, location: e.target.value })
+                  }
+                  placeholder="e.g., Barangay Hall, Purok Citrus I, Barangay Purisima"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="office-hours">Operating Hours</Label>
+                <Input
+                  id="office-hours"
+                  value={form.hours}
+                  onChange={(e) => setForm({ ...form, hours: e.target.value })}
+                  placeholder="Monday – Friday, 8:00 AM – 5:00 PM"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="office-services">Services Offered</Label>
+                <Textarea
+                  id="office-services"
+                  value={form.services_offered}
+                  onChange={(e) =>
+                    setForm({ ...form, services_offered: e.target.value })
+                  }
+                  placeholder="Describe certificates, assistance, or services handled by this office..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl border p-3">
+                <span className="text-sm font-medium">
+                  Visible in Resident Barangay Directory
+                </span>
+                <Switch
+                  checked={form.is_active}
+                  onCheckedChange={(v) => setForm({ ...form, is_active: v })}
+                />
+              </div>
+
+              <DialogFooter className="pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={saving}>
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : form.id ? (
+                    'Update Office'
+                  ) : (
+                    'Add Office'
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
 
-        {/* Delete Confirmation */}
         <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Post?</AlertDialogTitle>
+              <AlertDialogTitle>Delete Barangay Office?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the post.
+                This will remove the office from the Barangay Purisima directory.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+                onClick={handleDelete}
               >
                 Delete
               </AlertDialogAction>

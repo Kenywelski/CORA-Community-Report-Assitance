@@ -32,6 +32,7 @@ import {
   isPhoneUserAgent,
   type ResidentNavIconKey,
 } from '@/lib/residentNav';
+import { useAppPreferences } from '@/lib/preferences';
 
 interface BottomNavProps {
   currentPath?: string;
@@ -64,8 +65,30 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { signOut } = useAuth();
+  const { t } = useAppPreferences();
 
   const activePath = resolveActiveResidentPath(location.pathname, currentPath);
+
+  const getTranslatedItemLabel = (id: string, fallback: string) => {
+    switch (id) {
+      case 'home':
+        return t.navHome;
+      case 'my-requests':
+        return t.navMyReports;
+      case 'updates':
+        return t.navAnnouncements;
+      case 'alerts':
+        return t.navEmergencyAlerts;
+      case 'directory':
+        return t.navDirectory;
+      case 'programs':
+        return t.navPrograms;
+      case 'profile':
+        return t.navProfile;
+      default:
+        return fallback;
+    }
+  };
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
@@ -115,16 +138,16 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
   };
 
   const mobileNavItems = [
-    { icon: House, label: 'Home', path: '/' },
-    { icon: ClipboardList, label: 'My Reports', path: '/my-requests' },
-    { icon: Plus, label: 'Report an Issue', path: '/report-issue', isReportAction: true },
+    { icon: House, label: t.navHome, path: '/' },
+    { icon: ClipboardList, label: t.navMyReports, path: '/my-requests' },
+    { icon: Plus, label: t.reportAnIssue, path: '/report-issue', isReportAction: true },
     {
       icon: Bell,
-      label: 'Announcements',
+      label: t.navAnnouncements,
       path: '/updates',
       badge: announcementCount && announcementCount > 0 ? announcementCount : undefined,
     },
-    { icon: UserRound, label: 'Profile', path: '/profile' },
+    { icon: UserRound, label: t.navProfile, path: '/profile' },
   ];
 
   return (
@@ -135,13 +158,13 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
           aria-label="Main navigation"
           data-collapsed={collapsed}
           className={cn(
-            'desktop-sidebar fixed inset-y-0 left-0 z-40 hidden h-screen flex-col border-r border-[#E2E8F0] bg-white transition-[width,padding] duration-200 ease-out lg:flex',
+            'desktop-sidebar fixed inset-y-0 left-0 z-40 hidden h-screen flex-col border-r border-[#E2E8F0] dark:border-border bg-white dark:bg-card transition-[width,padding] duration-200 ease-out lg:flex',
             collapsed ? 'w-[76px] px-2.5' : 'w-[272px] px-4',
           )}
         >
         {/* 1. Sidebar Header */}
         {!collapsed ? (
-          <div className="flex h-[72px] shrink-0 items-center justify-between gap-2 border-b border-[#E2E8F0]">
+          <div className="flex h-[72px] shrink-0 items-center justify-between gap-2 border-b border-[#E2E8F0] dark:border-border">
             <button
               type="button"
               onClick={() => handleNavigate('/')}
@@ -157,11 +180,11 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
                 />
               </div>
               <div className="min-w-0">
-                <span className="block text-[18px] font-extrabold leading-none tracking-tight text-[#177A73]">
+                <span className="block text-[18px] font-extrabold leading-none tracking-tight text-[#177A73] dark:text-primary">
                   CORA
                 </span>
-                <span className="mt-1 block truncate text-[11px] font-medium leading-none text-[#64748B]">
-                  Community Portal
+                <span className="mt-1 block truncate text-[11px] font-medium leading-none text-[#64748B] dark:text-muted-foreground">
+                  {t.communityPortal}
                 </span>
               </div>
             </button>
@@ -171,13 +194,13 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
               onClick={toggleCollapsed}
               aria-label="Collapse sidebar"
               title="Collapse sidebar"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-transparent text-[#64748B] transition-colors hover:border-[#177A73]/20 hover:bg-[#EAF6F4] hover:text-[#177A73] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#177A73]"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-transparent text-[#64748B] dark:text-muted-foreground transition-colors hover:border-[#177A73]/20 hover:bg-[#EAF6F4] dark:hover:bg-muted hover:text-[#177A73] dark:hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#177A73]"
             >
               <PanelLeftClose className="h-[18px] w-[18px]" />
             </button>
           </div>
         ) : (
-          <div className="flex shrink-0 flex-col items-center gap-2 border-b border-[#E2E8F0] py-3">
+          <div className="flex shrink-0 flex-col items-center gap-2 border-b border-[#E2E8F0] dark:border-border py-3">
             <Tooltip delayDuration={100}>
               <TooltipTrigger asChild>
                 <button
@@ -196,7 +219,7 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right" className="border-[#E2E8F0] bg-[#142B38] text-xs font-medium text-white">
-                CORA — Community Portal
+                CORA — {t.communityPortal}
               </TooltipContent>
             </Tooltip>
 
@@ -207,7 +230,7 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
                   onClick={toggleCollapsed}
                   aria-label="Expand sidebar"
                   title="Expand sidebar"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-transparent text-[#64748B] transition-colors hover:border-[#177A73]/20 hover:bg-[#EAF6F4] hover:text-[#177A73] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#177A73]"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-transparent text-[#64748B] dark:text-muted-foreground transition-colors hover:border-[#177A73]/20 hover:bg-[#EAF6F4] dark:hover:bg-muted hover:text-[#177A73] dark:hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#177A73]"
                 >
                   <PanelLeftOpen className="h-[18px] w-[18px]" />
                 </button>
@@ -221,16 +244,16 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
 
         {/* 2. Barangay Location Section */}
         {!collapsed ? (
-          <div className="mt-3.5 shrink-0 rounded-xl border border-[#177A73]/15 bg-[#EAF6F4] px-3 py-2.5">
+          <div className="mt-3.5 shrink-0 rounded-xl border border-[#177A73]/15 dark:border-primary/25 bg-[#EAF6F4] dark:bg-primary/10 px-3 py-2.5">
             <div className="flex items-start gap-2.5">
-              <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#177A73]/12 text-[#177A73]">
+              <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#177A73]/12 dark:bg-primary/20 text-[#177A73] dark:text-primary">
                 <MapPin className="h-3.5 w-3.5" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[12.5px] font-semibold leading-snug text-[#142B38]">
+                <p className="truncate text-[12.5px] font-semibold leading-snug text-[#142B38] dark:text-foreground">
                   Barangay Purisima
                 </p>
-                <p className="mt-0.5 truncate text-[11px] font-normal leading-tight text-[#64748B]">
+                <p className="mt-0.5 truncate text-[11px] font-normal leading-tight text-[#64748B] dark:text-muted-foreground">
                   Tago, Surigao del Sur
                 </p>
               </div>
@@ -243,7 +266,7 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
                 tabIndex={0}
                 aria-label="Barangay Purisima, Tago, Surigao del Sur"
                 title="Barangay Purisima, Tago, Surigao del Sur"
-                className="mx-auto mt-3 flex h-9 w-10 shrink-0 items-center justify-center rounded-xl border border-[#177A73]/15 bg-[#EAF6F4] text-[#177A73] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#177A73]"
+                className="mx-auto mt-3 flex h-9 w-10 shrink-0 items-center justify-center rounded-xl border border-[#177A73]/15 dark:border-primary/25 bg-[#EAF6F4] dark:bg-primary/10 text-[#177A73] dark:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#177A73]"
               >
                 <MapPin className="h-4 w-4" />
               </div>
@@ -259,11 +282,11 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
           <button
             type="button"
             onClick={() => handleNavigate('/report-issue')}
-            aria-label="Report an Issue"
+            aria-label={t.reportAnIssue}
             className="mt-3 mb-2 flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-[#F36B3F] px-4 text-[13.5px] font-semibold text-white shadow-xs transition-all duration-150 hover:bg-[#e05d32] hover:shadow-sm active:scale-[0.99] active:bg-[#cc5129] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F36B3F] focus-visible:ring-offset-2"
           >
             <Plus className="h-[18px] w-[18px] shrink-0 stroke-[2.25]" />
-            <span className="whitespace-nowrap">Report an Issue</span>
+            <span className="whitespace-nowrap">{t.reportAnIssue}</span>
           </button>
         ) : (
           <Tooltip delayDuration={100}>
@@ -271,15 +294,15 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
               <button
                 type="button"
                 onClick={() => handleNavigate('/report-issue')}
-                aria-label="Report an Issue"
-                title="Report an Issue"
+                aria-label={t.reportAnIssue}
+                title={t.reportAnIssue}
                 className="mx-auto mt-3 mb-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F36B3F] text-white shadow-xs transition-all duration-150 hover:bg-[#e05d32] hover:shadow-sm active:scale-[0.98] active:bg-[#cc5129] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F36B3F] focus-visible:ring-offset-2"
               >
                 <Plus className="h-[19px] w-[19px] shrink-0 stroke-[2.25]" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="right" className="border-[#E2E8F0] bg-[#142B38] text-xs font-medium text-white">
-              Report an Issue
+              {t.reportAnIssue}
             </TooltipContent>
           </Tooltip>
         )}
@@ -289,18 +312,19 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
           {RESIDENT_NAV_SECTIONS.map((section, sectionIdx) => (
             <div key={section.id} className="flex flex-col gap-1">
               {!collapsed ? (
-                <p className="px-3 pb-1 pt-1.5 text-[10.5px] font-semibold uppercase tracking-[0.07em] text-[#64748B] select-none">
+                <p className="px-3 pb-1 pt-1.5 text-[10.5px] font-semibold uppercase tracking-[0.07em] text-[#64748B] dark:text-muted-foreground select-none">
                   {section.label}
                 </p>
               ) : (
                 sectionIdx > 0 && (
-                  <div aria-hidden="true" className="mx-auto my-1 h-px w-7 bg-[#E2E8F0]" />
+                  <div aria-hidden="true" className="mx-auto my-1 h-px w-7 bg-[#E2E8F0] dark:bg-border" />
                 )
               )}
 
               {section.items.map((item) => {
                 const Icon = ICON_MAP[item.iconKey];
                 const isActive = isResidentNavItemActive(item.path, activePath);
+                const itemLabel = getTranslatedItemLabel(item.id, item.label);
                 const badge =
                   item.supportsUnreadBadge && announcementCount && announcementCount > 0
                     ? announcementCount
@@ -311,21 +335,21 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
                     key={item.id}
                     type="button"
                     onClick={() => handleNavigate(item.path)}
-                    aria-label={item.label}
-                    title={collapsed ? item.label : undefined}
+                    aria-label={itemLabel}
+                    title={collapsed ? itemLabel : undefined}
                     aria-current={isActive ? 'page' : undefined}
                     className={cn(
                       'group relative flex h-10 w-full items-center rounded-xl text-left text-[13.5px] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#177A73] focus-visible:ring-offset-1',
                       collapsed ? 'justify-center px-0' : 'justify-start gap-3 px-3',
                       isActive
-                        ? 'bg-[#EAF6F4] font-semibold text-[#177A73] hover:bg-[#dff1ee]'
-                        : 'bg-transparent font-medium text-[#64748B] hover:bg-slate-100/80 hover:text-[#142B38]',
+                        ? 'bg-[#EAF6F4] dark:bg-primary/15 font-semibold text-[#177A73] dark:text-primary hover:bg-[#dff1ee] dark:hover:bg-primary/20'
+                        : 'bg-transparent font-medium text-[#64748B] dark:text-muted-foreground hover:bg-slate-100/80 dark:hover:bg-muted hover:text-[#142B38] dark:hover:text-foreground',
                     )}
                   >
                     {isActive && (
                       <span
                         aria-hidden="true"
-                        className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-[#177A73]"
+                        className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-[#177A73] dark:bg-primary"
                       />
                     )}
                     <div className="relative flex items-center justify-center">
@@ -333,8 +357,8 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
                         className={cn(
                           'h-[18px] w-[18px] shrink-0 transition-colors',
                           isActive
-                            ? 'text-[#177A73]'
-                            : 'text-[#64748B] group-hover:text-[#142B38]',
+                            ? 'text-[#177A73] dark:text-primary'
+                            : 'text-[#64748B] dark:text-muted-foreground group-hover:text-[#142B38] dark:group-hover:text-foreground',
                         )}
                       />
                       {collapsed && badge && (
@@ -346,7 +370,7 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
 
                     {!collapsed && (
                       <>
-                        <span className="truncate leading-snug">{item.label}</span>
+                        <span className="truncate leading-snug">{itemLabel}</span>
                         {badge && (
                           <span
                             className={cn(
@@ -372,7 +396,7 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
                         side="right"
                         className="border-[#E2E8F0] bg-[#142B38] text-xs font-medium text-white"
                       >
-                        {item.label}
+                        {itemLabel}
                       </TooltipContent>
                     </Tooltip>
                   );
@@ -385,16 +409,16 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
         </div>
 
         {/* 5. Bottom Logout Action */}
-        <div className="shrink-0 border-t border-[#E2E8F0] pt-2.5 pb-3">
+        <div className="shrink-0 border-t border-[#E2E8F0] dark:border-border pt-2.5 pb-3">
           {!collapsed ? (
             <button
               type="button"
               onClick={handleLogout}
-              aria-label="Logout"
-              className="group flex h-10 w-full items-center justify-start gap-3 rounded-xl px-3 text-[13.5px] font-medium text-red-600 transition-colors duration-150 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1"
+              aria-label={t.logout}
+              className="group flex h-10 w-full items-center justify-start gap-3 rounded-xl px-3 text-[13.5px] font-medium text-red-600 transition-colors duration-150 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1"
             >
               <LogOut className="h-[18px] w-[18px] shrink-0 text-red-600 transition-colors group-hover:text-red-700" />
-              <span className="whitespace-nowrap">Logout</span>
+              <span className="whitespace-nowrap">{t.logout}</span>
             </button>
           ) : (
             <Tooltip delayDuration={100}>
@@ -402,15 +426,15 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  aria-label="Logout"
-                  title="Logout"
-                  className="group flex h-10 w-full items-center justify-center rounded-xl px-0 text-[13.5px] font-medium text-red-600 transition-colors duration-150 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1"
+                  aria-label={t.logout}
+                  title={t.logout}
+                  className="group flex h-10 w-full items-center justify-center rounded-xl px-0 text-[13.5px] font-medium text-red-600 transition-colors duration-150 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1"
                 >
                   <LogOut className="h-[18px] w-[18px] shrink-0 text-red-600 transition-colors group-hover:text-red-700" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right" className="border-[#E2E8F0] bg-[#142B38] text-xs font-medium text-white">
-                Logout
+                {t.logout}
               </TooltipContent>
             </Tooltip>
           )}

@@ -906,163 +906,6 @@ const ReportIssue = () => {
                   </div>
                 )}
 
-                {/* 4-Class Reference Filter Analysis (Drainage, Streetlight, Road, Waste) */}
-                <div
-                  data-testid="reference-filter-analysis-panel"
-                  className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-xs font-bold text-[#142B38]">
-                        Trained 4-Class Reference Filter Analysis
-                      </p>
-                      <p className="text-[11px] text-[#64748B]">
-                        Filter by reference class (Drainage, Streetlight, Road, Waste) or tap a reference image to analyze it:
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1">
-                      {(
-                        [
-                          { key: 'all', label: 'All (4)' },
-                          { key: 'drainage', label: 'Drainage' },
-                          { key: 'street_light', label: 'Streetlight' },
-                          { key: 'road_damage', label: 'Road' },
-                          { key: 'garbage', label: 'Waste' },
-                        ] as const
-                      ).map((pill) => (
-                        <button
-                          key={pill.key}
-                          type="button"
-                          data-testid={`preview-ref-filter-${pill.key}`}
-                          onClick={() => setReferenceFilterTab(pill.key)}
-                          className={cn(
-                            'rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors',
-                            referenceFilterTab === pill.key
-                              ? 'bg-[#177A73] text-white'
-                              : 'border border-[#E2E8F0] bg-white text-[#64748B] hover:border-[#177A73]/40 hover:text-[#142B38]'
-                          )}
-                        >
-                          {pill.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                    {(referenceFilterTab === 'all'
-                      ? TRAINED_CLASS_REFERENCES
-                      : TRAINED_CLASS_REFERENCES.filter(
-                          (r) => r.key === referenceFilterTab
-                        )
-                    ).map((ref) => {
-                      const isMatchedClass =
-                        (activeCategoryObj?.key ||
-                          suitability.matchedCategory?.key) === ref.key &&
-                        suitability.status === 'confident';
-                      const filterScorePct =
-                        inferenceResult?.referenceMatch?.filterScores?.[
-                          ref.key
-                        ] ??
-                        (isMatchedClass
-                          ? suitability.confidencePercent ?? 90
-                          : 18);
-
-                      return (
-                        <div
-                          key={ref.key}
-                          data-testid={`reference-card-${ref.key}`}
-                          className={cn(
-                            'flex flex-col justify-between gap-2.5 rounded-xl border p-3 transition-all',
-                            isMatchedClass
-                              ? 'border-[#177A73] bg-[#EAF6F4]/70 ring-1 ring-[#177A73]/30'
-                              : 'border-[#E2E8F0] bg-white'
-                          )}
-                        >
-                          <div className="flex items-start gap-3">
-                            <img
-                              src={ref.referenceImageUrl}
-                              alt={ref.categoryLabel}
-                              className="h-14 w-16 shrink-0 rounded-lg object-cover ring-1 ring-black/10"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center justify-between gap-1">
-                                <span className="text-xs font-bold text-[#142B38]">
-                                  {ref.shortFilterLabel} · {ref.categoryLabel}
-                                </span>
-                                <span
-                                  className={cn(
-                                    'rounded-md px-1.5 py-0.5 text-[10px] font-bold',
-                                    isMatchedClass
-                                      ? 'bg-[#177A73] text-white'
-                                      : 'bg-slate-100 text-[#64748B]'
-                                  )}
-                                >
-                                  {isMatchedClass
-                                    ? `Matched · ${filterScorePct}%`
-                                    : `${filterScorePct}%`}
-                                </span>
-                              </div>
-                              <p className="mt-0.5 line-clamp-1 text-[11px] font-medium text-[#64748B]">
-                                {ref.problemTitle}
-                              </p>
-                              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
-                                <div
-                                  className={cn(
-                                    'h-full rounded-full transition-all',
-                                    isMatchedClass
-                                      ? 'bg-[#177A73]'
-                                      : 'bg-slate-400'
-                                  )}
-                                  style={{
-                                    width: `${Math.min(
-                                      100,
-                                      Math.max(5, filterScorePct)
-                                    )}%`,
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-between gap-2 border-t border-[#E2E8F0]/80 pt-2">
-                            <span className="truncate text-[10px] text-[#64748B]">
-                              {ref.visualFilterCues[0]}
-                            </span>
-                            <button
-                              type="button"
-                              data-testid={`preview-test-reference-${ref.key}`}
-                              onClick={async () => {
-                                try {
-                                  setStep('analyzing');
-                                  const blob = await loadReferenceImageAsBlob(
-                                    ref.referenceImageUrl
-                                  );
-                                  await handlePhotoCaptured(blob, {
-                                    blob,
-                                    localPreviewUrl:
-                                      URL.createObjectURL(blob),
-                                    capturedAtTimestamp: Date.now(),
-                                    gpsReading,
-                                    gpsError,
-                                  });
-                                } catch {
-                                  setStep('preview');
-                                  toast.error(
-                                    'Could not load reference image.'
-                                  );
-                                }
-                              }}
-                              className="shrink-0 rounded-md bg-[#177A73]/10 px-2 py-0.5 text-[10px] font-bold text-[#177A73] transition-colors hover:bg-[#177A73] hover:text-white"
-                            >
-                              Test Reference
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
                 {/* Category Correction Among the 4 Supported Classes (only when photo is clear and confident) */}
                 {suitability.status === 'confident' && (
                   <>
@@ -1372,7 +1215,7 @@ const ReportIssue = () => {
                   )}
                 </div>
 
-                {/* Optional Landmark / Voice Note Accordion */}
+                {/* Optional Landmark / Contact Info Accordion */}
                 <div className="border-t border-[#E2E8F0] pt-3">
                   <button
                     type="button"
@@ -1380,7 +1223,7 @@ const ReportIssue = () => {
                     className="flex w-full items-center justify-between text-left text-xs font-semibold text-[#64748B] hover:text-[#142B38]"
                   >
                     <span>
-                      Optional: Add Landmark, Contact Info, or Voice Note
+                      Optional: Select Purok or Add Contact Info
                     </span>
                     {showOptionalDetails ? (
                       <ChevronUp className="h-4 w-4" />
@@ -1391,23 +1234,41 @@ const ReportIssue = () => {
 
                   {showOptionalDetails && (
                     <div className="mt-3 space-y-3.5 pt-2">
-                      <VoiceReportAssistant
-                        barangay="Purisima"
-                        locationDetails={locationDetails}
-                        hasPhoto={true}
-                        onApply={applyVoice}
-                      />
-
                       <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-[#142B38]">
-                          Specific Landmark or Purok (Optional)
+                        <label
+                          htmlFor="purok-select"
+                          className="text-xs font-semibold text-[#142B38]"
+                        >
+                          Select Purok (Optional)
                         </label>
-                        <Input
+                        <select
+                          id="purok-select"
+                          data-testid="purok-dropdown"
                           value={locationDetails}
                           onChange={(e) => setLocationDetails(e.target.value)}
-                          placeholder="e.g., Purok 2, near Barangay Hall..."
-                          maxLength={200}
-                        />
+                          className="flex h-10 w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-sm text-[#142B38] shadow-xs transition-colors focus:border-[#177A73] focus:outline-none focus:ring-2 focus:ring-[#177A73]/20"
+                        >
+                          <option value="">Select Purok...</option>
+                          <option value="Purok Avocado Evergreen">
+                            Purok Avocado Evergreen
+                          </option>
+                          <option value="Purok Avocado Maroon">
+                            Purok Avocado Maroon
+                          </option>
+                          <option value="Purok Calamansi">
+                            Purok Calamansi
+                          </option>
+                          <option value="Purok Citrus I">Purok Citrus I</option>
+                          <option value="Purok Citrus II">
+                            Purok Citrus II
+                          </option>
+                          <option value="Purok Grapes">Purok Grapes</option>
+                          <option value="Purok Mangga I">Purok Mangga I</option>
+                          <option value="Purok Mangga II">
+                            Purok Mangga II
+                          </option>
+                          <option value="Purok Tambis">Purok Tambis</option>
+                        </select>
                       </div>
 
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1425,23 +1286,6 @@ const ReportIssue = () => {
                           maxLength={15}
                         />
                       </div>
-
-                      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3">
-                        <input
-                          type="checkbox"
-                          checked={isPublic}
-                          onChange={(e) => setIsPublic(e.target.checked)}
-                          className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-[#177A73]"
-                        />
-                        <div className="text-xs">
-                          <p className="font-semibold text-[#142B38]">
-                            Share on Barangay Community Wall
-                          </p>
-                          <p className="text-[#64748B]">
-                            Allow other residents to see this concern and follow its progress.
-                          </p>
-                        </div>
-                      </label>
                     </div>
                   )}
                 </div>

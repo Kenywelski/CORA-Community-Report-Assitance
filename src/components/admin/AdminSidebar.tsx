@@ -6,7 +6,7 @@ import {
   MapPin,
   MessageSquare,
   Megaphone,
-  Newspaper,
+  Building2,
   CalendarDays,
   Siren,
   BookOpen,
@@ -20,11 +20,13 @@ import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { LanguageThemeControls, useAppPreferences } from '@/lib/preferences';
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
   { icon: ClipboardList, label: 'Requests', path: '/admin/requests' },
-  { icon: Newspaper, label: 'Community Posts', path: '/admin/posts' },
+  { icon: Building2, label: 'Barangay Offices', path: '/admin/offices' },
+  { icon: CalendarDays, label: 'Barangay Programs', path: '/admin/programs' },
   { icon: MessageSquare, label: 'Staff Chat', path: '/admin/chat' },
   { icon: Users, label: 'Users', path: '/admin/users' },
   { icon: Megaphone, label: 'Announcements', path: '/admin/announcements' },
@@ -37,6 +39,7 @@ export const AdminSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { t } = useAppPreferences();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -47,24 +50,27 @@ export const AdminSidebar = () => {
   return (
     <>
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-card border-b border-border z-50 flex items-center px-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsCollapsed(!isCollapsed)}
-        >
-          <Menu className="h-5 w-5" />
-        </Button>
-        <div className="ml-3 flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg overflow-hidden bg-white ring-1 ring-border shrink-0">
-            <img
-              src="/assets/aistudio/3d37efc1-7635-48f1-b2ad-74baa90bab76_7adcf976.png"
-              alt="CORA Logo"
-              className="h-full w-full scale-[1.18] object-cover"
-            />
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-card border-b border-border z-50 flex items-center justify-between px-4">
+        <div className="flex items-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <div className="ml-2.5 flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg overflow-hidden bg-white ring-1 ring-border shrink-0">
+              <img
+                src="/assets/aistudio/3d37efc1-7635-48f1-b2ad-74baa90bab76_7adcf976.png"
+                alt="CORA Logo"
+                className="h-full w-full scale-[1.18] object-cover"
+              />
+            </div>
+            <span className="font-semibold text-primary text-sm sm:text-base">{t.adminPortal}</span>
           </div>
-          <span className="font-semibold text-primary">CORA Admin</span>
         </div>
+        <LanguageThemeControls variant="surface" />
       </div>
 
       {/* Sidebar */}
@@ -107,7 +113,10 @@ export const AdminSidebar = () => {
         {/* Navigation */}
         <nav className="p-2 space-y-1">
           {menuItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive =
+              location.pathname === item.path ||
+              (item.path === '/admin/offices' &&
+                location.pathname === '/admin/posts');
             return (
               <button
                 key={item.path}
