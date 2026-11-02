@@ -15,7 +15,7 @@ export const LANGUAGE_OPTIONS: { code: AppLanguage; label: string; short: string
   { code: 'en', label: 'English', short: 'ENG' },
 ];
 
-export const UI_TRANSLATIONS: Record<
+const BASE_TRANSLATIONS: Record<
   AppLanguage,
   {
     systemTitle: string;
@@ -142,6 +142,32 @@ export const UI_TRANSLATIONS: Record<
     communityPortal: 'Portal sa Komunidad',
   },
 };
+
+const ADMIN_PORTAL: Record<AppLanguage, string> = {
+  en: 'Admin Portal',
+  tl: 'Portal ng Admin',
+  ceb: 'Portal sa Admin',
+} as Record<AppLanguage, string>;
+
+const withNavKeys = (lang: AppLanguage) => {
+  const b = BASE_TRANSLATIONS[lang];
+  return {
+    ...b,
+    navHome: b.home,
+    navMyReports: b.myReports,
+    reportAnIssue: b.reportIssueBtn,
+    navAnnouncements: b.announcements,
+    navEmergencyAlerts: b.emergencyContacts,
+    navDirectory: b.barangayDirectory,
+    navPrograms: b.barangayPrograms,
+    navProfile: b.myProfile,
+    adminPortal: ADMIN_PORTAL[lang] ?? 'Admin Portal',
+  };
+};
+
+export const UI_TRANSLATIONS = Object.fromEntries(
+  (Object.keys(BASE_TRANSLATIONS) as AppLanguage[]).map((l) => [l, withNavKeys(l)]),
+) as Record<AppLanguage, ReturnType<typeof withNavKeys>>;
 
 export function getSavedLanguage(): AppLanguage {
   if (typeof window === 'undefined') return 'en';

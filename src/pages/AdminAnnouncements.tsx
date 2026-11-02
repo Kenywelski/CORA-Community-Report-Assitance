@@ -1,3 +1,4 @@
+import type { TablesUpdate } from '@/integrations/supabase/types';
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminLayout } from '@/components/admin/AdminLayout';
@@ -128,7 +129,7 @@ const AdminAnnouncements = () => {
       if (imageFile) {
         image_url = (await uploadImage(imageFile)) || undefined;
       }
-      const updateData: Record<string, unknown> = {
+      const updateData: TablesUpdate<'announcements'> = {
         title: data.title,
         excerpt: data.excerpt || null,
         content: data.content,

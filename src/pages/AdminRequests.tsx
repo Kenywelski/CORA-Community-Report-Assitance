@@ -52,7 +52,7 @@ import { AdminLayout } from '@/components/admin/AdminLayout';
 import { MediaGallery, MediaItem } from '@/components/MediaUpload';
 import { LocationPicker } from '@/components/LocationPicker';
 import { Input } from '@/components/ui/input';
-import type { Tables } from '@/integrations/supabase/types';
+import type { Tables, TablesUpdate } from '@/integrations/supabase/types';
 import {
   APPROVED_CONCERN_CATEGORIES,
   ApprovedConcernCategoryKey,
@@ -239,8 +239,8 @@ const AdminRequests = () => {
       const nextStatus =
         req.status === 'completed' ? 'completed' : decision.requestStatus;
 
-      const patch = {
-        status: nextStatus,
+      const patch: TablesUpdate<'service_requests'> = {
+        status: nextStatus as TablesUpdate<'service_requests'>['status'],
         ai_category:
           decision.matchedCategory?.label ?? req.ai_category ?? null,
         ai_confidence: decision.confidencePercent,
@@ -370,7 +370,7 @@ const AdminRequests = () => {
   ) => {
     setIsUpdating(true);
     const nowIso = new Date().toISOString();
-    const patch: Tables<'service_requests'>['Update'] = {
+    const patch: TablesUpdate<'service_requests'> = {
       status: newStatus,
       updated_at: nowIso,
       admin_overridden: true,
