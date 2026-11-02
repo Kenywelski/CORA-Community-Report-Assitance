@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import demoVideo from "@/assets/videos/cora-demo-tutorial.mp4.asset.json";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -953,6 +954,7 @@ const DemoVideo = ({ showVideo, onPlay }: { showVideo: boolean; onPlay: () => vo
       {showVideo ? (
         <video
           className="aspect-video w-full bg-[#142B38]"
+          src={demoVideo.url}
           controls
           autoPlay
           playsInline
