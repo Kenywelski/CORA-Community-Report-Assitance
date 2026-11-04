@@ -18,8 +18,9 @@ import {
   LogOut, 
   Shield,
   Loader2,
-  Save
+  Save,
 } from 'lucide-react';
+import { AppSettingsCard } from '@/components/AppSettingsCard';
 
 interface Profile {
   full_name: string | null;
@@ -244,6 +245,9 @@ const Profile = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* App & System Settings: Language, Theme Mode, Font Size */}
+          <AppSettingsCard />
 
           {/* Admin Dashboard Link */}
           {isAdmin && (

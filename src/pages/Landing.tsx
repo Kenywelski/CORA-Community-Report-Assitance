@@ -545,15 +545,6 @@ export const Landing = () => {
                 Verified notices and advisories published by Barangay Purisima personnel.
               </p>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate("/updates")}
-              className="h-10 shrink-0 gap-1.5 rounded-xl border-slate-200 bg-white text-xs font-semibold text-[#142B38] hover:bg-[#EAF6F4] hover:text-[#177A73]"
-            >
-              <span>View All Announcements</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
           </div>
 
           <div className="mt-8">
@@ -649,15 +640,6 @@ export const Landing = () => {
                   Official programs and services recorded for residents of Barangay Purisima.
                 </p>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate("/programs")}
-                className="h-10 shrink-0 gap-1.5 rounded-xl border-slate-200 bg-white text-xs font-semibold text-[#142B38] hover:bg-[#EAF6F4] hover:text-[#177A73]"
-              >
-                <span>View Programs Page</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
             </div>
 
             <div className="mt-8">
@@ -728,15 +710,6 @@ export const Landing = () => {
                   Verified emergency and response hotlines serving Barangay Purisima, Tago.
                 </p>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate("/emergency")}
-                className="h-10 shrink-0 gap-1.5 rounded-xl border-slate-200 bg-white text-xs font-semibold text-[#142B38] hover:bg-[#EAF6F4] hover:text-[#177A73]"
-              >
-                <span>Open Full Emergency Directory</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
             </div>
 
             <div className="mt-8">

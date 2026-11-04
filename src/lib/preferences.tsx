@@ -4,15 +4,54 @@ import { cn } from '@/lib/utils';
 
 export type AppLanguage = 'en' | 'tl' | 'ceb';
 export type ThemeMode = 'light' | 'dark';
+export type AppFontSize = 'small' | 'normal' | 'large' | 'xlarge';
 
 const LANG_STORAGE_KEY = 'cora:language_v1';
 const THEME_STORAGE_KEY = 'cora:theme_v1';
+const FONT_SIZE_STORAGE_KEY = 'cora:font_size_v1';
 const PREF_EVENT = 'cora:preferences-changed';
 
-export const LANGUAGE_OPTIONS: { code: AppLanguage; label: string; short: string }[] = [
-  { code: 'ceb', label: 'Bisaya', short: 'BIS' },
-  { code: 'tl', label: 'Tagalog', short: 'TAG' },
-  { code: 'en', label: 'English', short: 'ENG' },
+export const LANGUAGE_OPTIONS: { code: AppLanguage; label: string; short: string; native: string }[] = [
+  { code: 'ceb', label: 'Bisaya', short: 'BIS', native: 'Binisaya (Cebuano)' },
+  { code: 'tl', label: 'Tagalog', short: 'TAG', native: 'Tagalog (Filipino)' },
+  { code: 'en', label: 'English', short: 'ENG', native: 'English' },
+];
+
+export const FONT_SIZE_OPTIONS: {
+  id: AppFontSize;
+  label: string;
+  scalePercent: string;
+  px: string;
+  description: string;
+}[] = [
+  {
+    id: 'small',
+    label: 'Small',
+    scalePercent: '88%',
+    px: '14px',
+    description: 'Compact text for fitting more information',
+  },
+  {
+    id: 'normal',
+    label: 'Default',
+    scalePercent: '100%',
+    px: '16px',
+    description: 'Standard balanced size for most displays',
+  },
+  {
+    id: 'large',
+    label: 'Large',
+    scalePercent: '112%',
+    px: '18px',
+    description: 'Enlarged comfortable reading size',
+  },
+  {
+    id: 'xlarge',
+    label: 'Extra Large',
+    scalePercent: '125%',
+    px: '20px',
+    description: 'Maximum legibility for enhanced accessibility',
+  },
 ];
 
 const BASE_TRANSLATIONS: Record<
@@ -46,6 +85,18 @@ const BASE_TRANSLATIONS: Record<
     myProfile: string;
     logout: string;
     communityPortal: string;
+    settingsTitle: string;
+    settingsSubtitle: string;
+    languageTitle: string;
+    languageDesc: string;
+    themeTitle: string;
+    themeDesc: string;
+    lightMode: string;
+    darkMode: string;
+    fontSizeTitle: string;
+    fontSizeDesc: string;
+    previewLabel: string;
+    previewText: string;
   }
 > = {
   en: {
@@ -78,6 +129,19 @@ const BASE_TRANSLATIONS: Record<
     myProfile: 'My Profile',
     logout: 'Logout',
     communityPortal: 'Community Portal',
+    settingsTitle: 'App & System Settings',
+    settingsSubtitle: 'Configure your language, theme, and system display size',
+    languageTitle: 'System Language',
+    languageDesc: 'Select your preferred language across the system',
+    themeTitle: 'Theme Mode',
+    themeDesc: 'Switch between light and dark display theme',
+    lightMode: 'Light Mode',
+    darkMode: 'Dark Mode',
+    fontSizeTitle: 'System Font & Text Size',
+    fontSizeDesc: 'Adjust system-wide font scaling for better readability',
+    previewLabel: 'Live System Text Preview',
+    previewText:
+      'Barangay Purisima: Safe, Clean, and Progressive Community. This text adjusts instantly to your selected size.',
   },
   tl: {
     systemTitle: 'Sistema ng Ulat pang-Komunidad',
@@ -109,6 +173,19 @@ const BASE_TRANSLATIONS: Record<
     myProfile: 'Aking Profile',
     logout: 'Mag-logout',
     communityPortal: 'Portal ng Komunidad',
+    settingsTitle: 'Mga Setting ng Sistema at App',
+    settingsSubtitle: 'I-ayos ang wika, tema, at sukat ng font sa sistema',
+    languageTitle: 'Wika ng Sistema',
+    languageDesc: 'Piliin ang nais mong wika sa buong sistema',
+    themeTitle: 'Tema ng Hitsura',
+    themeDesc: 'Pumili sa pagitan ng Maliwanag at Madilim na tema',
+    lightMode: 'Maliwanag',
+    darkMode: 'Madilim',
+    fontSizeTitle: 'Sukat ng Font at Teksto',
+    fontSizeDesc: 'Baguhin ang laki ng teksto sa buong sistema para sa madaling pagbasa',
+    previewLabel: 'Live Preview ng Teksto',
+    previewText:
+      'Barangay Purisima: Ligtas, Malinis, at Progresibong Komunidad. Agad na mag-aadjust ang tekstong ito sa napiling laki.',
   },
   ceb: {
     systemTitle: 'Sistema sa Report sa Komunidad',
@@ -140,6 +217,19 @@ const BASE_TRANSLATIONS: Record<
     myProfile: 'Akong Profile',
     logout: 'Pag-logout',
     communityPortal: 'Portal sa Komunidad',
+    settingsTitle: 'Mga Setting sa Sistema ug App',
+    settingsSubtitle: 'I-set ang pinulongan, tema, ug gidak-on sa teksto',
+    languageTitle: 'Pinulongan sa Sistema',
+    languageDesc: 'Pilia ang imong gusto nga pinulongan sa tibuok sistema',
+    themeTitle: 'Tema sa Panagway',
+    themeDesc: 'Pagbalhin tali sa Hayag ug Ngitngit nga tema',
+    lightMode: 'Hayag',
+    darkMode: 'Ngitngit',
+    fontSizeTitle: 'Gidak-on sa Font ug Teksto',
+    fontSizeDesc: 'I-adjust ang gidak-on sa teksto para mas dali basahon',
+    previewLabel: 'Live nga Preview sa Teksto',
+    previewText:
+      'Barangay Purisima: Luwas, Limpyo, ug Progresibo nga Komunidad. Mo-adjust dayon kining teksto sa gipili nga gidak-on.',
   },
 };
 
@@ -191,6 +281,19 @@ export function getSavedTheme(): ThemeMode {
   return 'light';
 }
 
+export function getSavedFontSize(): AppFontSize {
+  if (typeof window === 'undefined') return 'normal';
+  try {
+    const raw = window.localStorage.getItem(FONT_SIZE_STORAGE_KEY);
+    if (raw === 'small' || raw === 'normal' || raw === 'large' || raw === 'xlarge') {
+      return raw;
+    }
+  } catch {
+    // ignore
+  }
+  return 'normal';
+}
+
 export function applyThemeToDom(theme: ThemeMode) {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
@@ -199,6 +302,24 @@ export function applyThemeToDom(theme: ThemeMode) {
   } else {
     root.classList.remove('dark');
   }
+}
+
+export function applyFontSizeToDom(size: AppFontSize) {
+  if (typeof document === 'undefined') return;
+  const sizeMap: Record<AppFontSize, string> = {
+    small: '14px',
+    normal: '16px',
+    large: '18px',
+    xlarge: '20px',
+  };
+  const targetPx = sizeMap[size] || '16px';
+  document.documentElement.style.fontSize = targetPx;
+}
+
+// Apply immediately on bundle evaluation to avoid layout shift
+if (typeof document !== 'undefined') {
+  applyThemeToDom(getSavedTheme());
+  applyFontSizeToDom(getSavedFontSize());
 }
 
 export function setAppLanguage(lang: AppLanguage) {
@@ -223,19 +344,38 @@ export function setAppTheme(theme: ThemeMode) {
   }
 }
 
+export function setAppFontSize(size: AppFontSize) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(FONT_SIZE_STORAGE_KEY, size);
+    applyFontSizeToDom(size);
+    window.dispatchEvent(new CustomEvent(PREF_EVENT));
+  } catch {
+    // ignore
+  }
+}
+
 export function useAppPreferences() {
   const [language, setLanguageState] = useState<AppLanguage>(() =>
     getSavedLanguage()
   );
   const [theme, setThemeState] = useState<ThemeMode>(() => getSavedTheme());
+  const [fontSize, setFontSizeState] = useState<AppFontSize>(() =>
+    getSavedFontSize()
+  );
 
   useEffect(() => {
     applyThemeToDom(getSavedTheme());
+    applyFontSizeToDom(getSavedFontSize());
+
     const sync = () => {
       setLanguageState(getSavedLanguage());
       const nextTheme = getSavedTheme();
       setThemeState(nextTheme);
       applyThemeToDom(nextTheme);
+      const nextFontSize = getSavedFontSize();
+      setFontSizeState(nextFontSize);
+      applyFontSizeToDom(nextFontSize);
     };
     window.addEventListener(PREF_EVENT, sync);
     window.addEventListener('storage', sync);
@@ -248,9 +388,11 @@ export function useAppPreferences() {
   return {
     language,
     theme,
+    fontSize,
     t: UI_TRANSLATIONS[language],
     setLanguage: setAppLanguage,
     setTheme: setAppTheme,
+    setFontSize: setAppFontSize,
     toggleTheme: () => setAppTheme(theme === 'dark' ? 'light' : 'dark'),
   };
 }

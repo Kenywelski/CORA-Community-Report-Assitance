@@ -146,15 +146,15 @@ export const LandingFaqChatbot = ({
           onClick={() => setOpen(true)}
           aria-label="Open CORA System FAQ Chatbot"
           className={cn(
-            'fixed bottom-5 right-5 z-40 flex items-center gap-2.5 rounded-2xl',
-            'bg-[#177A73] px-4 py-3.5 text-white shadow-lg ring-1 ring-white/20',
+            'fixed bottom-4 right-4 sm:bottom-5 sm:right-5 z-40 flex items-center gap-2 rounded-2xl',
+            'bg-[#177A73] px-3.5 py-2.5 sm:px-4 sm:py-3.5 text-white shadow-lg ring-1 ring-white/20',
             'transition-all duration-200 hover:bg-[#12625D] hover:shadow-xl active:scale-[0.98]',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#177A73] focus-visible:ring-offset-2'
           )}
         >
-          <span className="relative flex h-6 w-6 items-center justify-center">
-            <MessageCircleQuestion className="h-5 w-5" />
-            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#F36B3F] ring-2 ring-[#177A73]" />
+          <span className="relative flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center">
+            <MessageCircleQuestion className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-[#F36B3F] ring-2 ring-[#177A73]" />
           </span>
           <span className="text-xs font-semibold tracking-tight sm:text-sm">
             Have Questions? FAQs
@@ -179,20 +179,21 @@ export const LandingFaqChatbot = ({
 
           <div
             className={cn(
-              'relative flex w-full flex-col overflow-hidden bg-white shadow-2xl',
-              'h-[88dvh] rounded-t-2xl border border-[#E2E8F0]',
-              'sm:h-[min(620px,84vh)] sm:w-[400px] sm:rounded-2xl'
+              'relative flex w-full flex-col overflow-hidden bg-white shadow-2xl animate-scale-in',
+              'h-[82dvh] max-h-[86dvh] sm:h-[min(620px,84vh)]',
+              'rounded-t-2xl sm:rounded-2xl border border-[#E2E8F0]',
+              'max-w-[100vw] sm:w-[410px]'
             )}
           >
             {/* Header */}
             <div
-              className="flex shrink-0 items-center justify-between gap-3 px-4 py-3.5 text-white"
+              className="flex shrink-0 items-center justify-between gap-2.5 px-3.5 py-3 text-white sm:px-4 sm:py-3.5"
               style={{
                 background: 'linear-gradient(135deg, #142B38 0%, #177A73 100%)',
               }}
             >
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-white/25">
+              <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+                <div className="relative flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-white/25">
                   <img
                     src={CORA_LOGO_URL}
                     alt="CORA Logo"
@@ -200,10 +201,10 @@ export const LandingFaqChatbot = ({
                   />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="truncate text-sm font-bold leading-tight text-white">
+                  <h3 className="truncate text-xs font-bold leading-tight text-white sm:text-sm">
                     CORA FAQ Assistant
                   </h3>
-                  <p className="mt-0.5 flex items-center gap-1.5 truncate text-[11px] font-medium text-[#EAF6F4]">
+                  <p className="mt-0.5 flex items-center gap-1.5 truncate text-[10px] sm:text-[11px] font-medium text-[#EAF6F4]">
                     <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
                     <span>System Guide · Barangay Purisima</span>
                   </p>
@@ -262,7 +263,8 @@ export const LandingFaqChatbot = ({
             {/* Scrollable Body */}
             <div
               ref={scrollContainerRef}
-              className="flex-1 overflow-y-auto px-4 py-3.5 space-y-4 bg-white"
+              className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3.5 sm:px-4 py-3.5 space-y-3.5 bg-white touch-pan-y"
+              style={{ WebkitOverflowScrolling: 'touch' }}
             >
               {/* Welcome Banner */}
               <div className="rounded-xl border border-[#177A73]/20 bg-[#EAF6F4]/70 p-3.5">
@@ -409,7 +411,7 @@ export const LandingFaqChatbot = ({
                 e.preventDefault();
                 handleAskQuestion(input);
               }}
-              className="shrink-0 border-t border-[#E2E8F0] bg-[#F8FAFC] p-3"
+              className="shrink-0 border-t border-[#E2E8F0] bg-[#F8FAFC] p-2.5 sm:p-3 pb-[max(0.625rem,env(safe-area-inset-bottom))]"
             >
               <div className="flex items-center gap-2 rounded-xl border border-[#E2E8F0] bg-white px-3 py-1.5 focus-within:border-[#177A73] focus-within:ring-1 focus-within:ring-[#177A73]">
                 <input

@@ -281,14 +281,14 @@ export const ChatbotLauncher = () => {
       )}
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:justify-end p-0 sm:p-4 bg-background/60 backdrop-blur-sm sm:bg-transparent sm:backdrop-blur-0 animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:justify-end p-0 sm:p-4 bg-black/40 backdrop-blur-[2px] sm:bg-transparent sm:backdrop-blur-0 animate-fade-in">
           <div
             className="absolute inset-0 sm:hidden"
             onClick={() => setOpen(false)}
           />
           <div className={cn(
-            'relative w-full sm:w-[420px]',
-            'h-[100dvh] sm:h-[min(680px,90vh)]',
+            'relative w-full sm:w-[410px]',
+            'h-[82dvh] max-h-[86dvh] sm:h-[min(640px,86vh)]',
             'bg-card border border-border sm:rounded-3xl rounded-t-3xl',
             'shadow-elevated flex flex-col overflow-hidden animate-scale-in',
           )}>
@@ -369,7 +369,11 @@ export const ChatbotLauncher = () => {
             {/* AI tab */}
             {tab === 'ai' && (
               <div className="flex-1 flex flex-col min-h-0">
-                <div ref={aiScrollRef} className="flex-1 min-h-0 overflow-y-auto scroll-smooth px-4 py-2">
+                <div
+                  ref={aiScrollRef}
+                  className="flex-1 min-h-0 overflow-y-auto overscroll-contain scroll-smooth px-3.5 sm:px-4 py-2 touch-pan-y"
+                  style={{ WebkitOverflowScrolling: 'touch' }}
+                >
                   <div className="space-y-4">
                     {showWelcome && (
                       <div className="animate-fade-in">
@@ -473,7 +477,7 @@ export const ChatbotLauncher = () => {
                   </div>
                 </div>
 
-                <div className="p-3 border-t bg-card/80 backdrop-blur shrink-0">
+                <div className="p-2.5 sm:p-3 border-t bg-card/90 backdrop-blur shrink-0 pb-[max(0.625rem,env(safe-area-inset-bottom))]">
                   <div className="flex items-end gap-2 bg-muted/60 rounded-2xl px-3 py-1.5 border border-border/60 focus-within:border-primary/50 focus-within:bg-muted transition-colors">
                     <Textarea
                       ref={aiTextareaRef}
@@ -513,7 +517,11 @@ export const ChatbotLauncher = () => {
                 <div className="mx-3 mb-2 px-3 py-2 bg-muted/50 rounded-xl border border-border/60 text-xs text-muted-foreground shrink-0">
                   Messages go to municipal staff. They'll reply when available.
                 </div>
-                <div ref={staffScrollRef} className="flex-1 min-h-0 overflow-y-auto scroll-smooth px-4 py-2">
+                <div
+                  ref={staffScrollRef}
+                  className="flex-1 min-h-0 overflow-y-auto overscroll-contain scroll-smooth px-3.5 sm:px-4 py-2 touch-pan-y"
+                  style={{ WebkitOverflowScrolling: 'touch' }}
+                >
                   <div className="space-y-3">
                     {staffLoading ? (
                       <div className="space-y-3">
@@ -552,7 +560,7 @@ export const ChatbotLauncher = () => {
                     <div ref={staffEndRef} />
                   </div>
                 </div>
-                <div className="p-3 border-t bg-card/80 backdrop-blur shrink-0">
+                <div className="p-2.5 sm:p-3 border-t bg-card/90 backdrop-blur shrink-0 pb-[max(0.625rem,env(safe-area-inset-bottom))]">
                   <div className="flex items-end gap-2 bg-muted/60 rounded-2xl px-2 py-1.5 border border-border/60 focus-within:border-primary/50 focus-within:bg-muted transition-colors">
                     <Textarea
                       value={staffInput}

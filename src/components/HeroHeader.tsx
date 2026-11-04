@@ -3,7 +3,7 @@ import { User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "@/components/NotificationBell";
-import { LanguageThemeControls, useAppPreferences } from "@/lib/preferences";
+import { useAppPreferences } from "@/lib/preferences";
 import heroImage from "@/assets/hero-coastal.jpg";
 
 export const HeroHeader = () => {
@@ -39,7 +39,6 @@ export const HeroHeader = () => {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <LanguageThemeControls variant="hero" />
             <NotificationBell iconClassName="text-white" buttonClassName="text-white hover:bg-white/20" />
             <Button variant="ghost" size="icon" aria-label="User profile" className="text-white hover:bg-white/20" onClick={() => navigate(user ? '/profile' : '/auth')}>
               <User className="h-5 w-5" />
