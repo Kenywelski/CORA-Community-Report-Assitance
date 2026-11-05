@@ -5,6 +5,8 @@ import {
   evaluateReferenceFilterMatch,
   ImageQualityMetrics,
   MobileNetV3InferenceResponse,
+  parseRoboflowWorkflowResponse,
+  ROBOFLOW_CLASS_LABEL_BY_KEY,
 } from './mobilenetReportPipeline';
 
 /**
@@ -659,11 +661,8 @@ export async function runMobileNetV3Classification(options: {
     }
   }
 
-  // 3. Invoke Supabase Edge Function `mobilenet-classify` when explicitly enabled in environment
-  const enableEdgeFn =
-    import.meta.env.VITE_ENABLE_MOBILENET_EDGE_FN === 'true';
-  if (enableEdgeFn) {
-    try {
+  // 3. Invoke Supabase Edge Function `mobilenet-classify` (Roboflow workflow proxy; keeps the API key server-side)
+  try {
       const { data, error } = await supabase.functions.invoke(
         'mobilenet-classify',
         {
@@ -684,9 +683,8 @@ export async function runMobileNetV3Classification(options: {
           descriptionSource: data.descriptionSource ?? 'template_fallback',
         };
       }
-    } catch {
-      // Fall through to local visual feature analysis on the captured image
-    }
+  } catch {
+    // Fall through to local visual feature analysis on the captured image
   }
 
   // 4. Analyze actual captured image visual features across the 4 classes (drainage, road, streetlights, waste)
