@@ -22,6 +22,19 @@ export interface ApprovedConcernCategory {
   modelAliases: string[];
 }
 
+export const ROBOFLOW_WORKFLOW_URL =
+  'https://serverless.roboflow.com/gwen-apuli/workflows/four-class-classifier-test-1793801128146';
+
+export const ROBOFLOW_CLASS_LABEL_BY_KEY: Record<
+  ApprovedConcernCategoryKey,
+  'drainage' | 'road' | 'streetlights' | 'waste'
+> = {
+  drainage: 'drainage',
+  road_damage: 'road',
+  street_light: 'streetlights',
+  garbage: 'waste',
+};
+
 export const APPROVED_CONCERN_CATEGORIES: ApprovedConcernCategory[] = [
   {
     key: 'garbage',
@@ -32,11 +45,15 @@ export const APPROVED_CONCERN_CATEGORIES: ApprovedConcernCategory[] = [
     conservativeTemplate:
       'Improperly disposed waste is visible in the submitted photo. The concern has been logged for waste management action in Barangay Purisima.',
     modelAliases: [
+      'waste',
       'improper_waste_disposal',
       'improper waste disposal',
       'garbage',
-      'waste',
       'waste_disposal',
+      'waste problem',
+      'waste_problem',
+      'garbage problem',
+      'garbage_problem',
       'litter',
       'garbage/waste problem',
       'solid waste',
@@ -51,6 +68,9 @@ export const APPROVED_CONCERN_CATEGORIES: ApprovedConcernCategory[] = [
     conservativeTemplate:
       'A streetlight fixture concern is visible in the submitted photo. The lighting post has been logged for maintenance or repair in Barangay Purisima.',
     modelAliases: [
+      'streetlights',
+      'street_lights',
+      'street lights',
       'streetlight_problem',
       'streetlight problem',
       'street_light',
@@ -69,9 +89,11 @@ export const APPROVED_CONCERN_CATEGORIES: ApprovedConcernCategory[] = [
     conservativeTemplate:
       'A drainage or flooding concern is visible in the submitted photo. The affected waterway in Barangay Purisima has been logged for clearing and response.',
     modelAliases: [
+      'drainage',
       'drainage_flooding_concern',
       'drainage/flooding concern',
-      'drainage',
+      'drainage problem',
+      'drainage_problem',
       'drainage/canal issue',
       'flooding',
       'canal',
@@ -87,8 +109,12 @@ export const APPROVED_CONCERN_CATEGORIES: ApprovedConcernCategory[] = [
     conservativeTemplate:
       'A road surface damage concern is visible in the submitted photo. The affected road section in Barangay Purisima has been logged for maintenance action.',
     modelAliases: [
+      'road',
+      'roads',
       'road_damage',
       'road damage',
+      'road problem',
+      'road_problem',
       'pothole',
       'pavement_damage',
       'cracked_road',
@@ -250,6 +276,7 @@ export interface ReferenceFilterMatchDetails {
 export interface MobileNetV3InferenceResponse {
   modelStatus: 'connected' | 'not_connected' | 'error';
   modelName?: string;
+  rawPredictedClass?: string | null;
   predictedClass: string | null;
   confidence: number | null; // 0..1 or 0..100 normalized to 0..1
   classProbabilities?: Record<string, number>;
@@ -372,6 +399,290 @@ export function normalizeConfidenceScore(
     return Math.min(1, rawConfidence / 100);
   }
   return rawConfidence;
+}
+
+export interface RoboflowWorkflowRequestBody {
+  inputs: {
+    image: {
+      type: 'url' | 'base64';
+      value: string;
+    };
+  };
+}
+
+/**
+ * Determines whether a string is a publicly reachable HTTP(S) image URL
+ * that Roboflow's serverless workflow can fetch directly.
+ */
+export function isPublicHttpImageUrl(url: string | null | undefined): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return false;
+  try {
+    const parsed = new URL(trimmed);
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === '0.0.0.0' ||
+      host === '::1'
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Builds the request body for the Roboflow Workflow endpoint:
+ * { inputs: { image: { type: "url" | "base64", value: "..." } } }
+ */
+export function buildRoboflowWorkflowRequestBody(options: {
+  imageUrl?: string | null;
+  imageBase64?: string | null;
+  preferBase64?: boolean;
+}): RoboflowWorkflowRequestBody | null {
+  const { imageUrl, imageBase64, preferBase64 = false } = options;
+
+  const extractCleanBase64 = (raw: string | null | undefined): string | null => {
+    if (!raw || typeof raw !== 'string') return null;
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    const match = trimmed.match(/^data:image\/[a-zA-Z0-9.+-]+;base64,(.+)$/i);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+    if (!/^https?:\/\//i.test(trimmed) && !trimmed.startsWith('blob:') && !trimmed.startsWith('/')) {
+      return trimmed;
+    }
+    return null;
+  };
+
+  const base64Candidate =
+    extractCleanBase64(imageBase64) || extractCleanBase64(imageUrl);
+
+  if (!preferBase64 && isPublicHttpImageUrl(imageUrl)) {
+    return {
+      inputs: {
+        image: {
+          type: 'url',
+          value: imageUrl!.trim(),
+        },
+      },
+    };
+  }
+
+  if (base64Candidate) {
+    return {
+      inputs: {
+        image: {
+          type: 'base64',
+          value: base64Candidate,
+        },
+      },
+    };
+  }
+
+  if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim()) {
+    return {
+      inputs: {
+        image: {
+          type: 'url',
+          value: imageUrl.trim(),
+        },
+      },
+    };
+  }
+
+  return null;
+}
+
+export interface ParsedRoboflowClassification {
+  rawPredictedClass: string | null;
+  predictedClass: string | null;
+  matchedCategory: ApprovedConcernCategory | null;
+  confidence: number | null;
+  classProbabilities: Record<string, number>;
+}
+
+/**
+ * Parses Roboflow Workflow v1.5.0+ classification JSON responses across all standard
+ * workflow output shapes (outputs[].predictions, top/confidence, array or dictionary predictions)
+ * and maps `drainage`, `road`, `streetlights`, or `waste` to the 4 CORA report categories.
+ */
+export function parseRoboflowWorkflowResponse(
+  payload: unknown
+): ParsedRoboflowClassification {
+  const classProbabilities: Record<string, number> = {};
+  let bestClass: string | null = null;
+  let bestConfidence: number | null = null;
+
+  const recordCandidate = (
+    rawClass: unknown,
+    rawConf: unknown,
+    isExplicitTop = false
+  ) => {
+    if (typeof rawClass !== 'string' || !rawClass.trim()) return;
+    const label = rawClass.trim();
+    const normConf =
+      typeof rawConf === 'number'
+        ? normalizeConfidenceScore(rawConf)
+        : typeof rawConf === 'string' && rawConf.trim() !== ''
+        ? normalizeConfidenceScore(Number(rawConf))
+        : null;
+
+    if (normConf !== null) {
+      const existing = classProbabilities[label];
+      if (existing === undefined || normConf > existing) {
+        classProbabilities[label] = Number(normConf.toFixed(4));
+      }
+    }
+
+    if (isExplicitTop) {
+      if (
+        bestClass === null ||
+        (normConf !== null && (bestConfidence === null || normConf >= bestConfidence))
+      ) {
+        bestClass = label;
+        if (normConf !== null) {
+          bestConfidence = normConf;
+        }
+      }
+      return;
+    }
+
+    if (
+      normConf !== null &&
+      (bestConfidence === null || normConf > bestConfidence)
+    ) {
+      bestClass = label;
+      bestConfidence = normConf;
+    } else if (bestClass === null) {
+      bestClass = label;
+    }
+  };
+
+  const inspectNode = (node: unknown, depth = 0) => {
+    if (!node || depth > 7) return;
+
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        inspectNode(item, depth + 1);
+      }
+      return;
+    }
+
+    if (typeof node !== 'object') return;
+    const obj = node as Record<string, unknown>;
+
+    // 1. Direct top / predictedClass / class fields
+    const directLabel =
+      obj.top ??
+      obj.predictedClass ??
+      obj.predicted_class ??
+      obj.class ??
+      obj.class_name ??
+      obj.category ??
+      obj.label;
+    const directConf = obj.confidence ?? obj.score ?? obj.probability;
+
+    if (typeof directLabel === 'string' && directLabel.trim()) {
+      recordCandidate(directLabel, directConf, obj.top === directLabel);
+    }
+
+    // 2. predicted_classes array (e.g., ["drainage"])
+    if (Array.isArray(obj.predicted_classes) && obj.predicted_classes.length > 0) {
+      const firstClass = obj.predicted_classes[0];
+      if (typeof firstClass === 'string') {
+        recordCandidate(firstClass, directConf, true);
+      }
+    }
+
+    // 3. predictions as dictionary: { drainage: { confidence: 0.92 }, road: { confidence: 0.05 }, ... }
+    if (
+      obj.predictions &&
+      typeof obj.predictions === 'object' &&
+      !Array.isArray(obj.predictions)
+    ) {
+      const predObj = obj.predictions as Record<string, unknown>;
+      // Check if predObj itself is a classification wrapper (e.g. { top: 'road', confidence: 0.9, predictions: [...] })
+      if (
+        typeof predObj.top === 'string' ||
+        Array.isArray(predObj.predictions)
+      ) {
+        inspectNode(predObj, depth + 1);
+      } else {
+        for (const [k, v] of Object.entries(predObj)) {
+          if (typeof v === 'number') {
+            recordCandidate(k, v);
+          } else if (v && typeof v === 'object') {
+            const vObj = v as Record<string, unknown>;
+            if (
+              typeof vObj.confidence === 'number' ||
+              typeof vObj.score === 'number' ||
+              typeof vObj.probability === 'number'
+            ) {
+              recordCandidate(
+                k,
+                vObj.confidence ?? vObj.score ?? vObj.probability
+              );
+            } else {
+              inspectNode(v, depth + 1);
+            }
+          }
+        }
+      }
+    }
+
+    // 4. predictions as array: [{ class: 'drainage', confidence: 0.91 }, ...]
+    if (Array.isArray(obj.predictions)) {
+      for (const item of obj.predictions) {
+        inspectNode(item, depth + 1);
+      }
+    }
+
+    // 5. Traverse standard Roboflow workflow containers
+    for (const [key, val] of Object.entries(obj)) {
+      if (
+        key === 'predictions' ||
+        key === 'image' ||
+        key === 'visualization'
+      ) {
+        continue;
+      }
+      if (val && typeof val === 'object') {
+        inspectNode(val, depth + 1);
+      }
+    }
+  };
+
+  inspectNode(payload, 0);
+
+  if (
+    bestClass &&
+    bestConfidence === null &&
+    classProbabilities[bestClass] !== undefined
+  ) {
+    bestConfidence = classProbabilities[bestClass];
+  }
+
+  const matchedCategory = resolveApprovedCategory(bestClass);
+  const canonicalRawClass = matchedCategory
+    ? ROBOFLOW_CLASS_LABEL_BY_KEY[matchedCategory.key]
+    : bestClass
+    ? bestClass.trim().toLowerCase()
+    : null;
+
+  return {
+    rawPredictedClass: canonicalRawClass,
+    predictedClass: matchedCategory ? matchedCategory.label : bestClass,
+    matchedCategory,
+    confidence:
+      bestConfidence !== null ? Number(bestConfidence.toFixed(4)) : null,
+    classProbabilities,
+  };
 }
 
 /**
@@ -887,19 +1198,23 @@ export function evaluateAutonomousAiReportDecision(options: {
     };
   }
 
-  // 3. Must match one of the 4 approved classes with sufficient AI confidence
+  // 3. Must match one of the 4 approved classes with sufficient AI confidence or explicit user category selection on a clear photo
   const aiCategory = suitability.matchedCategory;
   const resolvedSelected = resolveApprovedCategory(selectedCategoryKey);
-  const finalCategory =
-    suitability.status === 'confident' && aiCategory
-      ? resolvedSelected || aiCategory
-      : null;
+  const hasConfidentAiMatch =
+    suitability.status === 'confident' &&
+    Boolean(aiCategory) &&
+    suitability.meetsConfidenceThreshold;
+  const hasExplicitUserSelection =
+    suitability.isReadable && Boolean(resolvedSelected);
 
-  if (
-    suitability.status !== 'confident' ||
-    !finalCategory ||
-    !suitability.meetsConfidenceThreshold
-  ) {
+  const finalCategory = hasConfidentAiMatch
+    ? resolvedSelected || aiCategory
+    : hasExplicitUserSelection
+    ? resolvedSelected
+    : null;
+
+  if (!finalCategory || (!hasConfidentAiMatch && !hasExplicitUserSelection)) {
     return {
       verdict: 'rejected',
       requestStatus: 'rejected',
@@ -1073,6 +1388,21 @@ export function buildAutomatedReportDescription(options: {
   sourceLabel: string;
 } {
   const { suitability, selectedCategoryKey, aiServiceDescription } = options;
+  const explicitCategory = resolveApprovedCategory(selectedCategoryKey);
+
+  // If the user explicitly changed the category from the AI's suggestion, generate the description for the user's selected category
+  if (
+    explicitCategory &&
+    (!suitability.matchedCategory ||
+      explicitCategory.key !== suitability.matchedCategory.key ||
+      suitability.status !== 'confident')
+  ) {
+    return {
+      description: explicitCategory.conservativeTemplate,
+      source: 'template_fallback',
+      sourceLabel: `Auto-Generated Description · ${explicitCategory.label}`,
+    };
+  }
 
   if (
     suitability.status === 'confident' &&
@@ -1093,7 +1423,6 @@ export function buildAutomatedReportDescription(options: {
     };
   }
 
-  const explicitCategory = resolveApprovedCategory(selectedCategoryKey);
   if (explicitCategory) {
     return {
       description: explicitCategory.conservativeTemplate,

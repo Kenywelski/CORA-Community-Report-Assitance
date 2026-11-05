@@ -490,9 +490,11 @@ export function BottomNav({ currentPath, onNavigate }: BottomNavProps) {
                     </span>
                   )}
                 </div>
-                <span className="max-w-full text-center text-[9px] font-medium leading-tight">
-                  {item.label}
-                </span>
+                {!isReportAction && (
+                  <span className="max-w-full text-center text-[9px] font-medium leading-tight">
+                    {item.label}
+                  </span>
+                )}
               </button>
             );
           })}

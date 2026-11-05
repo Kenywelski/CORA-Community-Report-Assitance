@@ -247,6 +247,113 @@ serve(async (req) => {
     }
 
     const startMs = Date.now();
+    const roboflowApiKey = Deno.env.get("ROBOFLOW_API_KEY")?.trim();
+    const roboflowWorkflowUrl =
+      Deno.env.get("ROBOFLOW_WORKFLOW_URL")?.trim() ||
+      "https://serverless.roboflow.com/gwen-apuli/workflows/four-class-classifier-test-1793801128146";
+
+    if (roboflowApiKey && effectiveImageSource) {
+      const isPublicUrl =
+        /^https?:\/\//i.test(effectiveImageSource) &&
+        !effectiveImageSource.includes("localhost") &&
+        !effectiveImageSource.includes("127.0.0.1");
+      const base64Match = effectiveImageSource.match(
+        /^data:image\/[a-zA-Z0-9.+-]+;base64,(.+)$/i
+      );
+      const imageInput = isPublicUrl
+        ? { type: "url", value: effectiveImageSource }
+        : {
+            type: "base64",
+            value: base64Match ? base64Match[1] : effectiveImageSource,
+          };
+
+      const rfResponse = await fetch(roboflowWorkflowUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${roboflowApiKey}`,
+        },
+        body: JSON.stringify({
+          inputs: {
+            image: imageInput,
+          },
+        }),
+      });
+
+      if (rfResponse.ok) {
+        const rfResult = await rfResponse.json();
+        const firstOutput = Array.isArray(rfResult?.outputs)
+          ? rfResult.outputs[0]
+          : rfResult;
+        const predBlock =
+          firstOutput?.predictions ??
+          firstOutput?.model_predictions ??
+          firstOutput;
+        const rawClass = (
+          predBlock?.top ??
+          (Array.isArray(predBlock?.predicted_classes)
+            ? predBlock.predicted_classes[0]
+            : null) ??
+          predBlock?.predictedClass ??
+          predBlock?.class ??
+          ""
+        )
+          .toString()
+          .trim()
+          .toLowerCase();
+
+        const rawConf =
+          typeof predBlock?.confidence === "number"
+            ? predBlock.confidence
+            : Array.isArray(predBlock?.predictions) &&
+              typeof predBlock.predictions[0]?.confidence === "number"
+            ? predBlock.predictions[0].confidence
+            : null;
+        const normalizedConfidence =
+          rawConf !== null && rawConf > 1 ? rawConf / 100 : rawConf;
+
+        const classMap: Record<string, string> = {
+          drainage: "Drainage/Flooding Concern",
+          road: "Road Damage",
+          streetlights: "Streetlight Problem",
+          streetlight: "Streetlight Problem",
+          waste: "Improper Waste Disposal",
+          garbage: "Improper Waste Disposal",
+        };
+        const predictedClass = classMap[rawClass] || rawClass || null;
+
+        let aiGeneratedDescription: string | null = null;
+        if (
+          predictedClass &&
+          normalizedConfidence !== null &&
+          normalizedConfidence >= 0.65
+        ) {
+          aiGeneratedDescription = await generateSupportingDescription(
+            effectiveImageSource,
+            predictedClass
+          );
+        }
+
+        return new Response(
+          JSON.stringify({
+            modelStatus: "connected",
+            rawPredictedClass: rawClass || null,
+            predictedClass,
+            confidence: normalizedConfidence,
+            inferenceTimeMs: Date.now() - startMs,
+            aiGeneratedDescription,
+            descriptionSource: aiGeneratedDescription
+              ? "ai_service"
+              : "template_fallback",
+            geofenceValidation,
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
     const mobilenetEndpoint = Deno.env.get("MOBILENETV3_MODEL_URL");
 
     if (mobilenetEndpoint) {

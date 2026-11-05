@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   Camera,
+  ImagePlus,
   Loader2,
   RefreshCw,
   X,
@@ -9,7 +10,12 @@ import {
   ZapOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { CapturedGpsReading } from '@/lib/mobilenetReportPipeline';
+import {
+  CapturedGpsReading,
+  ROBOFLOW_CLASS_LABEL_BY_KEY,
+  TRAINED_CLASS_REFERENCES,
+} from '@/lib/mobilenetReportPipeline';
+import { loadReferenceImageAsBlob } from '@/lib/mobilenetClassifyService';
 
 export interface CameraCapturePayload {
   blob: Blob;
@@ -329,6 +335,49 @@ export const DirectCameraCapture = ({
     setFacingMode((mode) => (mode === 'environment' ? 'user' : 'environment'));
   };
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelected = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file || capturing) return;
+    setCapturing(true);
+    const capturedAt = Date.now();
+    const localPreviewUrl = URL.createObjectURL(file);
+    await onUsePhoto(file, {
+      blob: file,
+      localPreviewUrl,
+      capturedAtTimestamp: capturedAt,
+      gpsReading: gpsReading
+        ? { ...gpsReading, capturedAtTimestamp: capturedAt }
+        : null,
+      gpsError,
+    });
+    event.target.value = '';
+  };
+
+  const handleSamplePhotoSelected = async (referenceImageUrl: string) => {
+    if (capturing) return;
+    setCapturing(true);
+    try {
+      const blob = await loadReferenceImageAsBlob(referenceImageUrl);
+      const capturedAt = Date.now();
+      const localPreviewUrl = URL.createObjectURL(blob);
+      await onUsePhoto(blob, {
+        blob,
+        localPreviewUrl,
+        capturedAtTimestamp: capturedAt,
+        gpsReading: gpsReading
+          ? { ...gpsReading, capturedAtTimestamp: capturedAt }
+          : null,
+        gpsError,
+      });
+    } catch {
+      setCapturing(false);
+    }
+  };
+
   const capturePhoto = () => {
     const video = videoRef.current;
     if (!video || capturing) return;
@@ -391,6 +440,16 @@ export const DirectCameraCapture = ({
       data-testid="direct-camera-capture"
       className="fixed inset-0 z-[70] h-screen h-[100dvh] w-full overflow-hidden bg-black text-white select-none"
     >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        data-testid="upload-photo-input"
+        aria-label="Upload concern photo"
+        onChange={handleFileSelected}
+        className="sr-only"
+      />
+
       {/* Full-Screen Live Camera Viewfinder */}
       <video
         ref={videoRef}
@@ -455,24 +514,34 @@ export const DirectCameraCapture = ({
         </div>
       )}
 
-      {/* Camera Permission Error Overlay */}
+      {/* Camera Permission Error Overlay (also offers direct photo upload & 4-class test samples) */}
       {cameraError && (
         <div
           data-testid="camera-permission-error"
-          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-black/95 px-6 text-center"
+          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 overflow-y-auto bg-black/95 px-6 py-10 text-center"
         >
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#F36B3F]/20 text-[#F36B3F]">
             <AlertCircle className="h-8 w-8" />
           </div>
           <div className="max-w-md space-y-1.5">
             <h2 className="text-base font-bold text-white">
-              Camera Permission Required
+              Capture or Upload Concern Photo
             </h2>
             <p className="text-xs leading-relaxed text-slate-300 sm:text-sm">
-              {cameraError}
+              {cameraError} You can also upload a photo directly to classify it with the 4-class classifier (drainage, road, streetlights, waste).
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+            <Button
+              type="button"
+              data-testid="upload-photo-fallback-btn"
+              disabled={capturing}
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-full bg-[#F36B3F] px-5 font-semibold text-white hover:bg-[#dc5a30]"
+            >
+              <ImagePlus className="mr-2 h-4 w-4" />
+              Upload Photo
+            </Button>
             <Button
               type="button"
               data-testid="retry-camera-btn"
@@ -491,13 +560,56 @@ export const DirectCameraCapture = ({
               Back
             </Button>
           </div>
+
+          <div className="mt-3 w-full max-w-md rounded-2xl border border-white/15 bg-white/5 p-3.5 text-left">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+              Or test with a 4-class sample photo:
+            </p>
+            <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {TRAINED_CLASS_REFERENCES.map((ref) => {
+                const rfClass = ROBOFLOW_CLASS_LABEL_BY_KEY[ref.key];
+                return (
+                  <button
+                    key={ref.key}
+                    type="button"
+                    disabled={capturing}
+                    data-testid={`sample-photo-${rfClass}`}
+                    onClick={() =>
+                      void handleSamplePhotoSelected(ref.referenceImageUrl)
+                    }
+                    className="flex flex-col items-center gap-1.5 rounded-xl border border-white/15 bg-white/10 p-2 text-center transition hover:border-[#177A73] hover:bg-white/20 disabled:opacity-50"
+                  >
+                    <img
+                      src={ref.referenceImageUrl}
+                      alt={ref.categoryLabel}
+                      className="h-12 w-full rounded-lg object-cover"
+                    />
+                    <span className="text-[11px] font-bold capitalize text-white">
+                      {rfClass}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
 
       {/* Native Phone Camera Bottom Control Bar */}
       <footer className="absolute inset-x-0 bottom-0 z-20 flex items-center justify-center bg-gradient-to-t from-black/80 via-black/40 to-transparent px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-8">
         <div className="flex w-full max-w-sm items-center justify-between">
-          <div className="h-12 w-12" />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            data-testid="camera-upload-photo-btn"
+            aria-label="Upload photo from device"
+            disabled={capturing}
+            onClick={() => fileInputRef.current?.click()}
+            className="h-12 w-12 rounded-full bg-black/45 text-white backdrop-blur-md hover:bg-black/65 hover:text-white"
+          >
+            <ImagePlus className="h-5 w-5" />
+          </Button>
 
           <button
             type="button"

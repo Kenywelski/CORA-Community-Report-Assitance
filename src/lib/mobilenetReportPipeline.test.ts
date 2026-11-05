@@ -4,14 +4,17 @@ import {
   APPROVED_CONCERN_CATEGORIES,
   LOW_CONFIDENCE_MESSAGE,
   MANUAL_REVIEW_FALLBACK_DESCRIPTION,
+  ROBOFLOW_WORKFLOW_URL,
   TRAINED_CLASS_REFERENCES,
   buildAutomatedReportDescription,
+  buildRoboflowWorkflowRequestBody,
   checkImageReadability,
   evaluateAutonomousAiReportDecision,
   evaluateExistingReportRecordByAi,
   evaluateImageSuitability,
   evaluateReferenceFilterMatch,
   flipFeatureVector80Horizontally,
+  parseRoboflowWorkflowResponse,
   resolveApprovedCategory,
   validateCapturedGpsLocation,
 } from './mobilenetReportPipeline';
@@ -26,7 +29,7 @@ const VALID_QUALITY = {
   edgeSharpnessScore: 28,
 };
 
-test('resolveApprovedCategory maps class labels to the 4 supported categories', () => {
+test('resolveApprovedCategory maps class labels and Roboflow classes (drainage, road, streetlights, waste) to the 4 supported categories', () => {
   assert.equal(APPROVED_CONCERN_CATEGORIES.length, 4);
   assert.equal(
     resolveApprovedCategory('Improper Waste Disposal')?.key,
@@ -41,7 +44,159 @@ test('resolveApprovedCategory maps class labels to the 4 supported categories', 
     'drainage'
   );
   assert.equal(resolveApprovedCategory('road_damage')?.key, 'road_damage');
+
+  // Verify the 4 Roboflow workflow predicted classes: drainage, road, streetlights, waste
+  assert.equal(resolveApprovedCategory('drainage')?.key, 'drainage');
+  assert.equal(resolveApprovedCategory('road')?.key, 'road_damage');
+  assert.equal(resolveApprovedCategory('streetlights')?.key, 'street_light');
+  assert.equal(resolveApprovedCategory('waste')?.key, 'garbage');
   assert.equal(resolveApprovedCategory('unrelated_class'), null);
+});
+
+test('buildRoboflowWorkflowRequestBody formats URL and base64 inputs for Roboflow Workflow v1.5.0+', () => {
+  assert.equal(
+    ROBOFLOW_WORKFLOW_URL,
+    'https://serverless.roboflow.com/gwen-apuli/workflows/four-class-classifier-test-1793801128146'
+  );
+
+  const urlPayload = buildRoboflowWorkflowRequestBody({
+    imageUrl: 'https://example.com/photos/road-concern.jpg',
+  });
+  assert.deepEqual(urlPayload, {
+    inputs: {
+      image: {
+        type: 'url',
+        value: 'https://example.com/photos/road-concern.jpg',
+      },
+    },
+  });
+
+  const base64Payload = buildRoboflowWorkflowRequestBody({
+    imageUrl: 'blob:http://localhost:3000/abc-123',
+    imageBase64: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/',
+  });
+  assert.deepEqual(base64Payload, {
+    inputs: {
+      image: {
+        type: 'base64',
+        value: '/9j/4AAQSkZJRgABAQAAAQABAAD/',
+      },
+    },
+  });
+});
+
+test('parseRoboflowWorkflowResponse extracts drainage, road, streetlights, and waste predictions from Roboflow Workflow outputs', () => {
+  // 1. Standard Roboflow Workflow outputs array with predictions object
+  const workflowOutputRoad = parseRoboflowWorkflowResponse({
+    outputs: [
+      {
+        predictions: {
+          top: 'road',
+          confidence: 0.942,
+          predictions: [
+            { class: 'road', confidence: 0.942 },
+            { class: 'drainage', confidence: 0.031 },
+            { class: 'waste', confidence: 0.017 },
+            { class: 'streetlights', confidence: 0.01 },
+          ],
+        },
+      },
+    ],
+  });
+  assert.equal(workflowOutputRoad.rawPredictedClass, 'road');
+  assert.equal(workflowOutputRoad.matchedCategory?.key, 'road_damage');
+  assert.equal(workflowOutputRoad.predictedClass, 'Road Damage');
+  assert.equal(workflowOutputRoad.confidence, 0.942);
+
+  // 2. Dictionary predictions shape for streetlights
+  const workflowOutputStreetlights = parseRoboflowWorkflowResponse({
+    outputs: [
+      {
+        model_predictions: {
+          predictions: {
+            streetlights: { confidence: 0.89 },
+            drainage: { confidence: 0.06 },
+            road: { confidence: 0.03 },
+            waste: { confidence: 0.02 },
+          },
+        },
+      },
+    ],
+  });
+  assert.equal(workflowOutputStreetlights.rawPredictedClass, 'streetlights');
+  assert.equal(workflowOutputStreetlights.matchedCategory?.key, 'street_light');
+  assert.equal(workflowOutputStreetlights.predictedClass, 'Streetlight Problem');
+  assert.equal(workflowOutputStreetlights.confidence, 0.89);
+
+  // 3. Top-level predicted_classes for drainage & waste
+  const workflowOutputDrainage = parseRoboflowWorkflowResponse({
+    outputs: [
+      {
+        predicted_classes: ['drainage'],
+        confidence: 0.91,
+      },
+    ],
+  });
+  assert.equal(workflowOutputDrainage.rawPredictedClass, 'drainage');
+  assert.equal(workflowOutputDrainage.matchedCategory?.key, 'drainage');
+  assert.equal(
+    workflowOutputDrainage.predictedClass,
+    'Drainage/Flooding Concern'
+  );
+  assert.equal(workflowOutputDrainage.confidence, 0.91);
+
+  const workflowOutputWaste = parseRoboflowWorkflowResponse({
+    top: 'waste',
+    confidence: 87.5,
+  });
+  assert.equal(workflowOutputWaste.rawPredictedClass, 'waste');
+  assert.equal(workflowOutputWaste.matchedCategory?.key, 'garbage');
+  assert.equal(workflowOutputWaste.predictedClass, 'Improper Waste Disposal');
+  assert.equal(workflowOutputWaste.confidence, 0.875);
+});
+
+test('user category override updates suggested category and automated description even after AI prediction or API error', () => {
+  const confidentRoad = evaluateImageSuitability(VALID_QUALITY, {
+    modelStatus: 'connected',
+    rawPredictedClass: 'road',
+    predictedClass: 'Road Damage',
+    confidence: 0.91,
+  });
+
+  // User changes suggested category from 'road_damage' to 'street_light'
+  const overriddenDesc = buildAutomatedReportDescription({
+    suitability: confidentRoad,
+    selectedCategoryKey: 'street_light',
+  });
+  assert.ok(overriddenDesc.sourceLabel.includes('Streetlight Problem'));
+  assert.ok(overriddenDesc.description.includes('streetlight'));
+
+  const overriddenDecision = evaluateAutonomousAiReportDecision({
+    suitability: confidentRoad,
+    selectedCategoryKey: 'street_light',
+    description: overriddenDesc.description,
+    hasPhoto: true,
+  });
+  assert.equal(overriddenDecision.verdict, 'approved');
+  assert.equal(overriddenDecision.matchedCategory?.key, 'street_light');
+
+  // When external Roboflow API errors out (model_unavailable) on a clear photo, user can still pick a category
+  const errorSuitability = evaluateImageSuitability(VALID_QUALITY, {
+    modelStatus: 'error',
+    predictedClass: null,
+    confidence: null,
+    errorMessage: 'Roboflow API error (401): Invalid API key',
+  });
+  assert.equal(errorSuitability.status, 'model_unavailable');
+
+  const userRecoveredDecision = evaluateAutonomousAiReportDecision({
+    suitability: errorSuitability,
+    selectedCategoryKey: 'drainage',
+    description: 'Clogged canal reported after manual category selection',
+    hasPhoto: true,
+  });
+  assert.equal(userRecoveredDecision.verdict, 'approved');
+  assert.equal(userRecoveredDecision.matchedCategory?.key, 'drainage');
 });
 
 test('TRAINED_CLASS_REFERENCES and evaluateReferenceFilterMatch accurately classify the 4 attached reference images and filter out unrelated scenes', () => {

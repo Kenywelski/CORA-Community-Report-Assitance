@@ -479,8 +479,12 @@ async function analyzeCapturedPhotoVisualFeatures(
           isUnrelatedScene: isTooUniform || isLikelySelfieOrPortrait,
         });
 
+        const matchedKey = filterEval.referenceMatch.matchedCategoryKey;
         resolve({
           modelStatus: 'connected',
+          rawPredictedClass: matchedKey
+            ? ROBOFLOW_CLASS_LABEL_BY_KEY[matchedKey]
+            : null,
           predictedClass: filterEval.predictedClass,
           confidence: filterEval.confidence,
           classProbabilities: filterEval.classProbabilities,
@@ -515,20 +519,95 @@ async function analyzeCapturedPhotoVisualFeatures(
 }
 
 /**
- * Analyzes the captured community concern photo and returns the detected category,
- * confidence score, and automatically generated description.
+ * Analyzes the captured/uploaded community concern photo by sending it to the backend
+ * Roboflow Workflow route (`POST /api/classify-image`), keeping `ROBOFLOW_API_KEY` in a
+ * server environment variable, and returning the predicted class (`drainage`, `road`,
+ * `streetlights`, or `waste`), confidence score, and suggested report category.
  */
 export async function runMobileNetV3Classification(options: {
   imageUrl: string;
   photoBlob?: Blob;
   gps: CapturedGpsReading | null;
+  simulateError?: boolean;
+  mockPredictedClass?: string | null;
 }): Promise<MobileNetV3InferenceResponse> {
-  const { imageUrl, photoBlob, gps } = options;
+  const { imageUrl, photoBlob, gps, simulateError, mockPredictedClass } =
+    options;
+
+  const imageDataUrl = photoBlob ? await blobToCompactDataUrl(photoBlob) : null;
+
+  // 1. Send the uploaded/captured photo to the backend Roboflow classifier proxy (/api/classify-image)
+  try {
+    const startMs = Date.now();
+    const backendRes = await fetch('/api/classify-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageUrl,
+        imageDataUrl,
+        gps,
+        simulateError,
+        mockPredictedClass,
+      }),
+    });
+
+    const contentType = backendRes.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const data = await backendRes.json();
+
+      if (backendRes.ok && data.modelStatus === 'connected') {
+        return {
+          modelStatus: 'connected',
+          modelName:
+            data.modelName ?? 'four-class-classifier-test-1793801128146',
+          rawPredictedClass: data.rawPredictedClass ?? null,
+          predictedClass:
+            data.predictedClass ??
+            data.suggestedCategoryLabel ??
+            data.rawPredictedClass ??
+            null,
+          confidence:
+            typeof data.confidence === 'number' ? data.confidence : null,
+          classProbabilities: data.classProbabilities,
+          inferenceTimeMs: data.inferenceTimeMs ?? Date.now() - startMs,
+          aiGeneratedDescription: data.aiGeneratedDescription ?? null,
+          descriptionSource: data.aiGeneratedDescription
+            ? 'ai_service'
+            : 'template_fallback',
+        };
+      }
+
+      if (!backendRes.ok || data.modelStatus === 'error') {
+        return {
+          modelStatus: 'error',
+          rawPredictedClass: null,
+          predictedClass: null,
+          confidence: null,
+          errorMessage:
+            data.errorMessage ||
+            `Classification service returned an error (HTTP ${backendRes.status}). You can select or change the report category manually below.`,
+        };
+      }
+    }
+  } catch (err) {
+    if (simulateError) {
+      return {
+        modelStatus: 'error',
+        rawPredictedClass: null,
+        predictedClass: null,
+        confidence: null,
+        errorMessage:
+          (err as Error)?.message ||
+          'Unable to reach the backend Roboflow classification endpoint. You can select a report category manually below.',
+      };
+    }
+    // Otherwise fall through to configured endpoint / Edge Function / local 4-class analysis
+  }
+
+  // 2. Direct inference server if configured via VITE_MOBILENETV3_ENDPOINT_URL
   const directEndpoint = import.meta.env.VITE_MOBILENETV3_ENDPOINT_URL as
     | string
     | undefined;
-
-  // 1. Direct inference server if configured
   if (directEndpoint && directEndpoint.trim()) {
     try {
       const startMs = Date.now();
@@ -545,22 +624,32 @@ export async function runMobileNetV3Classification(options: {
         res = await fetch(directEndpoint.trim(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageUrl, gps }),
+          body: JSON.stringify({ imageUrl, imageDataUrl, gps }),
         });
       }
 
       if (res.ok) {
-        const data = await res.json();
+        const rawData = await res.json();
+        const parsed = parseRoboflowWorkflowResponse(rawData);
         return {
-          modelStatus: data.modelStatus ?? 'connected',
+          modelStatus: rawData.modelStatus ?? 'connected',
+          rawPredictedClass: parsed.rawPredictedClass,
           predictedClass:
-            data.predictedClass ?? data.category ?? data.label ?? null,
+            parsed.predictedClass ??
+            rawData.predictedClass ??
+            rawData.category ??
+            rawData.label ??
+            null,
           confidence:
-            typeof data.confidence === 'number' ? data.confidence : null,
-          classProbabilities: data.classProbabilities,
-          inferenceTimeMs: data.inferenceTimeMs ?? Date.now() - startMs,
-          aiGeneratedDescription: data.aiGeneratedDescription ?? null,
-          descriptionSource: data.aiGeneratedDescription
+            parsed.confidence ??
+            (typeof rawData.confidence === 'number'
+              ? rawData.confidence
+              : null),
+          classProbabilities:
+            rawData.classProbabilities ?? parsed.classProbabilities,
+          inferenceTimeMs: rawData.inferenceTimeMs ?? Date.now() - startMs,
+          aiGeneratedDescription: rawData.aiGeneratedDescription ?? null,
+          descriptionSource: rawData.aiGeneratedDescription
             ? 'ai_service'
             : 'template_fallback',
         };
@@ -570,13 +659,10 @@ export async function runMobileNetV3Classification(options: {
     }
   }
 
-  // 2. Invoke Supabase Edge Function `mobilenet-classify` when explicitly enabled in environment
+  // 3. Invoke Supabase Edge Function `mobilenet-classify` when explicitly enabled in environment
   const enableEdgeFn =
     import.meta.env.VITE_ENABLE_MOBILENET_EDGE_FN === 'true';
   if (enableEdgeFn) {
-    const imageDataUrl = photoBlob
-      ? await blobToCompactDataUrl(photoBlob)
-      : null;
     try {
       const { data, error } = await supabase.functions.invoke(
         'mobilenet-classify',
@@ -588,6 +674,7 @@ export async function runMobileNetV3Classification(options: {
       if (!error && data && data.modelStatus === 'connected') {
         return {
           modelStatus: 'connected',
+          rawPredictedClass: data.rawPredictedClass ?? null,
           predictedClass: data.predictedClass ?? null,
           confidence:
             typeof data.confidence === 'number' ? data.confidence : null,
@@ -602,17 +689,18 @@ export async function runMobileNetV3Classification(options: {
     }
   }
 
-  // 3. Analyze actual captured image visual features (with brief transition so "AI is analyzing your report..." is clearly visible)
+  // 4. Analyze actual captured image visual features across the 4 classes (drainage, road, streetlights, waste)
   if (photoBlob) {
     const [result] = await Promise.all([
       analyzeCapturedPhotoVisualFeatures(photoBlob),
-      new Promise((resolve) => setTimeout(resolve, 650)),
+      new Promise((resolve) => setTimeout(resolve, 450)),
     ]);
     return result;
   }
 
   return {
     modelStatus: 'not_connected',
+    rawPredictedClass: null,
     predictedClass: null,
     confidence: null,
     errorMessage:

@@ -50,6 +50,7 @@ import {
   ImageSuitabilityEvaluation,
   LOW_CONFIDENCE_MESSAGE,
   MobileNetV3InferenceResponse,
+  ROBOFLOW_CLASS_LABEL_BY_KEY,
   TRAINED_CLASS_REFERENCES,
   buildAutomatedReportDescription,
   evaluateAutonomousAiReportDecision,
@@ -84,6 +85,7 @@ const ReportIssue = () => {
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
   const [capturedAtIso, setCapturedAtIso] = useState<string | null>(null);
+  const lastCapturedBlobRef = useRef<Blob | null>(null);
 
   // AI Classification & Suitability State
   const [qualityMetrics, setQualityMetrics] =
@@ -214,9 +216,16 @@ const ReportIssue = () => {
   ]);
 
   const handlePhotoCaptured = useCallback(
-    async (photo: Blob, payload?: CameraCapturePayload) => {
+    async (
+      photo: Blob,
+      payload?: CameraCapturePayload & {
+        simulateError?: boolean;
+        mockPredictedClass?: string | null;
+      }
+    ) => {
       setCameraModalOpen(false);
       setStep('analyzing');
+      lastCapturedBlobRef.current = photo;
 
       const previewUrl =
         payload?.localPreviewUrl || URL.createObjectURL(photo);
@@ -282,7 +291,7 @@ const ReportIssue = () => {
         setUploadedPhotoUrl(previewUrl);
       }
 
-      // 4. Analyze image and identify concern category + description
+      // 4. Send photo to backend Roboflow classifier and identify concern category + description
       let inference: MobileNetV3InferenceResponse;
       if (
         quality.width >= 160 &&
@@ -293,6 +302,8 @@ const ReportIssue = () => {
           imageUrl: finalImageUrl,
           photoBlob: photo,
           gps: currentGps,
+          simulateError: payload?.simulateError,
+          mockPredictedClass: payload?.mockPredictedClass,
         });
       } else {
         inference = {
@@ -316,16 +327,15 @@ const ReportIssue = () => {
         evalResult.matchedCategory
       ) {
         setSelectedCategoryKey(evalResult.matchedCategory.key);
+        setShowCategorySelector(false);
       } else {
-        setSelectedCategoryKey('');
+        setSelectedCategoryKey(evalResult.matchedCategory?.key || '');
+        setShowCategorySelector(true);
       }
 
       const generated = buildAutomatedReportDescription({
         suitability: evalResult,
-        selectedCategoryKey:
-          evalResult.status === 'confident'
-            ? evalResult.matchedCategory?.key
-            : null,
+        selectedCategoryKey: evalResult.matchedCategory?.key ?? null,
         aiServiceDescription: inference.aiGeneratedDescription,
       });
       setDescription(generated.description);
@@ -336,7 +346,22 @@ const ReportIssue = () => {
     [gpsReading, requestFreshGpsLocation]
   );
 
-  // Expose test helper for automated browser verification of camera captures
+  const handleRetryClassification = useCallback(async () => {
+    const blob = lastCapturedBlobRef.current;
+    if (!blob) {
+      setCameraModalOpen(true);
+      return;
+    }
+    await handlePhotoCaptured(blob, {
+      blob,
+      localPreviewUrl: photoPreviewUrl || URL.createObjectURL(blob),
+      capturedAtTimestamp: Date.now(),
+      gpsReading,
+      gpsError,
+    });
+  }, [gpsError, gpsReading, handlePhotoCaptured, photoPreviewUrl]);
+
+  // Expose test helper for automated browser verification of camera captures & Roboflow responses
   useEffect(() => {
     (
       window as unknown as Record<string, unknown>
@@ -364,10 +389,12 @@ const ReportIssue = () => {
   const handleSelectCategoryOverride = (key: ApprovedConcernCategoryKey) => {
     setSelectedCategoryKey(key);
     if (
-      suitability?.matchedCategory &&
+      !suitability?.matchedCategory ||
       suitability.matchedCategory.key !== key
     ) {
       setIsCategoryOverridden(true);
+    } else {
+      setIsCategoryOverridden(false);
     }
     setShowCategorySelector(false);
   };
@@ -771,81 +798,155 @@ const ReportIssue = () => {
                   </span>
                 </div>
 
-                {/* Confident 4-Class Prediction Box */}
-                {suitability.status === 'confident' &&
-                  suitability.matchedCategory && (
-                    <div
-                      data-testid="confident-prediction-box"
-                      className="rounded-xl border border-[#177A73]/30 bg-[#EAF6F4]/60 p-4"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          {(() => {
-                            const catKey =
-                              activeCategoryObj?.key ||
-                              suitability.matchedCategory?.key ||
-                              'garbage';
-                            const Icon = CATEGORY_ICONS[catKey];
-                            return (
-                              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#177A73] text-white">
-                                <Icon className="h-5 w-5" />
-                              </div>
-                            );
-                          })()}
-                          <div>
-                            <p className="text-xs font-medium text-[#64748B]">
-                              Identified Community Concern (4 Supported Classes)
-                            </p>
-                            <p
-                              data-testid="detected-concern-label"
-                              className="mt-0.5 text-base font-bold text-[#142B38]"
-                            >
-                              {activeCategoryObj?.label ||
-                                suitability.matchedCategory?.label}
-                            </p>
-                            {isCategoryOverridden &&
-                              suitability.matchedCategory && (
-                                <p className="mt-0.5 text-[11px] font-medium text-[#177A73]">
-                                  Updated from{' '}
-                                  {suitability.matchedCategory.label}
-                                </p>
-                              )}
-                          </div>
-                        </div>
-
-                        {suitability.confidencePercent !== null &&
-                          !isCategoryOverridden && (
-                            <div className="min-w-[175px]">
-                              <div className="flex items-center justify-between gap-3 text-xs">
-                                <span className="font-medium text-[#64748B]">
-                                  Detection Confidence
-                                </span>
-                                <span
-                                  data-testid="detected-confidence-value"
-                                  className="font-bold text-[#177A73]"
-                                >
-                                  {suitability.confidencePercent}%
-                                </span>
-                              </div>
-                              <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-white ring-1 ring-[#177A73]/20">
-                                <div
-                                  className="h-full rounded-full bg-[#177A73] transition-all"
-                                  style={{
-                                    width: `${
-                                      suitability.confidencePercent ?? 0
-                                    }%`,
-                                  }}
-                                />
-                              </div>
+                {/* Suggested or User-Selected 4-Class Prediction Box */}
+                {(activeCategoryObj ||
+                  (suitability.status === 'confident' &&
+                    suitability.matchedCategory)) && (
+                  <div
+                    data-testid="confident-prediction-box"
+                    className="rounded-xl border border-[#177A73]/30 bg-[#EAF6F4]/60 p-4"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        {(() => {
+                          const catKey =
+                            activeCategoryObj?.key ||
+                            suitability.matchedCategory?.key ||
+                            'garbage';
+                          const Icon = CATEGORY_ICONS[catKey];
+                          return (
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#177A73] text-white">
+                              <Icon className="h-5 w-5" />
                             </div>
-                          )}
+                          );
+                        })()}
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-xs font-medium text-[#64748B]">
+                              {isCategoryOverridden
+                                ? 'Selected Report Category'
+                                : 'Suggested Report Category'}
+                            </p>
+                            {(() => {
+                              const currentKey =
+                                activeCategoryObj?.key ||
+                                suitability.matchedCategory?.key;
+                              const rfClass =
+                                (!isCategoryOverridden &&
+                                  inferenceResult?.rawPredictedClass) ||
+                                (currentKey
+                                  ? ROBOFLOW_CLASS_LABEL_BY_KEY[currentKey]
+                                  : null);
+                              return rfClass ? (
+                                <span
+                                  data-testid="predicted-roboflow-class"
+                                  className="inline-flex items-center rounded-md bg-[#177A73]/15 px-2 py-0.5 font-mono text-[11px] font-bold text-[#177A73]"
+                                >
+                                  class: {rfClass}
+                                </span>
+                              ) : null;
+                            })()}
+                          </div>
+                          <p
+                            data-testid="detected-concern-label"
+                            className="mt-0.5 text-base font-bold text-[#142B38]"
+                          >
+                            {activeCategoryObj?.label ||
+                              suitability.matchedCategory?.label}
+                          </p>
+                          {isCategoryOverridden &&
+                            suitability.matchedCategory && (
+                              <p
+                                data-testid="category-override-note"
+                                className="mt-0.5 text-[11px] font-medium text-[#177A73]"
+                              >
+                                Updated from{' '}
+                                {suitability.matchedCategory.label}
+                              </p>
+                            )}
+                        </div>
+                      </div>
+
+                      {suitability.confidencePercent !== null &&
+                        !isCategoryOverridden && (
+                          <div className="min-w-[175px]">
+                            <div className="flex items-center justify-between gap-3 text-xs">
+                              <span className="font-medium text-[#64748B]">
+                                Detection Confidence
+                              </span>
+                              <span
+                                data-testid="detected-confidence-value"
+                                className="font-bold text-[#177A73]"
+                              >
+                                {suitability.confidencePercent}%
+                              </span>
+                            </div>
+                            <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-white ring-1 ring-[#177A73]/20">
+                              <div
+                                className="h-full rounded-full bg-[#177A73] transition-all"
+                                style={{
+                                  width: `${
+                                    suitability.confidencePercent ?? 0
+                                  }%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Classifier Service Error Banner (Graceful recovery + Retry + Manual Category Selection) */}
+                {(inferenceResult?.modelStatus === 'error' ||
+                  suitability.status === 'model_unavailable') && (
+                  <div
+                    data-testid="classification-error-banner"
+                    role="alert"
+                    className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950"
+                  >
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                      <div className="flex-1 space-y-2">
+                        <p className="text-sm font-bold leading-snug">
+                          Automatic Classifier Unavailable — Please Select or Confirm Category
+                        </p>
+                        <p
+                          data-testid="classification-error-message"
+                          className="text-xs leading-relaxed text-amber-900"
+                        >
+                          {inferenceResult?.errorMessage ||
+                            suitability.userMessage}
+                        </p>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            data-testid="retry-classification-btn"
+                            onClick={() => void handleRetryClassification()}
+                            className="rounded-lg bg-[#177A73] text-xs font-semibold text-white hover:bg-[#12625D]"
+                          >
+                            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                            Retry Classification
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={handleRetakePhoto}
+                            className="rounded-lg border-amber-300 bg-white text-xs font-semibold text-amber-950 hover:bg-amber-100"
+                          >
+                            <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                            Retake or Upload Photo
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  )}
+                  </div>
+                )}
 
-                {/* Non-matching / Unrelated Image Warning (Will Auto-Reject) */}
-                {(suitability.status === 'low_confidence' ||
-                  suitability.status === 'model_unavailable') && (
+                {/* Non-matching / Unrelated Image Warning */}
+                {suitability.status === 'low_confidence' && (
                   <div
                     data-testid="low-confidence-banner"
                     className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-950"
@@ -854,7 +955,7 @@ const ReportIssue = () => {
                       <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
                       <div className="flex-1 space-y-2">
                         <p className="text-sm font-bold leading-snug">
-                          Unrelated or Unrecognized Concern — Automatic AI Rejection
+                          Low Classification Confidence — Select a Category or Retake Photo
                         </p>
                         <p className="text-xs leading-relaxed text-red-800">
                           {LOW_CONFIDENCE_MESSAGE}
@@ -906,18 +1007,33 @@ const ReportIssue = () => {
                   </div>
                 )}
 
-                {/* Category Correction Among the 4 Supported Classes (only when photo is clear and confident) */}
-                {suitability.status === 'confident' && (
+                {/* Category Selection / Override Among the 4 Supported Classes (drainage, road, streetlights, waste) */}
+                {suitability.isReadable && (
                   <>
-                    {showCategorySelector ? (
-                      <div className="space-y-2.5 pt-1">
-                        <p className="text-xs font-bold text-[#142B38]">
-                          Select one of the 4 supported community concern classes:
-                        </p>
+                    {showCategorySelector || !activeCategoryObj ? (
+                      <div
+                        data-testid="category-selector-grid"
+                        className="space-y-2.5 pt-1"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-[#142B38]">
+                            Select or change the report category (drainage, road, streetlights, waste):
+                          </p>
+                          {activeCategoryObj && (
+                            <button
+                              type="button"
+                              onClick={() => setShowCategorySelector(false)}
+                              className="text-xs font-semibold text-[#64748B] hover:text-[#142B38]"
+                            >
+                              Hide
+                            </button>
+                          )}
+                        </div>
                         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                           {APPROVED_CONCERN_CATEGORIES.map((cat) => {
                             const Icon = CATEGORY_ICONS[cat.key];
                             const isSelected = selectedCategoryKey === cat.key;
+                            const rfClass = ROBOFLOW_CLASS_LABEL_BY_KEY[cat.key];
                             return (
                               <button
                                 key={cat.key}
@@ -944,9 +1060,14 @@ const ReportIssue = () => {
                                   <Icon className="h-4 w-4" />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <p className="text-xs font-bold text-[#142B38]">
-                                    {cat.label}
-                                  </p>
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="text-xs font-bold text-[#142B38]">
+                                      {cat.label}
+                                    </p>
+                                    <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[#64748B]">
+                                      {rfClass}
+                                    </span>
+                                  </div>
                                   <p className="truncate text-[11px] text-[#64748B]">
                                     {cat.shortDescription}
                                   </p>
@@ -962,7 +1083,7 @@ const ReportIssue = () => {
                     ) : (
                       <div className="flex items-center justify-between border-t border-[#E2E8F0] pt-3 text-xs">
                         <span className="text-[#64748B]">
-                          Need to switch among the 4 supported categories?
+                          Need to change the suggested category (drainage, road, streetlights, waste)?
                         </span>
                         <button
                           type="button"
