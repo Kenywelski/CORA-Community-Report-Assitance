@@ -247,9 +247,17 @@ serve(async (req) => {
     }
 
     const startMs = Date.now();
-    const roboflowApiKey = Deno.env.get("ROBOFLOW_API_KEY")?.trim();
-    const roboflowWorkflowUrl =
-      Deno.env.get("ROBOFLOW_WORKFLOW_URL")?.trim() ||
+    // Secrets are stored as Roboflow_API / Roboflow_URL; keep ROBOFLOW_* aliases for compatibility.
+    const roboflowApiKey = (
+      Deno.env.get("Roboflow_API") ?? Deno.env.get("ROBOFLOW_API_KEY") ?? ""
+    )
+      .trim();
+    const roboflowWorkflowUrl = (
+      Deno.env.get("Roboflow_URL") ??
+      Deno.env.get("ROBOFLOW_WORKFLOW_URL") ??
+      ""
+    )
+      .trim() ||
       "https://serverless.roboflow.com/gwen-apuli/workflows/four-class-classifier-test-1793801128146";
 
     if (roboflowApiKey && effectiveImageSource) {
