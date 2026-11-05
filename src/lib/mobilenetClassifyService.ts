@@ -681,9 +681,8 @@ export async function runMobileNetV3Classification(options: {
           descriptionSource: data.descriptionSource ?? 'template_fallback',
         };
       }
-    } catch {
-      // Fall through to local visual feature analysis on the captured image
-    }
+  } catch {
+    // Fall through to local visual feature analysis on the captured image
   }
 
   // 4. Analyze actual captured image visual features across the 4 classes (drainage, road, streetlights, waste)
