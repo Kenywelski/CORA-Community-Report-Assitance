@@ -68,18 +68,52 @@ export const LandingFaqChatbot = ({
   const [input, setInput] = useState('');
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
 
   const visibleFaqs = getFaqsByCategory(selectedCategory);
 
   useEffect(() => {
+    if (!isOpen || typeof window === 'undefined') {
+      setViewportHeight(null);
+      return;
+    }
+
+    const updateViewport = () => {
+      const vv = window.visualViewport;
+      if (vv && window.innerWidth < 640) {
+        setViewportHeight(Math.floor(vv.height));
+      } else {
+        setViewportHeight(null);
+      }
+    };
+
+    updateViewport();
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', updateViewport);
+    window.addEventListener('resize', updateViewport);
+
+    const prevOverflow = document.body.style.overflow;
+    if (window.innerWidth < 640) {
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      vv?.removeEventListener('resize', updateViewport);
+      window.removeEventListener('resize', updateViewport);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     if (!isOpen) return;
     requestAnimationFrame(() => {
+      const el = scrollContainerRef.current;
+      if (!el) return;
       if (showFaqBrowser && turns.length === 0) {
-        scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+        el.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
-        endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        el.scrollTop = el.scrollHeight;
       }
     });
   }, [turns, isOpen, showFaqBrowser, selectedCategory]);
@@ -87,6 +121,9 @@ export const LandingFaqChatbot = ({
   const handleAskQuestion = (questionText: string) => {
     const trimmed = questionText.trim();
     if (!trimmed) return;
+    if (typeof window !== 'undefined' && window.innerWidth < 640) {
+      inputRef.current?.blur();
+    }
 
     const now = Date.now();
     const userTurn: ChatTurn = {
@@ -136,6 +173,10 @@ export const LandingFaqChatbot = ({
     setInput('');
   };
 
+  const mobileDynamicStyle = viewportHeight
+    ? { height: `${Math.min(520, Math.max(280, viewportHeight - 24))}px`, maxHeight: `${viewportHeight - 16}px` }
+    : undefined;
+
   return (
     <>
       {/* Floating FAQ Chatbot Launcher Button */}
@@ -169,7 +210,8 @@ export const LandingFaqChatbot = ({
           aria-modal="false"
           aria-label="CORA System FAQ Assistant"
           data-testid="landing-faq-dialog"
-          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 backdrop-blur-[2px] sm:inset-auto sm:bottom-5 sm:right-5 sm:bg-transparent sm:p-0 sm:backdrop-blur-0"
+          style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-2.5 backdrop-blur-[2px] sm:inset-auto sm:bottom-5 sm:right-5 sm:bg-transparent sm:p-0 sm:backdrop-blur-0"
         >
           {/* Mobile backdrop tap to close */}
           <div
@@ -178,16 +220,17 @@ export const LandingFaqChatbot = ({
           />
 
           <div
+            style={mobileDynamicStyle}
             className={cn(
               'relative flex w-full flex-col overflow-hidden bg-white shadow-2xl animate-scale-in',
-              'h-[82dvh] max-h-[86dvh] sm:h-[min(620px,84vh)]',
-              'rounded-t-2xl sm:rounded-2xl border border-[#E2E8F0]',
-              'max-w-[100vw] sm:w-[410px]'
+              'h-[min(480px,74dvh)] max-h-[calc(100dvh-4.5rem)] sm:h-[min(600px,84vh)]',
+              'rounded-2xl border border-[#E2E8F0]',
+              'max-w-[calc(100vw-1.25rem)] sm:w-[400px] sm:max-w-[400px]'
             )}
           >
             {/* Header */}
             <div
-              className="flex shrink-0 items-center justify-between gap-2.5 px-3.5 py-3 text-white sm:px-4 sm:py-3.5"
+              className="flex shrink-0 items-center justify-between gap-2.5 px-3.5 py-2.5 text-white sm:px-4 sm:py-3"
               style={{
                 background: 'linear-gradient(135deg, #142B38 0%, #177A73 100%)',
               }}
@@ -401,8 +444,6 @@ export const LandingFaqChatbot = ({
                   </div>
                 </div>
               )}
-
-              <div ref={endRef} />
             </div>
 
             {/* Bottom Input Form */}
@@ -411,7 +452,7 @@ export const LandingFaqChatbot = ({
                 e.preventDefault();
                 handleAskQuestion(input);
               }}
-              className="shrink-0 border-t border-[#E2E8F0] bg-[#F8FAFC] p-2.5 sm:p-3 pb-[max(0.625rem,env(safe-area-inset-bottom))]"
+              className="shrink-0 border-t border-[#E2E8F0] bg-[#F8FAFC] p-2 sm:p-2.5"
             >
               <div className="flex items-center gap-2 rounded-xl border border-[#E2E8F0] bg-white px-3 py-1.5 focus-within:border-[#177A73] focus-within:ring-1 focus-within:ring-[#177A73]">
                 <input
@@ -422,7 +463,7 @@ export const LandingFaqChatbot = ({
                   placeholder="Ask a question about CORA..."
                   aria-label="Ask a question about CORA"
                   data-testid="landing-faq-input"
-                  className="min-w-0 flex-1 bg-transparent py-1 text-xs text-[#142B38] placeholder:text-[#64748B] focus:outline-none sm:text-sm"
+                  className="min-w-0 flex-1 bg-transparent py-1 text-base text-[#142B38] placeholder:text-[#64748B] focus:outline-none sm:text-sm"
                 />
                 <Button
                   type="submit"

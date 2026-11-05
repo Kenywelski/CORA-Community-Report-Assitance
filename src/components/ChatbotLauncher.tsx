@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import {
-  MessageCircle, Send, Bot, Headphones, Loader2, ChevronDown,
+  MessageCircle, Send, Bot, Headphones, Loader2, ChevronDown, X,
   Trash2, FileText, AlertTriangle, Phone, Megaphone, Building2, HelpCircle,
-  Mic, ImagePlus, Sparkles,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -30,14 +30,14 @@ const WELCOME: AiMsg = {
 const QUICK_ACTIONS = [
   { icon: AlertTriangle, label: 'Report an Issue', prompt: 'How do I report a community issue?' },
   { icon: Phone, label: 'Emergency Contacts', prompt: 'What are the emergency contact numbers in Barangay Purisima, Tago?' },
-  { icon: Building2, label: 'Municipal Offices', prompt: 'List the municipal offices and what they do.' },
-  { icon: FileText, label: 'Request Documents', prompt: 'How do I request a municipal document or service?' },
-  { icon: Megaphone, label: 'Announcements', prompt: 'What are the latest announcements from the municipality?' },
+  { icon: Building2, label: 'Barangay Offices', prompt: 'List the barangay and municipal offices and what they do.' },
+  { icon: FileText, label: 'Request Documents', prompt: 'How do I request a barangay clearance or certificate?' },
+  { icon: Megaphone, label: 'Announcements', prompt: 'What are the latest announcements in Barangay Purisima?' },
   { icon: HelpCircle, label: 'FAQs', prompt: 'What are frequently asked questions about CORA?' },
 ];
 
-const STORAGE_KEY = 'mycortes-chat-ai-v2';
-const OPEN_KEY = 'mycortes-chat-open-v1';
+const STORAGE_KEY = 'cora-purisima-chat-ai-v3';
+const OPEN_KEY = 'cora-purisima-chat-open-v2';
 const TEAL = 'hsl(174,55%,22%)';
 const TEAL_DARK = 'hsl(174,55%,16%)';
 
@@ -58,12 +58,12 @@ export const ChatbotLauncher = () => {
     [location.pathname],
   );
 
-
   const [open, setOpen] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return window.localStorage.getItem(OPEN_KEY) === '1';
   });
   const [tab, setTab] = useState<'ai' | 'staff'>('ai');
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
 
   const [aiMessages, setAiMessages] = useState<AiMsg[]>(() => {
     if (typeof window === 'undefined') return [WELCOME];
@@ -79,19 +79,51 @@ export const ChatbotLauncher = () => {
   const [aiInput, setAiInput] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const aiScrollRef = useRef<HTMLDivElement>(null);
-  const aiEndRef = useRef<HTMLDivElement>(null);
   const aiTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [staffInput, setStaffInput] = useState('');
   const [staffThreadId, setStaffThreadId] = useState<string | null>(null);
   const staffScrollRef = useRef<HTMLDivElement>(null);
-  const staffEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(aiMessages)); } catch { /* noop */ }
   }, [aiMessages]);
   useEffect(() => {
     try { window.localStorage.setItem(OPEN_KEY, open ? '1' : '0'); } catch { /* noop */ }
+  }, [open]);
+
+  // Track visualViewport on mobile so virtual keyboard never pushes header off-screen
+  useEffect(() => {
+    if (!open || typeof window === 'undefined') {
+      setViewportHeight(null);
+      return;
+    }
+
+    const updateViewport = () => {
+      const vv = window.visualViewport;
+      if (vv && window.innerWidth < 640) {
+        setViewportHeight(Math.floor(vv.height));
+      } else {
+        setViewportHeight(null);
+      }
+    };
+
+    updateViewport();
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', updateViewport);
+    window.addEventListener('resize', updateViewport);
+
+    // Lock background body scroll on mobile when chat is open
+    const prevOverflow = document.body.style.overflow;
+    if (window.innerWidth < 640) {
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      vv?.removeEventListener('resize', updateViewport);
+      window.removeEventListener('resize', updateViewport);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [open]);
 
   useEffect(() => {
@@ -145,22 +177,36 @@ export const ChatbotLauncher = () => {
     return () => { supabase.removeChannel(ch); };
   }, [staffThreadId, queryClient]);
 
+  // Scroll strictly inside the message container (never window/document scrollIntoView)
   useEffect(() => {
-    aiEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [aiMessages, aiBusy]);
-  useEffect(() => {
-    staffEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [staffMessages]);
+    const el = aiScrollRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+  }, [aiMessages, aiBusy, open, tab]);
 
   useEffect(() => {
-    if (open && tab === 'ai') {
+    const el = staffScrollRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+  }, [staffMessages, open, tab]);
+
+  // Only auto-focus input on desktop screens so mobile virtual keyboard doesn't pop up automatically
+  useEffect(() => {
+    if (open && tab === 'ai' && typeof window !== 'undefined' && window.innerWidth >= 640) {
       requestAnimationFrame(() => aiTextareaRef.current?.focus());
     }
-  }, [open, tab, aiBusy]);
+  }, [open, tab]);
 
   const sendAi = async (overrideText?: string) => {
     const text = (overrideText ?? aiInput).trim();
     if (!text || aiBusy) return;
+    if (typeof window !== 'undefined' && window.innerWidth < 640) {
+      aiTextareaRef.current?.blur();
+    }
     const userMsg: AiMsg = { role: 'user', content: text, ts: Date.now() };
     const base = aiMessages.filter((m) => m.content !== '__WELCOME_CARD__');
     const next = [...base, userMsg];
@@ -235,6 +281,9 @@ export const ChatbotLauncher = () => {
 
   const clearAi = () => {
     setAiMessages([{ ...WELCOME, ts: Date.now() }]);
+    requestAnimationFrame(() => {
+      if (aiScrollRef.current) aiScrollRef.current.scrollTop = 0;
+    });
     toast.success('Chat cleared');
   };
 
@@ -260,13 +309,17 @@ export const ChatbotLauncher = () => {
 
   const showWelcome = aiMessages.length === 1 && aiMessages[0].content === '__WELCOME_CARD__';
 
+  const mobileDynamicStyle = viewportHeight
+    ? { height: `${Math.min(520, Math.max(280, viewportHeight - 24))}px`, maxHeight: `${viewportHeight - 16}px` }
+    : undefined;
+
   return (
     <>
       {!open && (
         <button
           onClick={() => setOpen(true)}
           className={cn(
-            'fixed bottom-24 right-4 lg:bottom-6 z-40 h-14 w-14 rounded-2xl',
+            'fixed bottom-24 right-4 lg:bottom-6 z-40 h-13 w-13 sm:h-14 sm:w-14 rounded-2xl',
             'text-primary-foreground shadow-elevated',
             'flex items-center justify-center transition-all duration-300',
             'hover:scale-110 hover:shadow-2xl active:scale-95',
@@ -281,43 +334,49 @@ export const ChatbotLauncher = () => {
       )}
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:justify-end p-0 sm:p-4 bg-black/40 backdrop-blur-[2px] sm:bg-transparent sm:backdrop-blur-0 animate-fade-in">
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center sm:justify-end p-2.5 sm:p-4 bg-black/50 backdrop-blur-[2px] sm:bg-transparent sm:backdrop-blur-0 animate-fade-in"
+          style={viewportHeight ? { height: `${viewportHeight}px` } : undefined}
+        >
           <div
             className="absolute inset-0 sm:hidden"
             onClick={() => setOpen(false)}
           />
-          <div className={cn(
-            'relative w-full sm:w-[410px]',
-            'h-[82dvh] max-h-[86dvh] sm:h-[min(640px,86vh)]',
-            'bg-card border border-border sm:rounded-3xl rounded-t-3xl',
-            'shadow-elevated flex flex-col overflow-hidden animate-scale-in',
-          )}>
-            {/* Header */}
+          <div
+            style={mobileDynamicStyle}
+            className={cn(
+              'relative w-full max-w-[calc(100vw-1.25rem)] sm:w-[400px] sm:max-w-[400px]',
+              'h-[min(480px,74dvh)] max-h-[calc(100dvh-4.5rem)] sm:h-[min(600px,84vh)] sm:max-h-[calc(100vh-2rem)]',
+              'bg-card border border-border rounded-2xl sm:rounded-3xl',
+              'shadow-2xl flex flex-col overflow-hidden animate-scale-in',
+            )}
+          >
+            {/* Sticky Top Header */}
             <div
-              className="flex items-center justify-between px-4 py-3 text-primary-foreground shrink-0"
+              className="flex items-center justify-between px-3.5 py-2.5 sm:px-4 sm:py-3 text-primary-foreground shrink-0"
               style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_DARK})` }}
             >
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="h-11 w-11 rounded-2xl bg-white/15 flex items-center justify-center backdrop-blur ring-1 ring-white/20">
-                    <Bot className="h-6 w-6" />
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="relative shrink-0">
+                  <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur ring-1 ring-white/20">
+                    <Bot className="h-5 w-5" />
                   </div>
-                  <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-[hsl(174,55%,18%)] animate-pulse" />
+                  <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-[hsl(174,55%,18%)]" />
                 </div>
-                <div>
-                  <h3 className="font-semibold text-[15px] leading-tight">CORA AI Assistant</h3>
-                  <p className="text-[11px] opacity-90 flex items-center gap-1.5 mt-0.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 inline-block" />
-                    Always ready to help
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-xs sm:text-sm leading-tight truncate">CORA AI Assistant</h3>
+                  <p className="text-[10px] sm:text-[11px] opacity-90 flex items-center gap-1.5 mt-0.5 truncate">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 inline-block shrink-0" />
+                    <span className="truncate">Barangay Purisima · Ready to help</span>
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 shrink-0">
                 {tab === 'ai' && !showWelcome && (
                   <Button
                     variant="ghost" size="icon"
                     onClick={clearAi}
-                    className="text-primary-foreground hover:bg-white/20 h-8 w-8"
+                    className="text-primary-foreground hover:bg-white/20 h-8 w-8 rounded-lg"
                     aria-label="Clear chat"
                     title="Clear chat"
                   >
@@ -327,17 +386,19 @@ export const ChatbotLauncher = () => {
                 <Button
                   variant="ghost" size="icon"
                   onClick={() => setOpen(false)}
-                  className="text-primary-foreground hover:bg-white/20 h-8 w-8"
-                  aria-label="Minimize chat"
+                  className="text-primary-foreground hover:bg-white/20 h-8 w-8 rounded-lg"
+                  aria-label="Close chat"
+                  title="Close chat"
                 >
-                  <ChevronDown className="h-5 w-5" />
+                  <X className="h-4 w-4 sm:hidden" />
+                  <ChevronDown className="h-5 w-5 hidden sm:block" />
                 </Button>
               </div>
             </div>
 
             {/* Segmented tabs */}
-            <div className="px-3 pt-3 pb-2 shrink-0">
-              <div className="relative grid grid-cols-2 bg-muted rounded-xl p-1 h-10">
+            <div className="px-3 pt-2 pb-1.5 shrink-0 border-b border-border/50 bg-card">
+              <div className="relative grid grid-cols-2 bg-muted rounded-xl p-1 h-9">
                 <div
                   className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-lg shadow-sm transition-all duration-300 ease-out"
                   style={{
@@ -346,6 +407,7 @@ export const ChatbotLauncher = () => {
                   }}
                 />
                 <button
+                  type="button"
                   onClick={() => setTab('ai')}
                   className={cn(
                     'relative z-10 flex items-center justify-center gap-1.5 text-xs font-medium rounded-lg transition-colors',
@@ -355,6 +417,7 @@ export const ChatbotLauncher = () => {
                   <Bot className="h-3.5 w-3.5" /> AI Assistant
                 </button>
                 <button
+                  type="button"
                   onClick={() => setTab('staff')}
                   className={cn(
                     'relative z-10 flex items-center justify-center gap-1.5 text-xs font-medium rounded-lg transition-colors',
@@ -368,54 +431,54 @@ export const ChatbotLauncher = () => {
 
             {/* AI tab */}
             {tab === 'ai' && (
-              <div className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 <div
                   ref={aiScrollRef}
-                  className="flex-1 min-h-0 overflow-y-auto overscroll-contain scroll-smooth px-3.5 sm:px-4 py-2 touch-pan-y"
+                  className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 sm:px-4 py-2.5 touch-pan-y"
                   style={{ WebkitOverflowScrolling: 'touch' }}
                 >
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {showWelcome && (
                       <div className="animate-fade-in">
                         <div
-                          className="relative rounded-2xl p-5 text-primary-foreground overflow-hidden shadow-md"
+                          className="relative rounded-xl p-3.5 sm:p-4 text-primary-foreground overflow-hidden shadow-sm"
                           style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_DARK})` }}
                         >
-                          <div className="absolute -top-6 -right-6 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
-                          <div className="relative flex items-start gap-3">
-                            <div className="h-10 w-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center shrink-0 ring-1 ring-white/20">
-                              <Sparkles className="h-5 w-5" />
+                          <div className="relative flex items-start gap-2.5">
+                            <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-white/15 backdrop-blur flex items-center justify-center shrink-0 ring-1 ring-white/20">
+                              <Sparkles className="h-4 w-4" />
                             </div>
-                            <div>
-                              <h4 className="font-semibold text-base leading-tight">Welcome to CORA</h4>
-                              <p className="text-[13px] opacity-90 mt-1 leading-relaxed">
-                                I can help you with municipal services, emergency info, announcements, and how to navigate the app.
+                            <div className="min-w-0">
+                              <h4 className="font-semibold text-xs sm:text-sm leading-tight">Welcome to CORA</h4>
+                              <p className="text-[11px] sm:text-xs opacity-90 mt-1 leading-relaxed">
+                                Ask about barangay services, issue reporting, emergency hotlines, or announcements.
                               </p>
                             </div>
                           </div>
                         </div>
 
-                        <div className="mt-4">
-                          <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-2 px-1">
+                        <div className="mt-3">
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold mb-1.5 px-1">
                             Quick actions
                           </p>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                             {QUICK_ACTIONS.map(({ icon: Icon, label, prompt }) => (
                               <button
                                 key={label}
+                                type="button"
                                 onClick={() => sendAi(prompt)}
                                 className={cn(
-                                  'group flex items-center gap-2 px-3 py-3 rounded-xl',
+                                  'group flex items-center gap-2 px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-xl',
                                   'bg-card border border-border/70',
-                                  'text-xs font-medium text-left transition-all',
-                                  'hover:border-primary/40 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0',
+                                  'text-[11px] sm:text-xs font-medium text-left transition-all',
+                                  'hover:border-primary/40 hover:shadow-sm active:scale-[0.99]',
                                 )}
                               >
                                 <span
-                                  className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-colors"
+                                  className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0 transition-colors"
                                   style={{ backgroundColor: 'hsl(174,55%,22%,0.08)' }}
                                 >
-                                  <Icon className="h-4 w-4" style={{ color: TEAL }} />
+                                  <Icon className="h-3.5 w-3.5" style={{ color: TEAL }} />
                                 </span>
                                 <span className="truncate leading-tight">{label}</span>
                               </button>
@@ -433,10 +496,10 @@ export const ChatbotLauncher = () => {
                           m.role === 'user' ? 'items-end' : 'items-start',
                         )}
                       >
-                        <div className="flex items-end gap-2 max-w-[88%]">
+                        <div className="flex items-end gap-1.5 sm:gap-2 max-w-[90%]">
                           {m.role === 'assistant' && (
                             <div
-                              className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-primary-foreground"
+                              className="h-6 w-6 sm:h-7 sm:w-7 rounded-full flex items-center justify-center shrink-0 text-primary-foreground"
                               style={{ backgroundColor: TEAL }}
                             >
                               <Bot className="h-3.5 w-3.5" />
@@ -444,41 +507,40 @@ export const ChatbotLauncher = () => {
                           )}
                           <div
                             className={cn(
-                              'px-4 py-2.5 text-[14px] leading-relaxed shadow-sm',
+                              'px-3 py-2 sm:px-3.5 sm:py-2.5 text-xs sm:text-[13.5px] leading-relaxed shadow-xs break-words overflow-hidden',
                               m.role === 'user'
-                                ? 'text-primary-foreground rounded-2xl rounded-br-md'
-                                : 'bg-muted text-foreground rounded-2xl rounded-bl-md',
+                                ? 'text-primary-foreground rounded-2xl rounded-br-sm'
+                                : 'bg-muted text-foreground rounded-2xl rounded-bl-sm',
                             )}
                             style={m.role === 'user' ? { backgroundColor: TEAL } : undefined}
                           >
                             {m.role === 'assistant' ? (
                               m.content ? (
-                                <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1">
+                                <div className="prose prose-xs sm:prose-sm dark:prose-invert max-w-none text-xs sm:text-[13.5px] leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
                                   <ReactMarkdown>{m.content}</ReactMarkdown>
                                 </div>
                               ) : (
                                 <div className="flex items-center gap-1 py-1" aria-label="Assistant is typing">
-                                  <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '0ms' }} />
-                                  <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '150ms' }} />
-                                  <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '300ms' }} />
                                 </div>
                               )
                             ) : (
-                              <p className="whitespace-pre-wrap">{m.content}</p>
+                              <p className="whitespace-pre-wrap break-words">{m.content}</p>
                             )}
                           </div>
                         </div>
-                        <span className={cn('text-[10px] text-muted-foreground mt-1', m.role === 'user' ? 'pr-1' : 'pl-9')}>
+                        <span className={cn('text-[10px] text-muted-foreground mt-1', m.role === 'user' ? 'pr-1' : 'pl-8')}>
                           {formatTime(m.ts)}
                         </span>
                       </div>
                     ))}
-                    <div ref={aiEndRef} />
                   </div>
                 </div>
 
-                <div className="p-2.5 sm:p-3 border-t bg-card/90 backdrop-blur shrink-0 pb-[max(0.625rem,env(safe-area-inset-bottom))]">
-                  <div className="flex items-end gap-2 bg-muted/60 rounded-2xl px-3 py-1.5 border border-border/60 focus-within:border-primary/50 focus-within:bg-muted transition-colors">
+                <div className="p-2 sm:p-2.5 border-t bg-card/95 backdrop-blur shrink-0">
+                  <div className="flex items-end gap-1.5 bg-muted/60 rounded-xl px-2.5 py-1 border border-border/60 focus-within:border-primary/50 focus-within:bg-muted transition-colors">
                     <Textarea
                       ref={aiTextareaRef}
                       value={aiInput}
@@ -491,20 +553,21 @@ export const ChatbotLauncher = () => {
                       }}
                       placeholder="Ask me anything…"
                       rows={1}
-                      className="resize-none min-h-[38px] max-h-32 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-1 py-2 text-sm"
+                      className="resize-none min-h-[34px] max-h-24 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-1 py-1.5 text-base sm:text-sm"
                       disabled={aiBusy}
                     />
                     <Button
+                      type="button"
                       onClick={() => sendAi()}
                       disabled={!aiInput.trim() || aiBusy}
                       size="icon"
-                      className="h-9 w-9 shrink-0 rounded-xl transition-transform hover:scale-105 active:scale-95 disabled:hover:scale-100 text-primary-foreground"
+                      className="h-8 w-8 shrink-0 rounded-lg transition-transform active:scale-95 text-primary-foreground"
                       style={{ backgroundColor: TEAL }}
                     >
-                      {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      {aiBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                     </Button>
                   </div>
-                  <p className="text-[10px] text-muted-foreground text-center mt-1.5">
+                  <p className="text-[10px] text-muted-foreground text-center mt-1">
                     AI can make mistakes. Verify important info.
                   </p>
                 </div>
@@ -513,26 +576,26 @@ export const ChatbotLauncher = () => {
 
             {/* Staff tab */}
             {tab === 'staff' && (
-              <div className="flex-1 flex flex-col min-h-0">
-                <div className="mx-3 mb-2 px-3 py-2 bg-muted/50 rounded-xl border border-border/60 text-xs text-muted-foreground shrink-0">
-                  Messages go to municipal staff. They'll reply when available.
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                <div className="mx-3 mt-2 mb-1 px-2.5 py-1.5 bg-muted/50 rounded-lg border border-border/60 text-[11px] text-muted-foreground shrink-0">
+                  Messages go to barangay staff. They'll reply when available.
                 </div>
                 <div
                   ref={staffScrollRef}
-                  className="flex-1 min-h-0 overflow-y-auto overscroll-contain scroll-smooth px-3.5 sm:px-4 py-2 touch-pan-y"
+                  className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 sm:px-4 py-2 touch-pan-y"
                   style={{ WebkitOverflowScrolling: 'touch' }}
                 >
-                  <div className="space-y-3">
+                  <div className="space-y-2.5">
                     {staffLoading ? (
-                      <div className="space-y-3">
+                      <div className="space-y-2.5">
                         {[...Array(3)].map((_, i) => (
                           <div key={i} className={cn('flex', i % 2 ? 'justify-end' : 'justify-start')}>
-                            <div className="h-10 w-40 rounded-2xl bg-muted animate-pulse" />
+                            <div className="h-9 w-36 rounded-2xl bg-muted animate-pulse" />
                           </div>
                         ))}
                       </div>
                     ) : staffMessages.length === 0 ? (
-                      <div className="text-center text-sm text-muted-foreground py-10">
+                      <div className="text-center text-xs sm:text-sm text-muted-foreground py-8">
                         No messages yet. Start by saying hello 👋
                       </div>
                     ) : staffMessages.map((m) => {
@@ -541,14 +604,14 @@ export const ChatbotLauncher = () => {
                         <div key={m.id} className={cn('flex flex-col animate-fade-in', isMine ? 'items-end' : 'items-start')}>
                           <div
                             className={cn(
-                              'max-w-[85%] px-4 py-2.5 text-[14px] leading-relaxed shadow-sm',
+                              'max-w-[88%] px-3 py-2 sm:px-3.5 sm:py-2.5 text-xs sm:text-[13.5px] leading-relaxed shadow-xs break-words',
                               isMine
-                                ? 'text-primary-foreground rounded-2xl rounded-br-md'
-                                : 'bg-muted rounded-2xl rounded-bl-md',
+                                ? 'text-primary-foreground rounded-2xl rounded-br-sm'
+                                : 'bg-muted rounded-2xl rounded-bl-sm',
                             )}
                             style={isMine ? { backgroundColor: TEAL } : undefined}
                           >
-                            <p className="whitespace-pre-wrap">{m.content}</p>
+                            <p className="whitespace-pre-wrap break-words">{m.content}</p>
                           </div>
                           <span className="text-[10px] text-muted-foreground mt-1 px-1">
                             {!isMine && <span className="font-medium text-primary">Staff · </span>}
@@ -557,11 +620,10 @@ export const ChatbotLauncher = () => {
                         </div>
                       );
                     })}
-                    <div ref={staffEndRef} />
                   </div>
                 </div>
-                <div className="p-2.5 sm:p-3 border-t bg-card/90 backdrop-blur shrink-0 pb-[max(0.625rem,env(safe-area-inset-bottom))]">
-                  <div className="flex items-end gap-2 bg-muted/60 rounded-2xl px-2 py-1.5 border border-border/60 focus-within:border-primary/50 focus-within:bg-muted transition-colors">
+                <div className="p-2 sm:p-2.5 border-t bg-card/95 backdrop-blur shrink-0">
+                  <div className="flex items-end gap-1.5 bg-muted/60 rounded-xl px-2.5 py-1 border border-border/60 focus-within:border-primary/50 focus-within:bg-muted transition-colors">
                     <Textarea
                       value={staffInput}
                       onChange={(e) => setStaffInput(e.target.value)}
@@ -573,17 +635,18 @@ export const ChatbotLauncher = () => {
                       }}
                       placeholder="Type your message to staff…"
                       rows={1}
-                      className="resize-none min-h-[38px] max-h-32 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-2 py-2 text-sm"
+                      className="resize-none min-h-[34px] max-h-24 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none px-1 py-1.5 text-base sm:text-sm"
                       disabled={!staffThreadId}
                     />
                     <Button
+                      type="button"
                       onClick={sendStaff}
                       disabled={!staffInput.trim() || !staffThreadId}
                       size="icon"
-                      className="h-9 w-9 shrink-0 rounded-xl transition-transform hover:scale-105 active:scale-95 disabled:hover:scale-100 text-primary-foreground"
+                      className="h-8 w-8 shrink-0 rounded-lg transition-transform active:scale-95 text-primary-foreground"
                       style={{ backgroundColor: TEAL }}
                     >
-                      <Send className="h-4 w-4" />
+                      <Send className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </div>
@@ -595,3 +658,4 @@ export const ChatbotLauncher = () => {
     </>
   );
 };
+
