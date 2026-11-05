@@ -659,11 +659,8 @@ export async function runMobileNetV3Classification(options: {
     }
   }
 
-  // 3. Invoke Supabase Edge Function `mobilenet-classify` when explicitly enabled in environment
-  const enableEdgeFn =
-    import.meta.env.VITE_ENABLE_MOBILENET_EDGE_FN === 'true';
-  if (enableEdgeFn) {
-    try {
+  // 3. Invoke Supabase Edge Function `mobilenet-classify` (Roboflow workflow proxy; keeps the API key server-side)
+  try {
       const { data, error } = await supabase.functions.invoke(
         'mobilenet-classify',
         {
