@@ -401,7 +401,7 @@ async function generateDetails(
   contentType: string,
 ) {
   const result = await askGemini(
-    `Create a concise report title and factual description for a CORA community report in Barangay Purisima, Tago, Surigao del Sur. The supported category is ${category.label}. Describe only visible details relevant to that category. Do not invent causes, severity, measurements, or hazards, and do not claim official verification. Return only JSON with a title (3 to 120 characters) and description (20 to 1000 characters).`,
+    `Create a concise report title and factual description for a CORA community report in Barangay Purisima, Tago, Surigao del Sur. Write the description in simple, natural, friendly Bisaya/Cebuano that local residents can easily understand. Avoid formal or technical words and use English only when necessary. The supported category is ${category.label}. Describe only visible details relevant to that category. Do not invent causes, severity, measurements, or hazards, and do not claim official verification. Return only JSON with a title (3 to 120 characters) and description (20 to 1000 characters).`,
     { buffer, contentType },
   );
   const title = typeof result.title === 'string' ? result.title.trim() : '';
@@ -608,9 +608,9 @@ router.post('/submit', upload.single('file'), async (request, response) => {
     };
     validateLocationInput(location);
 
-    const selectedCategory = resolveModelCategory(request.body.category);
+    const selectedCategory = resolveModelCategory(proof.predicted_category);
     if (!selectedCategory) {
-      throw new RequestError(400, 'Please select a supported concern category.');
+      throw new RequestError(403, 'Please verify your photo again.');
     }
     const title = typeof request.body.title === 'string' ? request.body.title.trim() : '';
     const description =

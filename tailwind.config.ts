@@ -1,8 +1,9 @@
 import type { Config } from "tailwindcss";
+import animate from "tailwindcss-animate";
 
 export default {
   darkMode: ["class"],
-  content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
+  content: ["./frontend/**/*.{ts,tsx}"],
   prefix: "",
   theme: {
     container: {
@@ -17,60 +18,60 @@ export default {
         sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
       },
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        border: "hsl(var(--border, 180 15% 90%) / <alpha-value>)",
+        input: "hsl(var(--input, 180 15% 90%) / <alpha-value>)",
+        ring: "hsl(var(--ring, 174 62% 28%) / <alpha-value>)",
+        background: "hsl(var(--background, 180 20% 98%) / <alpha-value>)",
+        foreground: "hsl(var(--foreground, 200 50% 10%) / <alpha-value>)",
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: "hsl(var(--primary, 174 62% 28%) / <alpha-value>)",
+          foreground: "hsl(var(--primary-foreground, 0 0% 100%) / <alpha-value>)",
         },
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: "hsl(var(--secondary, 174 30% 94%) / <alpha-value>)",
+          foreground: "hsl(var(--secondary-foreground, 174 62% 28%) / <alpha-value>)",
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+          DEFAULT: "hsl(var(--destructive, 0 84% 60%) / <alpha-value>)",
+          foreground: "hsl(var(--destructive-foreground, 0 0% 100%) / <alpha-value>)",
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: "hsl(var(--muted, 180 15% 95%) / <alpha-value>)",
+          foreground: "hsl(var(--muted-foreground, 200 20% 45%) / <alpha-value>)",
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: "hsl(var(--accent, 16 85% 58%) / <alpha-value>)",
+          foreground: "hsl(var(--accent-foreground, 0 0% 100%) / <alpha-value>)",
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: "hsl(var(--popover, 0 0% 100%) / <alpha-value>)",
+          foreground: "hsl(var(--popover-foreground, 200 50% 10%) / <alpha-value>)",
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT: "hsl(var(--card, 0 0% 100%) / <alpha-value>)",
+          foreground: "hsl(var(--card-foreground, 200 50% 10%) / <alpha-value>)",
         },
         emergency: {
-          DEFAULT: "hsl(var(--emergency))",
-          foreground: "hsl(var(--emergency-foreground))",
+          DEFAULT: "hsl(var(--emergency, 12 90% 52%) / <alpha-value>)",
+          foreground: "hsl(var(--emergency-foreground, 0 0% 100%) / <alpha-value>)",
         },
         success: {
-          DEFAULT: "hsl(var(--success))",
-          foreground: "hsl(var(--success-foreground))",
+          DEFAULT: "hsl(var(--success, 152 60% 42%) / <alpha-value>)",
+          foreground: "hsl(var(--success-foreground, 0 0% 100%) / <alpha-value>)",
         },
         warning: {
-          DEFAULT: "hsl(var(--warning))",
-          foreground: "hsl(var(--warning-foreground))",
+          DEFAULT: "hsl(var(--warning, 38 92% 50%) / <alpha-value>)",
+          foreground: "hsl(var(--warning-foreground, 0 0% 10%) / <alpha-value>)",
         },
         sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
+          DEFAULT: "hsl(var(--sidebar-background, 0 0% 98%) / <alpha-value>)",
+          foreground: "hsl(var(--sidebar-foreground, 240 5.3% 26.1%) / <alpha-value>)",
+          primary: "hsl(var(--sidebar-primary, 240 5.9% 10%) / <alpha-value>)",
+          "primary-foreground": "hsl(var(--sidebar-primary-foreground, 0 0% 98%) / <alpha-value>)",
+          accent: "hsl(var(--sidebar-accent, 240 4.8% 95.9%) / <alpha-value>)",
+          "accent-foreground": "hsl(var(--sidebar-accent-foreground, 240 5.9% 10%) / <alpha-value>)",
+          border: "hsl(var(--sidebar-border, 220 13% 91%) / <alpha-value>)",
+          ring: "hsl(var(--sidebar-ring, 217.2 91.2% 59.8%) / <alpha-value>)",
         },
       },
       borderRadius: {
@@ -121,5 +122,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [animate],
 } satisfies Config;

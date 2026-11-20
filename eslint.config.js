@@ -23,4 +23,23 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
+  {
+    files: [
+      "frontend/components/ui/**/*.tsx",
+      "frontend/features/residents/components/AuthGuard.tsx",
+      "frontend/features/residents/components/ReportDetailDialog.tsx",
+      "frontend/lib/preferences.tsx",
+    ],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
+  },
+  {
+    files: ["supabase/functions/**/*.ts"],
+    languageOptions: {
+      globals: {
+        Deno: "readonly",
+      },
+    },
+  },
 );

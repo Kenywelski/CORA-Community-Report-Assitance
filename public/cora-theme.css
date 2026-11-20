@@ -1,0 +1,246 @@
+/*
+ * Stable semantic theme tokens loaded before the React application.
+ * Keep these values aligned with frontend/globalStyleSource.ts so all semantic
+ * Tailwind utilities have valid colors during startup and hot reloads.
+ */
+:root {
+  color-scheme: light;
+
+  --background: 180 20% 98%;
+  --foreground: 200 50% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 200 50% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 200 50% 10%;
+
+  --primary: 174 62% 28%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 174 30% 94%;
+  --secondary-foreground: 174 62% 28%;
+  --muted: 180 15% 95%;
+  --muted-foreground: 200 20% 45%;
+  --accent: 16 85% 58%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --emergency: 12 90% 52%;
+  --emergency-foreground: 0 0% 100%;
+  --success: 152 60% 42%;
+  --success-foreground: 0 0% 100%;
+  --warning: 38 92% 50%;
+  --warning-foreground: 0 0% 10%;
+
+  --border: 180 15% 90%;
+  --input: 180 15% 90%;
+  --ring: 174 62% 28%;
+  --radius: 1rem;
+
+  --gradient-primary: linear-gradient(135deg, hsl(174 62% 28%) 0%, hsl(180 55% 22%) 100%);
+  --gradient-hero: linear-gradient(180deg, hsl(174 62% 28%) 0%, hsl(180 55% 35%) 50%, hsl(174 40% 45%) 100%);
+  --gradient-card: linear-gradient(145deg, hsl(0 0% 100%) 0%, hsl(180 20% 98%) 100%);
+  --gradient-accent: linear-gradient(135deg, hsl(16 85% 58%) 0%, hsl(25 90% 55%) 100%);
+
+  --shadow-sm: 0 1px 2px 0 hsl(200 50% 10% / 0.05);
+  --shadow-md: 0 4px 6px -1px hsl(200 50% 10% / 0.08), 0 2px 4px -2px hsl(200 50% 10% / 0.05);
+  --shadow-lg: 0 10px 15px -3px hsl(200 50% 10% / 0.08), 0 4px 6px -4px hsl(200 50% 10% / 0.05);
+  --shadow-xl: 0 20px 25px -5px hsl(200 50% 10% / 0.1), 0 8px 10px -6px hsl(200 50% 10% / 0.05);
+  --shadow-glow: 0 0 20px hsl(174 62% 28% / 0.3);
+
+  --sidebar-background: 0 0% 98%;
+  --sidebar-foreground: 240 5.3% 26.1%;
+  --sidebar-primary: 240 5.9% 10%;
+  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-accent: 240 4.8% 95.9%;
+  --sidebar-accent-foreground: 240 5.9% 10%;
+  --sidebar-border: 220 13% 91%;
+  --sidebar-ring: 217.2 91.2% 59.8%;
+}
+
+:root.dark {
+  color-scheme: dark;
+
+  --background: 200 50% 6%;
+  --foreground: 180 20% 98%;
+  --card: 200 45% 10%;
+  --card-foreground: 180 20% 98%;
+  --popover: 200 45% 10%;
+  --popover-foreground: 180 20% 98%;
+
+  --primary: 174 55% 45%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 200 40% 15%;
+  --secondary-foreground: 174 55% 45%;
+  --muted: 200 35% 15%;
+  --muted-foreground: 180 15% 65%;
+  --accent: 16 80% 55%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 70% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --emergency: 12 85% 50%;
+  --emergency-foreground: 0 0% 100%;
+  --success: 152 55% 45%;
+  --success-foreground: 0 0% 100%;
+  --warning: 38 88% 48%;
+  --warning-foreground: 0 0% 10%;
+
+  /* Unified dark blue-teal outline: #273E49 */
+  --border: 199 31% 22%;
+  --input: 199 31% 22%;
+  --ring: 174 55% 45%;
+
+  --gradient-primary: linear-gradient(135deg, hsl(174 55% 35%) 0%, hsl(180 50% 28%) 100%);
+  --gradient-hero: linear-gradient(180deg, hsl(200 50% 8%) 0%, hsl(174 45% 18%) 100%);
+  --gradient-card: linear-gradient(145deg, hsl(200 45% 12%) 0%, hsl(200 40% 10%) 100%);
+
+  --sidebar-background: 240 5.9% 10%;
+  --sidebar-foreground: 240 4.8% 95.9%;
+  --sidebar-primary: 224.3 76.3% 48%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 240 3.7% 15.9%;
+  --sidebar-accent-foreground: 240 4.8% 95.9%;
+  --sidebar-border: 199 31% 22%;
+  --sidebar-ring: 217.2 91.2% 59.8%;
+}
+
+/*
+ * Light-mode utility safeguards.
+ * These concrete colors prevent a stale development stylesheet from turning
+ * semantic UI utilities into browser-default black and white controls.
+ */
+:root:not(.dark) body,
+:root:not(.dark) .text-foreground {
+  color: #0d1e26;
+}
+
+:root:not(.dark) body,
+:root:not(.dark) .bg-background {
+  background-color: #f9fbfb;
+}
+
+:root:not(.dark) .bg-card,
+:root:not(.dark) .bg-popover {
+  background-color: #ffffff;
+}
+
+:root:not(.dark) .text-card-foreground,
+:root:not(.dark) .text-popover-foreground {
+  color: #0d1e26;
+}
+
+:root:not(.dark) .border-border,
+:root:not(.dark) .border-input {
+  border-color: #e2e9e9;
+}
+
+:root:not(.dark) .bg-primary {
+  background-color: #1b746b;
+}
+
+:root:not(.dark) .text-primary {
+  color: #1b746b;
+}
+
+:root:not(.dark) .border-primary {
+  border-color: #1b746b;
+}
+
+:root:not(.dark) .ring-primary {
+  --tw-ring-color: #1b746b;
+}
+
+:root:not(.dark) .bg-primary\/5 {
+  background-color: rgba(27, 116, 107, 0.05);
+}
+
+:root:not(.dark) .bg-primary\/10 {
+  background-color: rgba(27, 116, 107, 0.1);
+}
+
+:root:not(.dark) .bg-primary\/15 {
+  background-color: rgba(27, 116, 107, 0.15);
+}
+
+:root:not(.dark) .bg-primary\/20 {
+  background-color: rgba(27, 116, 107, 0.2);
+}
+
+:root:not(.dark) .bg-primary\/80 {
+  background-color: rgba(27, 116, 107, 0.8);
+}
+
+:root:not(.dark) .bg-primary\/90 {
+  background-color: rgba(27, 116, 107, 0.9);
+}
+
+:root:not(.dark) .text-primary-foreground {
+  color: #ffffff;
+}
+
+:root:not(.dark) .bg-secondary {
+  background-color: #ebf4f3;
+}
+
+:root:not(.dark) .text-secondary-foreground {
+  color: #1b746b;
+}
+
+:root:not(.dark) .bg-muted {
+  background-color: #f0f4f4;
+}
+
+:root:not(.dark) .text-muted-foreground {
+  color: #5c7a8a;
+}
+
+:root:not(.dark) .bg-accent {
+  background-color: #ef6939;
+}
+
+:root:not(.dark) .text-accent {
+  color: #ef6939;
+}
+
+:root:not(.dark) .text-accent-foreground,
+:root:not(.dark) .text-destructive-foreground,
+:root:not(.dark) .text-success-foreground {
+  color: #ffffff;
+}
+
+:root:not(.dark) .bg-destructive {
+  background-color: #ef4343;
+}
+
+:root:not(.dark) .text-destructive {
+  color: #ef4343;
+}
+
+:root:not(.dark) .border-destructive {
+  border-color: #ef4343;
+}
+
+:root:not(.dark) .bg-success {
+  background-color: #2bab6f;
+}
+
+:root:not(.dark) .text-success {
+  color: #2bab6f;
+}
+
+:root:not(.dark) .bg-warning {
+  background-color: #f59f0a;
+}
+
+:root:not(.dark) .text-warning {
+  color: #f59f0a;
+}
+
+:root:not(.dark) .from-primary {
+  --tw-gradient-from: #1b746b var(--tw-gradient-from-position);
+  --tw-gradient-to: rgba(27, 116, 107, 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+:root:not(.dark) .via-primary {
+  --tw-gradient-to: rgba(27, 116, 107, 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), #1b746b var(--tw-gradient-via-position), var(--tw-gradient-to);
+}

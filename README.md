@@ -1,26 +1,243 @@
-# CORA
+# CORA | Community Report System
 
-mycortes is a full-featured municipal mobile application for the Municipality of Cortes, Surigao del Sur, Philippines, designed as a centralized digital platform that connects residents with local government services. The app enables citizens to register and manage profiles, access official municipal announcements and emergency advisories, submit service requests and community incident reports with photo uploads and location tagging, track the real-time status of their submissions, receive push notifications, view municipal programs and events, and provide feedback or suggestions. A secure web-based admin dashboard allows LGU staff to manage users, review and assign requests and reports to appropriate departments, update statuses, publish announcements and events, send notifications, and monitor analytics, all aimed at improving service efficiency, transparency, citizen engagement, and timely communication during emergencies.
+CORA is the community reporting and public information system for Barangay Purisima, Municipality of Tago, Surigao del Sur. Residents can submit and track community concerns, view announcements and programs, and access barangay information. Department staff receive assigned requests in a dedicated queue, while administrators manage the full system.
 
-This project was built with [Lovable](https://lovable.dev).
+## Project Structure
 
-**Live app**: https://cortes-connect-hub.lovable.app
+```text
+Cora-barangay-purisima/
+|-- backend/
+|   |-- api.ts
+|   |-- geminiRetry.ts
+|   |-- reportValidation.ts
+|   |-- reportValidation.test.ts
+|   |-- reportWorkflow.ts
+|   `-- index.ts
+|-- frontend/
+|   |-- app/
+|   |   |-- App.tsx
+|   |   |-- AppProviders.tsx
+|   |   |-- AppRouter.tsx
+|   |   |-- NotFound.tsx
+|   |   |-- RouteGuards.tsx
+|   |   `-- routePaths.ts
+|   |-- components/
+|   |   `-- ui/
+|   |       |-- alert-dialog.tsx
+|   |       |-- alert.tsx
+|   |       |-- avatar.tsx
+|   |       |-- badge.tsx
+|   |       |-- button.tsx
+|   |       |-- card.tsx
+|   |       |-- chart.tsx
+|   |       |-- dialog.tsx
+|   |       |-- form.tsx
+|   |       |-- input.tsx
+|   |       |-- label.tsx
+|   |       |-- popover.tsx
+|   |       |-- scroll-area.tsx
+|   |       |-- select.tsx
+|   |       |-- separator.tsx
+|   |       |-- skeleton.tsx
+|   |       |-- sonner.tsx
+|   |       |-- switch.tsx
+|   |       |-- tabs.tsx
+|   |       |-- textarea.tsx
+|   |       |-- toast.tsx
+|   |       |-- toaster.tsx
+|   |       `-- tooltip.tsx
+|   |-- data/
+|   |   `-- purisima_boundary.geojson.ts
+|   |-- features/
+|   |   |-- admin/
+|   |   |   |-- components/
+|   |   |   |   |-- AdminLayout.tsx
+|   |   |   |   `-- AdminSidebar.tsx
+|   |   |   `-- pages/
+|   |   |       |-- AdminAnnouncements.tsx
+|   |   |       |-- AdminChat.tsx
+|   |   |       |-- AdminDashboard.tsx
+|   |   |       |-- AdminEmergencyContacts.tsx
+|   |   |       |-- AdminFeedback.tsx
+|   |   |       |-- AdminKnowledge.tsx
+|   |   |       |-- AdminOffices.tsx
+|   |   |       |-- AdminPrograms.tsx
+|   |   |       |-- AdminRequests.tsx
+|   |   |       `-- AdminUsers.tsx
+|   |   |-- auth/
+|   |   |   |-- AuthContext.ts
+|   |   |   |-- AuthProvider.tsx
+|   |   |   |-- authEmail.ts
+|   |   |   `-- useAuth.ts
+|   |   |-- emergency-contacts/
+|   |   |   `-- queryKeys.ts
+|   |   |-- landing/
+|   |   |   |-- components/
+|   |   |   |   `-- LandingFaqChatbot.tsx
+|   |   |   `-- pages/
+|   |   |       `-- Landing.tsx
+|   |   |-- maps/
+|   |   |   `-- PurisimaBoundaryLayer.tsx
+|   |   |-- realtime/
+|   |   |   `-- publicDataSync.ts
+|   |   |-- reports/
+|   |   |   |-- api/
+|   |   |   |   `-- reportQueryKeys.ts
+|   |   |   |-- components/
+|   |   |   |   |-- LocationPicker.tsx
+|   |   |   |   `-- MediaUpload.tsx
+|   |   |   |-- reportUpdateText.ts
+|   |   |   `-- testReports.ts
+|   |   |-- residents/
+|   |   |   |-- assets/
+|   |   |   |   |-- hero-coastal.jpg
+|   |   |   |   `-- purisima-sunrise.jpg
+|   |   |   |-- components/
+|   |   |   |   |-- ActivityFeed.tsx
+|   |   |   |   |-- AnnouncementDetailDialog.tsx
+|   |   |   |   |-- AnnouncementsFeed.tsx
+|   |   |   |   |-- AppSettingsCard.tsx
+|   |   |   |   |-- AuthGuard.tsx
+|   |   |   |   |-- BarangayPurisimaMap.tsx
+|   |   |   |   |-- BottomNav.tsx
+|   |   |   |   |-- ChatbotLauncher.tsx
+|   |   |   |   |-- DirectCameraCapture.tsx
+|   |   |   |   |-- HeroHeader.tsx
+|   |   |   |   |-- HomeGate.tsx
+|   |   |   |   |-- NotificationBell.tsx
+|   |   |   |   |-- PerformanceDashboard.tsx
+|   |   |   |   |-- QuickServices.tsx
+|   |   |   |   |-- ReportDetailDialog.tsx
+|   |   |   |   |-- ReportWorkflowSteps.tsx
+|   |   |   |   |-- RequestStatusCard.tsx
+|   |   |   |   |-- ResidentPageHeader.tsx
+|   |   |   |   `-- VoiceReportAssistant.tsx
+|   |   |   `-- pages/
+|   |   |       |-- Auth.tsx
+|   |   |       |-- CommunityWall.tsx
+|   |   |       |-- Directory.tsx
+|   |   |       |-- EmergencyContacts.tsx
+|   |   |       |-- Feedback.tsx
+|   |   |       |-- GuestMode.tsx
+|   |   |       |-- Index.tsx
+|   |   |       |-- MyRequests.tsx
+|   |   |       |-- Profile.tsx
+|   |   |       |-- Programs.tsx
+|   |   |       |-- ReportIssue.tsx
+|   |   |       |-- Services.tsx
+|   |   |       |-- Settings.tsx
+|   |   |       `-- Updates.tsx
+|   |   `-- staff/
+|   |       `-- pages/
+|   |           `-- StaffRequests.tsx
+|   |-- hooks/
+|   |   |-- use-mobile.tsx
+|   |   `-- use-toast.ts
+|   |-- integrations/
+|   |   `-- supabase/
+|   |       |-- client.ts
+|   |       `-- types.ts
+|   |-- lib/
+|   |   |-- aiClientIdentity.ts
+|   |   |-- barangayContentStore.ts
+|   |   |-- coraFaqEngine.ts
+|   |   |-- imageAnalysisService.ts
+|   |   |-- reportAnalysis.ts
+|   |   |-- preferences.tsx
+|   |   |-- purisimaGeo.ts
+|   |   |-- residentNav.ts
+|   |   `-- utils.ts
+|   |-- globalStyleSource.ts
+|   |-- main.tsx
+|   `-- vite-env.d.ts
+|-- public/
+|   |-- assets/
+|   |   `-- branding/
+|   |       |-- barangay-hall-purisima.png
+|   |       `-- cora-logo.png
+|   `-- cora-theme.css
+|-- dist/                       # Generated by `npm run build`; hashed assets omitted
+|-- node_modules/               # Generated by `npm install`; dependencies omitted
+|-- .env                        # Local environment values
+|-- .env.example                # Environment variable template
+|-- .gitignore
+|-- AGENTS.md
+|-- README.md
+|-- components.json
+|-- eslint.config.js
+|-- index.html
+|-- package-lock.json
+|-- package.json
+|-- postcss.config.js
+|-- tailwind.config.ts
+|-- tsconfig.app.json
+|-- tsconfig.json
+|-- tsconfig.node.json
+`-- vite.config.ts
+```
 
-## Build with Lovable
+The tree lists every maintained project file currently present. `.git/`, generated dependency
+contents, and hashed production bundle files are intentionally not expanded.
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/040a4e84-b1fc-47c3-8fd1-5e2fe429eb2d).
+## System Architecture
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+The React application is composed in `frontend/app`, with domain and role-specific behavior owned
+by `frontend/features`. Shared primitives live in `frontend/components/ui`, while external clients
+remain under `frontend/integrations`. The Node/Express host in `backend` serves the application and
+the server-side AI endpoints. Supabase-dependent frontend modules remain typed and isolated under
+`frontend/integrations/supabase`, ready to connect to the replacement project.
+
+Add new code to the folder that owns its responsibility. Create narrower folders such as
+`backend/routes`, `backend/controllers`, or `frontend/types` only when the project has code for
+those responsibilities; avoid empty placeholder directories.
+
+The repository includes Supabase database migrations and the `admin-user-management` Edge Function.
+Deploy that function with `npx supabase functions deploy admin-user-management
+--remote=<project-ref> --use-api`. It verifies admin access before returning account emails or
+deleting a user. It uses Supabase's server-side `SUPABASE_SERVICE_ROLE_KEY`; never expose that key
+in frontend code or a `VITE_*` variable.
+Other Edge Functions and production database setup must be provisioned separately.
+
+When voice reporting is restored, transcription and organization belong in the `voice-report`
+function without storing audio. The organized result must continue through the standard report
+insert path so validation, routing, and status tracking remain centralized.
 
 ## Development
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Install Node.js and npm, then run these commands from the project directory:
 
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+```powershell
+npm install
 npm run dev
 ```
+
+Open the local URL printed by the server (usually `http://localhost:3000`). Copy `.env.example` to
+`.env` and configure `VITE_SUPABASE_PROJECT_ID`, `VITE_SUPABASE_URL`, and
+`VITE_SUPABASE_PUBLISHABLE_KEY` for the new Supabase project. The frontend intentionally stops at
+startup when the URL or publishable key is missing. In the project-root `.env`, also set
+`SUPABASE_SERVICE_ROLE_KEY`, `OPENCLIP_API_TOKEN`, and `GEMINI_API_KEY` for the backend. The
+OpenCLIP token is sent server-to-server in the `X-API-Key` header. Never put these secrets in
+`VITE_*` variables or commit `.env`.
+
+Google sign-in remains disabled unless `VITE_GOOGLE_AUTH_ENABLED=true` is set. Enable it only after
+adding a valid Google OAuth Client ID and Client Secret in the Supabase dashboard under Authentication
+> Providers > Google, and configuring the Supabase callback URL and Google authorized redirect URI.
+
+Run `npm run backend:dev` in a second terminal. Set `VITE_CORA_API_URL=http://localhost:3001` for
+local frontend requests, and configure `CORA_ALLOWED_ORIGINS` with the deployed frontend origin
+when hosting the backend remotely. Report submission requires the
+`20261119000000_report_ai_security.sql` migration; it moves report inserts behind the backend
+verification workflow. Administrators can enable Test Resident uploads from User Management.
+
+## Validation
+
+```powershell
+npm run typecheck
+npm test
+npm run lint
+npm run build
+```
+
+`npm run validate` runs the same checks in sequence. Deploy and verify the required Supabase
+migrations and Edge Functions before releasing features that depend on authentication, database
+records, storage, realtime events, or server-side account management.
