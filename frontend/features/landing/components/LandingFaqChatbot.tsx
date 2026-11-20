@@ -180,14 +180,12 @@ export const LandingFaqChatbot = ({
           liveContext: liveContext ?? null,
         },
       };
-      const localBackendUrl = import.meta.env.DEV
-        ? import.meta.env.VITE_CORA_API_URL?.trim()
-        : '';
+      const backendUrl = import.meta.env.VITE_CORA_API_URL?.trim();
       let answer: string;
 
-      if (localBackendUrl) {
+      if (backendUrl) {
         const response = await fetch(
-          `${localBackendUrl.replace(/\/+$/, '')}/api/chat`,
+          `${backendUrl.replace(/\/+$/, '')}/api/chat`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

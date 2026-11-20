@@ -311,20 +311,18 @@ export const ChatbotLauncher = () => {
     try {
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      const localBackendUrl = import.meta.env.DEV
-        ? import.meta.env.VITE_CORA_API_URL?.trim()
-        : '';
+      const backendUrl = import.meta.env.VITE_CORA_API_URL?.trim();
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Please sign in to use the assistant.');
       const res = await fetch(
-        localBackendUrl
-          ? `${localBackendUrl.replace(/\/+$/, '')}/api/chat`
+        backendUrl
+          ? `${backendUrl.replace(/\/+$/, '')}/api/chat`
           : `${SUPABASE_URL}/functions/v1/chat-ai`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(localBackendUrl ? {} : { apikey: ANON }),
+            ...(backendUrl ? {} : { apikey: ANON }),
             'Authorization': `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
