@@ -5,7 +5,7 @@ import { reportWorkflowRouter } from './reportWorkflow.ts';
 
 const env = loadEnv('development', process.cwd(), '');
 const app = express();
-const port = Number(process.env.API_PORT) || 3001;
+const port = Number(process.env.PORT || process.env.API_PORT) || 3001;
 const allowedOrigins = new Set([
   'http://localhost:3000',
   'http://127.0.0.1:3000',
