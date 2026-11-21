@@ -61,10 +61,10 @@ const GuestMode = () => {
           <button
             type="button"
             onClick={() => navigate('/auth')}
-            className="mb-6 hidden h-8 items-center gap-2 rounded-full px-3 text-sm font-semibold text-[#087765] transition-colors hover:bg-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#087d6e]/40 lg:flex"
+            className="mb-8 hidden items-center gap-2 text-muted-foreground transition-colors hover:text-foreground lg:flex"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Sign In Page
+            <span className="text-sm font-medium">Back to Sign In Page</span>
           </button>
 
           <div className="w-full rounded-[22px] border border-white/80 bg-[linear-gradient(145deg,#ffffff_0%,#f8fcff_100%)] px-5 py-5 text-center shadow-[0_12px_28px_rgba(19,91,101,0.14)] sm:rounded-[24px] sm:px-8 sm:py-9">
