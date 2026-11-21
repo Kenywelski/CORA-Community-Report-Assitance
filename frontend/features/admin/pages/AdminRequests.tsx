@@ -403,6 +403,7 @@ const AdminRequests = () => {
 
   const stats = {
     total: requests.length,
+    guest: requests.filter((r) => r.user_id === null).length,
     submitted: requests.filter((r) => r.status === 'pending').length,
     inProgress: requests.filter((r) =>
       ['assigned', 'in_progress'].includes(r.status)
@@ -424,6 +425,7 @@ const AdminRequests = () => {
   const filteredRequests = requests
     .filter((r) => {
       if (activeTab === 'all') return true;
+      if (activeTab === 'guest') return r.user_id === null;
       if (activeTab === 'in_progress') {
         return r.status === 'in_progress' || r.status === 'assigned';
       }
@@ -476,7 +478,7 @@ const AdminRequests = () => {
   return (
     <AdminLayout
       title="Report Management"
-      subtitle={`${stats.total} total resident ${stats.total === 1 ? 'report' : 'reports'}`}
+      subtitle={`${stats.total} total ${stats.total === 1 ? 'report' : 'reports'}`}
     >
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
         {[
@@ -598,9 +600,10 @@ const AdminRequests = () => {
       <Card className="rounded-2xl border-0 bg-card shadow-none">
         <CardContent className="p-2.5 sm:p-3">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-3 flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl bg-muted/70 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:grid md:grid-cols-5 md:overflow-visible">
+            <TabsList className="mb-3 flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl bg-muted/70 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:grid md:grid-cols-6 md:overflow-visible">
               {[
                 { value: 'all', label: 'All', count: stats.total },
+                { value: 'guest', label: 'Guest Reports', count: stats.guest },
                 { value: 'pending', label: 'Pending', count: statusCounts.pending },
                 { value: 'under_review', label: 'Under Review', count: statusCounts.under_review },
                 { value: 'in_progress', label: 'In Progress', count: statusCounts.in_progress },

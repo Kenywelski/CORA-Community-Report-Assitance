@@ -229,6 +229,14 @@ when hosting the backend remotely. Report submission requires the
 `20261119000000_report_ai_security.sql` migration; it moves report inserts behind the backend
 verification workflow. Administrators can enable Test Resident uploads from User Management.
 
+### Vercel deployment
+
+The root `vercel.json` configures the Vite build output and SPA route fallback so direct visits or
+refreshes on React Router pages resolve to `index.html`. Deploy from the repository root and set
+the public Supabase variables plus `VITE_CORA_API_URL` in the Vercel project environment. The
+report-processing backend must be hosted separately, and its `CORA_ALLOWED_ORIGINS` must include
+the deployed frontend origin.
+
 ## Validation
 
 ```powershell
