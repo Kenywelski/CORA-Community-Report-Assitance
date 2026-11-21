@@ -37,7 +37,6 @@ import {
   AlertCircle,
   ArrowLeft,
   CalendarDays,
-  Camera,
   CameraOff,
   Check,
   CheckCircle2,
@@ -57,6 +56,7 @@ import {
   Send,
   ShieldCheck,
   User,
+  Zap,
 } from 'lucide-react';
 
 type ReportStage = 'capture' | 'review' | 'submitted';
@@ -395,6 +395,8 @@ const ReportIssue = () => {
   const [possibleDuplicate, setPossibleDuplicate] = useState(false);
   const [captureMode, setCaptureMode] = useState<'camera' | 'upload'>('camera');
   const [submissionFailed, setSubmissionFailed] = useState(false);
+  const [torchEnabled, setTorchEnabled] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
   const analysisInFlight = useRef(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -408,9 +410,39 @@ const ReportIssue = () => {
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
+    setTorchEnabled(false);
     if (videoRef.current) videoRef.current.srcObject = null;
     if (mobileVideoRef.current) mobileVideoRef.current.srcObject = null;
   }, []);
+
+  const toggleTorch = useCallback(async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) {
+      toast.error('Camera torch is unavailable.');
+      return;
+    }
+
+    const capabilities = track.getCapabilities?.() as MediaTrackCapabilities & {
+      torch?: boolean;
+    };
+    if (!torchSupported && !capabilities?.torch) {
+      toast.error('Torch is not supported by this camera.');
+      return;
+    }
+
+    const nextEnabled = !torchEnabled;
+    try {
+      const torchConstraint: MediaTrackConstraintSet & { torch: boolean } = {
+        torch: nextEnabled,
+      };
+      await track.applyConstraints({
+        advanced: [torchConstraint],
+      });
+      setTorchEnabled(nextEnabled);
+    } catch {
+      toast.error('Unable to change the camera torch.');
+    }
+  }, [torchEnabled, torchSupported]);
 
   const startCamera = useCallback(async () => {
     stopCamera();
@@ -435,6 +467,12 @@ const ReportIssue = () => {
         },
       });
       streamRef.current = stream;
+      setTorchEnabled(false);
+      const track = stream.getVideoTracks()[0];
+      const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & {
+        torch?: boolean;
+      };
+      setTorchSupported(capabilities?.torch === true);
       const videos = [videoRef.current, mobileVideoRef.current].filter(
         (video): video is HTMLVideoElement => video !== null,
       );
@@ -817,11 +855,15 @@ const ReportIssue = () => {
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label="Retry camera"
-                onClick={() => void startCamera()}
-                className="h-10 w-10 rounded-full border border-white/25 bg-black/35 text-white hover:bg-black/50 hover:text-white"
+                aria-label={torchEnabled ? 'Turn flashlight off' : 'Turn flashlight on'}
+                aria-pressed={torchEnabled}
+                onClick={() => void toggleTorch()}
+                className={cn(
+                  'h-10 w-10 rounded-full border border-white/25 bg-black/35 text-white hover:bg-black/50 hover:text-white',
+                  torchEnabled && 'bg-white text-[#00745B] hover:bg-white hover:text-[#00745B]',
+                )}
               >
-                <RefreshCw className="h-4 w-4" />
+                <Zap className="h-5 w-5" fill={torchEnabled ? 'currentColor' : 'none'} />
               </Button>
             </header>
 
@@ -888,9 +930,7 @@ const ReportIssue = () => {
                 >
                   <span className="h-[58px] w-[58px] rounded-full bg-white" />
                 </button>
-                <span className="flex h-14 w-16 items-center justify-center">
-                  <Camera className="h-6 w-6 text-white/75" />
-                </span>
+                <span className="h-14 w-16" />
               </div>
               <p className="mt-3 text-center text-sm font-bold">
                 Take a photo of the issue
@@ -941,15 +981,6 @@ const ReportIssue = () => {
                     <p className="mt-0.5 whitespace-nowrap text-[9px] text-white/90">Barangay Purisima</p>
                   </div>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => void startCamera()}
-                  aria-label="Retry camera"
-                  className="absolute right-6 top-5 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/40 bg-black/15 text-white backdrop-blur-md transition hover:bg-white/10 2xl:right-[30px] 2xl:top-[22px] 2xl:h-[58px] 2xl:w-[58px]"
-                >
-                  <RefreshCw className="h-5 w-5 2xl:h-7 2xl:w-7" />
-                </button>
 
                 <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-[280px] w-[440px] max-h-[50vh] max-w-[46vw] -translate-x-1/2 -translate-y-1/2 2xl:h-[445px] 2xl:w-[560px] 2xl:max-h-[54vh] 2xl:max-w-[48vw]">
                   <span className="absolute left-0 top-0 h-10 w-10 rounded-tl-2xl border-l-4 border-t-4 border-white 2xl:h-[58px] 2xl:w-[58px] 2xl:rounded-tl-[24px] 2xl:border-l-[7px] 2xl:border-t-[7px]" />
