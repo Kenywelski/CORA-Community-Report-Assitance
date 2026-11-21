@@ -1012,11 +1012,9 @@ const ReportIssue = () => {
               muted
               playsInline
               className="absolute inset-0 h-full w-full object-cover"
-              style={{ backgroundColor: palette.camera }}
+              style={{ backgroundColor: palette.camera, filter: 'none' }}
               aria-label="Live camera preview"
             />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/75" />
-            <div className="pointer-events-none absolute inset-0 bg-black/10" />
 
             <header
               data-camera-controls
@@ -1154,6 +1152,7 @@ const ReportIssue = () => {
                   style={{
                     backgroundColor:
                       cameraStarting || cameraError ? '#011412' : '#000000',
+                    filter: 'none',
                   }}
                   aria-label="Live camera preview"
                 />
