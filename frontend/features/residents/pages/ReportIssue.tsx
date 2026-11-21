@@ -4,6 +4,7 @@ import {
   type SetStateAction,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -466,7 +467,7 @@ const ReportIssue = () => {
   const [torchSupported, setTorchSupported] = useState(false);
   const analysisInFlight = useRef(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = document.getElementById('root');
     const previousRootBackground = root?.style.backgroundColor ?? '';
     const previousBodyBackground = document.body.style.backgroundColor;
@@ -916,7 +917,7 @@ const ReportIssue = () => {
       className={cn(
         'min-h-screen transition-colors',
         stage === 'capture'
-          ? 'overflow-hidden pb-0 lg:pb-6'
+          ? 'overflow-hidden touch-none select-none pb-0 lg:pb-6'
           : stage === 'review'
             ? 'pb-20 lg:pb-6'
             : 'pb-6',
