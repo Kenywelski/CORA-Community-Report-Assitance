@@ -1,4 +1,4 @@
-import { Camera, UserRound } from 'lucide-react';
+import { ArrowLeft, Camera, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import heroCoastal from '@/features/residents/assets/hero-coastal.jpg';
 import { useAppPreferences } from '@/lib/preferences';
@@ -57,27 +57,38 @@ const GuestMode = () => {
           <span className="text-xs font-bold sm:text-sm">Guest Mode</span>
         </div>
 
-        <div className="w-full max-w-[520px] rounded-[22px] border border-white/80 bg-[linear-gradient(145deg,#ffffff_0%,#f8fcff_100%)] px-5 py-5 text-center shadow-[0_12px_28px_rgba(19,91,101,0.14)] sm:rounded-[24px] sm:px-8 sm:py-9 lg:max-w-[560px]">
-          <div className="mx-auto flex h-[84px] w-[84px] items-center justify-center rounded-[22px] bg-[#d4f7f1] text-[#06735f] sm:h-[104px] sm:w-[104px] sm:rounded-[26px]">
-            <Camera className="h-14 w-14 sm:h-[60px] sm:w-[60px]" strokeWidth={2.25} />
-          </div>
-
-          <h2 className="mt-3 text-[26px] font-extrabold leading-[1.15] tracking-[-0.04em] text-[#10213b] sm:mt-4 sm:text-[32px]">
-            Report an Issue
-          </h2>
-          <p className="mx-auto mt-1 max-w-[440px] text-[14px] font-medium leading-[1.4] text-[#65758d] sm:mt-2.5 sm:text-base">
-            Capture a photo of a community concern
-            <br className="hidden sm:block" /> in Barangay Purisima.
-          </p>
-
+        <div className="w-full max-w-[520px] lg:max-w-[560px]">
           <button
             type="button"
-            onClick={() => navigate('/report-issue?mode=guest')}
-            className="mt-5 flex h-11 w-full items-center justify-center gap-3 rounded-[15px] bg-[linear-gradient(100deg,#078a73_0%,#007b67_100%)] px-5 text-base font-extrabold text-white shadow-sm transition-transform duration-150 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#087d6e]/25 active:translate-y-0 sm:mt-6 sm:h-14 sm:text-lg"
+            onClick={() => navigate('/auth')}
+            className="mb-6 hidden h-8 items-center gap-2 rounded-full px-3 text-sm font-semibold text-[#087765] transition-colors hover:bg-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#087d6e]/40 lg:flex"
           >
-            <Camera className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={2.1} />
-            Capture Photo
+            <ArrowLeft className="h-4 w-4" />
+            Back to Sign In Page
           </button>
+
+          <div className="w-full rounded-[22px] border border-white/80 bg-[linear-gradient(145deg,#ffffff_0%,#f8fcff_100%)] px-5 py-5 text-center shadow-[0_12px_28px_rgba(19,91,101,0.14)] sm:rounded-[24px] sm:px-8 sm:py-9">
+            <div className="mx-auto flex h-[84px] w-[84px] items-center justify-center rounded-[22px] bg-[#d4f7f1] text-[#06735f] sm:h-[104px] sm:w-[104px] sm:rounded-[26px]">
+              <Camera className="h-14 w-14 sm:h-[60px] sm:w-[60px]" strokeWidth={2.25} />
+            </div>
+
+            <h2 className="mt-3 text-[26px] font-extrabold leading-[1.15] tracking-[-0.04em] text-[#10213b] sm:mt-4 sm:text-[32px]">
+              Report an Issue
+            </h2>
+            <p className="mx-auto mt-1 max-w-[440px] text-[14px] font-medium leading-[1.4] text-[#65758d] sm:mt-2.5 sm:text-base">
+              Capture a photo of a community concern
+              <br className="hidden sm:block" /> in Barangay Purisima.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => navigate('/report-issue?mode=guest')}
+              className="mt-5 flex h-11 w-full items-center justify-center gap-3 rounded-[15px] bg-[linear-gradient(100deg,#078a73_0%,#007b67_100%)] px-5 text-base font-extrabold text-white shadow-sm transition-transform duration-150 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#087d6e]/25 active:translate-y-0 sm:mt-6 sm:h-14 sm:text-lg"
+            >
+              <Camera className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={2.1} />
+              Capture Photo
+            </button>
+          </div>
         </div>
       </section>
     </main>

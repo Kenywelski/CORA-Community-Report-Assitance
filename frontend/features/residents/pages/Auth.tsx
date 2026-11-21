@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,6 +48,35 @@ const Auth = () => {
     isLoading,
   } = useAuth();
   const navigate = useNavigate();
+  const navigateRef = useRef(navigate);
+  useEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!window.matchMedia('(max-width: 1023px)').matches) return;
+
+    const currentState: unknown = window.history.state?.usr;
+    const existingState =
+      typeof currentState === 'object' && currentState !== null ? currentState : {};
+    const hasMobileBackTrap =
+      'mobileAuthBackTrap' in existingState &&
+      existingState.mobileAuthBackTrap === true;
+
+    if (!hasMobileBackTrap) {
+      navigateRef.current(
+        `${window.location.pathname}${window.location.search}${window.location.hash}`,
+        { state: { ...existingState, mobileAuthBackTrap: true } },
+      );
+    }
+
+    const handleMobileBack = () => {
+      navigateRef.current(ROUTES.landing, { replace: true });
+    };
+    window.addEventListener('popstate', handleMobileBack);
+    return () => window.removeEventListener('popstate', handleMobileBack);
+  }, []);
+
   const authInputClassName =
     'h-14 rounded-[20px] border-[#d5dadd] bg-[#f8f9fa] pl-12 text-base shadow-none placeholder:text-[#6b7280] focus-visible:border-[#1f7f73] focus-visible:ring-[#1f7f73]/20 lg:h-11 lg:rounded-md lg:border-input lg:bg-background lg:pl-10 lg:text-sm';
   const primaryAuthButtonClassName =

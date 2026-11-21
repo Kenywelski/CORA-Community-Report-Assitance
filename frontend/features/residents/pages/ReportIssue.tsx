@@ -1025,11 +1025,11 @@ const ReportIssue = () => {
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label="Go back"
+                aria-label="Close camera"
                 onClick={() => navigate(-1)}
                 className="h-10 w-10 rounded-full border border-white/25 bg-black/35 text-white hover:bg-black/50 hover:text-white"
               >
-                <ArrowLeft className="h-5 w-5" />
+                <X className="h-5 w-5" />
               </Button>
               <Button
                 type="button"
