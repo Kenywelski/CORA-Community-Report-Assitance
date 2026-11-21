@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Building2,
@@ -96,9 +96,16 @@ const MobileProfileMenuRow = ({ icon: Icon, label, onClick }: MobileProfileMenuR
 );
 
 const Profile = () => {
+  const location = useLocation();
   const navigate = useNavigate();
   const { user, isLoading: authLoading, isAdmin, signOut } = useAuth();
-  const [mobileView, setMobileView] = useState<'menu' | 'information'>('menu');
+  const mobileView =
+    location.state !== null &&
+    typeof location.state === 'object' &&
+    'profileView' in location.state &&
+    location.state.profileView === 'information'
+      ? 'information'
+      : 'menu';
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -221,7 +228,9 @@ const Profile = () => {
                   icon={UserRound}
                   label="Profile Information"
                   onClick={() => {
-                    setMobileView('information');
+                    navigate(location.pathname, {
+                      state: { profileView: 'information' },
+                    });
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                 />
@@ -250,6 +259,19 @@ const Profile = () => {
         )}
 
         <div className={cn(mobileView === 'menu' ? 'hidden lg:block' : 'block')}>
+
+        {mobileView === 'information' && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(-1)}
+            className="mb-3 h-9 rounded-full px-3 text-xs font-semibold lg:hidden"
+          >
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            Back to My Profile
+          </Button>
+        )}
 
         <ResidentPageHeader
           title="My Profile"
