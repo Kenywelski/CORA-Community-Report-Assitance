@@ -392,10 +392,10 @@ const RESIDENT_TRANSLATIONS: Record<string, LocalizedText> = {
   '{count} follower': { en: '{count} follower', tl: '{count} tagasubaybay', ceb: '{count} nagsubaybay' },
   '{count} followers': { en: '{count} followers', tl: '{count} tagasubaybay', ceb: '{count} nagsubaybay' },
   Purok: { en: 'Purok', tl: 'Purok', ceb: 'Purok' },
-  'Barangay Staff Messages & Updates': {
-    en: 'Barangay Staff Messages & Updates',
-    tl: 'Mga Mensahe at Update ng Kawani ng Barangay',
-    ceb: 'Mga Mensahe ug Update sa Kawani sa Barangay',
+  'Messages & Updates': {
+    en: 'Messages & Updates',
+    tl: 'Mga Mensahe at Update',
+    ceb: 'Mga Mensahe ug Update',
   },
   'You have no reports yet.': {
     en: 'You have no reports yet.',

@@ -183,9 +183,9 @@ export const ImagePreview = ({
           overlayClassName="bg-black/20 backdrop-blur-md"
           closeButtonClassName="right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border-0 bg-background/95 p-0 text-foreground opacity-100 shadow-md hover:bg-background hover:opacity-100 focus:outline-none focus:ring-0 focus:ring-offset-0"
           className={cn(
-            '!flex items-center justify-center border-0 p-0 !shadow-none',
+            '!flex items-center justify-center border-0 p-0 !shadow-none !outline-none !ring-0',
             fullScreenOnMobile
-              ? '!fixed !left-0 !top-0 !h-[100dvh] !max-h-none !w-screen !max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none !bg-black lg:!left-[50%] lg:!top-[50%] lg:!h-auto lg:!max-h-[92dvh] lg:!w-auto lg:!max-w-[96vw] lg:!-translate-x-1/2 lg:!-translate-y-1/2 lg:!rounded-2xl'
+              ? '!fixed !left-0 !top-0 !h-[100dvh] !max-h-none !w-screen !max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none !bg-black lg:!left-[50%] lg:!top-[50%] lg:!h-[92dvh] lg:!max-h-[92dvh] lg:!w-[96vw] lg:!max-w-[96vw] lg:!-translate-x-1/2 lg:!-translate-y-1/2 lg:!rounded-none lg:!bg-transparent'
               : 'h-auto max-h-[92dvh] w-auto max-w-[96vw] overflow-visible !bg-transparent'
           )}
         >
@@ -195,8 +195,8 @@ export const ImagePreview = ({
             alt={alt}
             className={
               fullScreenOnMobile
-                ? 'h-full w-full max-h-[100dvh] max-w-[100vw] object-contain lg:h-auto lg:w-auto lg:max-h-[88dvh] lg:max-w-[96vw]'
-                : 'max-h-[88dvh] max-w-full rounded object-contain'
+                ? 'h-full w-full max-h-[100dvh] max-w-[100vw] object-contain lg:h-full lg:w-full lg:max-h-[92dvh] lg:max-w-[96vw] lg:rounded-none'
+                : 'max-h-[88dvh] max-w-full rounded-none object-contain'
             }
           />
         </DialogContent>

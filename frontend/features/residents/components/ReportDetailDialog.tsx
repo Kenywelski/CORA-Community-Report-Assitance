@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import {
   AlignLeft,
-  ArrowLeft,
   Bell,
   BellOff,
   Building2,
@@ -371,22 +370,14 @@ export const ReportDetailDialog = ({
       <DialogContent
         closeButtonClassName="hidden"
         className={cn(
-          '!block !h-[100dvh] !max-h-none !w-screen !max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none border-0 bg-background p-0 shadow-2xl ring-0',
-          showMyReportsMobileView
-            ? '!left-0 !top-0 lg:!left-[50%] lg:!top-[50%] lg:!h-auto lg:!max-h-[94dvh] lg:!w-[calc(100vw-3rem)] lg:!max-w-4xl lg:!-translate-x-1/2 lg:!-translate-y-1/2 lg:!rounded-[22px] lg:!overflow-y-auto'
-            : mobileMyReportsLayout
-              ? '!left-0 !top-0 sm:!left-[50%] sm:!top-[50%] sm:!h-auto sm:!max-h-[94dvh] sm:!w-[calc(100vw-3rem)] sm:!max-w-4xl sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:!rounded-[22px] sm:!overflow-y-auto'
-              : '!left-0 !top-0 sm:!left-[50%] sm:!top-[50%] sm:!h-auto sm:!max-h-[86dvh] sm:!w-[calc(100vw-3rem)] sm:!max-w-4xl sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:!rounded-[22px]',
+          '!block !h-[100dvh] !max-h-none !w-screen !max-w-none !translate-x-0 !translate-y-0 overflow-x-hidden overflow-y-auto rounded-none border-0 bg-background p-0 shadow-2xl ring-0 [scrollbar-gutter:stable]',
+          '!left-0 !top-0',
         )}
       >
         <div
           className={cn(
-            'h-full max-h-[100dvh] overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]',
-            showMyReportsMobileView
-              ? 'p-0 lg:max-h-[94dvh] lg:p-4 lg:pb-6'
-              : mobileMyReportsLayout
-                ? 'p-2 sm:h-auto sm:max-h-none sm:overflow-visible sm:p-3 lg:p-4 lg:pb-6'
-                : 'p-2 sm:max-h-[86dvh] sm:p-3 lg:p-4',
+            'min-h-full',
+            'p-2 sm:p-3 lg:p-4 lg:pb-6',
           )}
         >
           <DialogTitle className="sr-only">{cleanTitle}</DialogTitle>
@@ -403,7 +394,7 @@ export const ReportDetailDialog = ({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 rounded-full text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/30"
+                    className="h-8 w-8 rounded-full border-0 bg-red-50 p-0 text-red-600 shadow-none hover:bg-red-100 hover:text-red-700 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20 dark:hover:text-red-200"
                     aria-label={translate('Delete report')}
                     title={translate('Delete report')}
                     onClick={() => setDeleteDialogOpen(true)}
@@ -426,7 +417,7 @@ export const ReportDetailDialog = ({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 shrink-0 rounded-none border-0 bg-transparent p-0 text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground focus-visible:ring-0 sm:h-8 sm:w-8"
+                    className="h-8 w-8 shrink-0 rounded-full border border-border/70 bg-background p-0 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground focus-visible:ring-0"
                     aria-label={translate('Close report details')}
                   >
                     <X className="h-4 w-4" />
@@ -435,9 +426,9 @@ export const ReportDetailDialog = ({
               </div>
             </div>
 
-            <div className="mt-1.5 flex items-center gap-1.5">
+            <div className="mt-1.5 inline-flex items-center rounded-full bg-muted pr-1 text-muted-foreground">
               <span
-                className="inline-flex rounded-full bg-muted px-3 py-1 font-mono text-[11px] font-semibold text-muted-foreground"
+                className="inline-flex px-3 py-1 font-mono text-[11px] font-semibold"
                 title={report.id}
               >
                 Report ID: {reportReference}
@@ -446,7 +437,7 @@ export const ReportDetailDialog = ({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className="h-7 w-7 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="h-6 w-6 shrink-0 rounded-full p-0 text-muted-foreground hover:bg-background hover:text-primary"
                 aria-label={translate('Copy report ID')}
                 title={translate('Copy report ID')}
                 onClick={() => void handleCopyReportId()}
@@ -456,7 +447,7 @@ export const ReportDetailDialog = ({
             </div>
           </header>
 
-          <section className="mt-2 rounded-[18px] border border-border/70 bg-card p-2.5 shadow-sm sm:p-3">
+          <section className="mt-5 rounded-[18px] border border-border/70 bg-card p-2.5 shadow-sm sm:p-3">
             <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-base font-extrabold tracking-tight sm:text-lg">
                 {translate('Report Progress')}
@@ -518,10 +509,12 @@ export const ReportDetailDialog = ({
                   <LocationPicker
                     value={coordinates}
                     onChange={() => undefined}
-                    height="260px"
+                    height="380px"
                     readOnly
                     hideLabel
                     hideCoordinates={mobileMyReportsLayout}
+                    focusOnValue
+                    zoomControlVariant="report"
                     markerVariant="report"
                   />
                 ) : (
@@ -584,19 +577,9 @@ export const ReportDetailDialog = ({
 
           {showMyReportsMobileView && (
             <div>
-              <header className="border-b border-[#e1ebe8] bg-gradient-to-r from-[#f0faf6] to-white px-3 py-2">
+              <header className="px-3 pb-2 pt-6">
                 <div className="flex min-w-0 items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 rounded-full text-[#008c5b] hover:bg-[#e3f5ec]"
-                    onClick={() => onOpenChange(false)}
-                    aria-label={translate('Back to My Reports')}
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                  <h1 className="min-w-0 flex-1 truncate text-sm font-extrabold leading-tight text-[#0b1838]">
+                  <h1 className="min-w-0 flex-1 truncate text-lg font-extrabold leading-tight text-[#0b1838] dark:text-foreground">
                     {cleanTitle}
                   </h1>
                   <span
@@ -612,7 +595,7 @@ export const ReportDetailDialog = ({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 shrink-0 rounded-full text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/30"
+                      className="h-8 w-8 shrink-0 rounded-full border-0 bg-red-50 p-0 text-red-600 shadow-none hover:bg-red-100 hover:text-red-700 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20 dark:hover:text-red-200"
                       aria-label={translate('Delete report')}
                       title={translate('Delete report')}
                       onClick={() => setDeleteDialogOpen(true)}
@@ -624,7 +607,7 @@ export const ReportDetailDialog = ({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 shrink-0 rounded-full text-muted-foreground"
+                      className="h-8 w-8 shrink-0 rounded-full border border-border/70 bg-background p-0 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground focus-visible:ring-0"
                       aria-label={translate('Close report details')}
                     >
                       <X className="h-4 w-4" />
@@ -632,7 +615,7 @@ export const ReportDetailDialog = ({
                   </DialogClose>
                 </div>
 
-                <div className="mt-1 flex items-center justify-between gap-2 rounded-full bg-[#e8f7f0] px-2.5 py-1.5 text-xs text-[#0b1838]">
+                <div className="mt-3 flex items-center justify-between gap-1 rounded-full bg-[#e8f7f0] py-1 pl-2.5 pr-1 text-xs text-[#0b1838] dark:bg-primary/10 dark:text-foreground">
                   <div className="flex min-w-0 items-center gap-2">
                     <FileText className="h-3.5 w-3.5 shrink-0 text-[#008c5b]" />
                     <span className="truncate font-semibold">
@@ -643,7 +626,7 @@ export const ReportDetailDialog = ({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 shrink-0 rounded-full text-[#008c5b] hover:bg-white/70"
+                    className="h-6 w-6 shrink-0 rounded-full p-0 text-[#008c5b] hover:bg-white/70 dark:text-teal-300 dark:hover:bg-white/10"
                     aria-label={translate('Copy report ID')}
                     onClick={() => void handleCopyReportId()}
                   >
@@ -652,13 +635,13 @@ export const ReportDetailDialog = ({
                 </div>
               </header>
 
-              <main className="space-y-4 p-4">
-                <section className="rounded-[22px] bg-[#eff8f4] p-3">
+              <main className="space-y-4 px-4 pb-4 pt-1">
+                <section className="rounded-[22px] bg-[#eff8f4] p-3 dark:bg-card">
                   <div className="flex min-w-0 items-center justify-between gap-1.5">
-                    <h2 className="min-w-0 flex-1 truncate whitespace-nowrap text-[13px] font-extrabold tracking-tight text-[#0b1838]">
+                    <h2 className="min-w-0 flex-1 truncate whitespace-nowrap text-[13px] font-extrabold tracking-tight text-[#0b1838] dark:text-foreground">
                       {translate('Report Progress')}
                     </h2>
-                    <span className="shrink-0 whitespace-nowrap rounded-full bg-[#dcf3e8] px-1.5 py-1 text-[8px] font-bold text-[#008c5b]">
+                    <span className="shrink-0 whitespace-nowrap rounded-full bg-[#dcf3e8] px-1.5 py-1 text-[8px] font-bold text-[#008c5b] dark:bg-primary/15 dark:text-teal-300">
                       {translate('Last Update: {date}', {
                         date: format(new Date(latestUpdate), 'MMM d, h:mm a'),
                       })}
@@ -666,7 +649,7 @@ export const ReportDetailDialog = ({
                   </div>
 
                   <div className="relative mt-4">
-                    <div className="absolute left-[12.5%] right-[12.5%] top-4 h-0.5 bg-[#cbd5df]" />
+                    <div className="absolute left-[12.5%] right-[12.5%] top-4 h-0.5 bg-[#cbd5df] dark:bg-slate-600" />
                     {currentStepIndex > 0 && (
                       <div
                         className="absolute left-[12.5%] top-4 h-0.5 bg-[#008c5b]"
@@ -682,10 +665,10 @@ export const ReportDetailDialog = ({
                           <div key={step.label} className="flex min-w-0 flex-col items-center text-center">
                             <span
                               className={cn(
-                                'z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 bg-white',
+                                'z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 bg-white dark:bg-card',
                                 active
                                   ? 'border-[#008c5b] bg-[#008c5b] text-white'
-                                  : 'border-[#aab6c5] text-[#aab6c5]',
+                                  : 'border-[#aab6c5] text-[#aab6c5] dark:border-slate-600 dark:text-slate-500',
                               )}
                             >
                               {active ? (
@@ -699,12 +682,12 @@ export const ReportDetailDialog = ({
                                 'mt-2 flex min-h-7 w-full items-center justify-center rounded-full px-1 text-[9px] font-extrabold leading-tight min-[400px]:text-[10px]',
                                 active
                                   ? 'bg-[#008c5b] text-white'
-                                  : 'bg-[#e9eef1] text-[#344054]',
+                                  : 'bg-[#e9eef1] text-[#344054] dark:bg-muted dark:text-muted-foreground',
                               )}
                             >
                               {translate(step.label)}
                             </span>
-                            <span className="mt-1 text-[9px] leading-tight text-[#68778e] min-[400px]:text-[10px]">
+                            <span className="mt-1 text-[9px] leading-tight text-[#68778e] dark:text-muted-foreground min-[400px]:text-[10px]">
                               {step.date
                                 ? format(new Date(step.date), 'MMM d, h:mm a')
                                 : translate('Pending')}
@@ -716,12 +699,12 @@ export const ReportDetailDialog = ({
                   </div>
                 </section>
 
-                <section className="overflow-hidden rounded-[20px] border border-[#e4ebef] bg-white shadow-sm">
+                <section className="overflow-hidden rounded-[20px] border border-[#e4ebef] bg-white shadow-sm dark:border-border/70 dark:bg-card">
                   {reportImage ? (
                     <ImagePreview
                       src={reportImage}
                       alt={'Evidence for ' + cleanTitle}
-                      className="w-full bg-white"
+                      className="w-full bg-white dark:bg-card"
                       fullScreenOnMobile
                     >
                       <img
@@ -738,11 +721,11 @@ export const ReportDetailDialog = ({
                   )}
                 </section>
 
-                <section className="rounded-[22px] border border-[#e4ebef] bg-white p-4">
-                  <h2 className="mb-2 text-lg font-extrabold tracking-tight text-[#0b1838]">
+                <section className="rounded-[22px] border border-[#e4ebef] bg-white p-4 dark:border-border/70 dark:bg-card">
+                  <h2 className="mb-2 text-lg font-extrabold tracking-tight text-[#0b1838] dark:text-foreground">
                     {translate('Report Information')}
                   </h2>
-                  <div className="divide-y divide-[#e7edf0]">
+                  <div className="divide-y divide-[#e7edf0] dark:divide-border/60">
                     <MobileInformationRow label={translate('Category')} icon={<Tag className="h-5 w-5" />}>
                       <span className="inline-flex rounded-full bg-[#e2f5eb] px-3 py-1 text-xs font-bold text-[#008c5b]">
                         {cleanCategory}
@@ -768,20 +751,20 @@ export const ReportDetailDialog = ({
                   </div>
                 </section>
 
-                <details className="group rounded-[20px] border border-[#e4ebef] bg-white px-4 py-3">
+                <details className="group rounded-[20px] border border-[#e4ebef] bg-white px-4 py-3 dark:border-border/70 dark:bg-card">
                   <summary className="flex cursor-pointer list-none items-center gap-3">
                     <User className="h-6 w-6 shrink-0 text-[#008c5b]" />
                     <span className="min-w-0 flex-1">
-                      <span className="block font-extrabold text-[#0b1838]">
+                      <span className="block font-extrabold text-[#0b1838] dark:text-foreground">
                         {translate('Reporter Information')}
                       </span>
-                      <span className="block text-xs text-[#68778e]">
+                      <span className="block text-xs text-[#68778e] dark:text-muted-foreground">
                         {translate('Optional details (Name and Contact)')}
                       </span>
                     </span>
-                    <ChevronDown className="h-5 w-5 shrink-0 text-[#0b1838] transition-transform group-open:rotate-180" />
+                    <ChevronDown className="h-5 w-5 shrink-0 text-[#0b1838] transition-transform group-open:rotate-180 dark:text-foreground" />
                   </summary>
-                  <div className="mt-3 space-y-3 border-t border-[#e7edf0] pt-3">
+                  <div className="mt-3 space-y-3 border-t border-[#e7edf0] pt-3 dark:border-border/60">
                     <InformationRow label={translate('Name')}>
                       <p>{report.reporter_name || '—'}</p>
                     </InformationRow>
@@ -793,8 +776,8 @@ export const ReportDetailDialog = ({
                   </div>
                 </details>
 
-                <section className="rounded-[22px] border border-[#e1efe8] bg-[#f0f9f5] p-4">
-                  <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold text-[#0b1838]">
+                <section className="rounded-[22px] border border-[#e1efe8] bg-[#f0f9f5] p-4 dark:border-border/70 dark:bg-card">
+                  <h2 className="mb-3 flex items-center gap-2 text-lg font-extrabold text-[#0b1838] dark:text-foreground">
                     <MapPin className="h-6 w-6 text-[#008c5b]" />
                     {translate('Reported Location')}
                   </h2>
@@ -838,31 +821,25 @@ export const ReportDetailDialog = ({
             className={cn(
               'mt-2 rounded-[18px] border border-border/70 bg-card p-3 shadow-sm',
               showMyReportsMobileView &&
-                'mt-4 rounded-[22px] border-[#e4ebef] bg-white p-3 lg:mt-2 lg:rounded-[18px] lg:border-border/70 lg:bg-card lg:p-3',
+                'mx-4 mt-1 rounded-[22px] border-[#e4ebef] bg-white p-3 dark:border-border/70 dark:bg-card lg:mx-0 lg:mt-2 lg:rounded-[18px] lg:border-border/70 lg:bg-card lg:p-3',
             )}
           >
             <div
               className={cn(
                 'flex min-w-0 flex-col gap-2 border-b border-border/60 pb-2.5 sm:flex-row sm:items-center sm:justify-between',
-                showMyReportsMobileView && 'border-b-0 pb-0 lg:border-b lg:pb-2.5',
+                showMyReportsMobileView && 'border-b pb-2.5 lg:border-b lg:pb-2.5',
               )}
             >
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
-                  <MessageCircle
-                    className={cn(
-                      'h-6 w-6 shrink-0 text-primary',
-                      showMyReportsMobileView && 'h-5 w-5 lg:h-6 lg:w-6',
-                    )}
-                  />
                   <h2
                     className={cn(
                       'text-lg font-extrabold tracking-tight sm:text-xl',
                       showMyReportsMobileView &&
-                        'min-w-0 whitespace-nowrap text-[12px] leading-tight tracking-tight lg:text-lg lg:tracking-normal',
+                        'min-w-0 whitespace-nowrap text-lg leading-tight tracking-tight lg:text-lg lg:tracking-normal',
                     )}
                   >
-                    {translate('Barangay Staff Messages & Updates')}
+                    {translate('Messages & Updates')}
                   </h2>
                 </div>
               </div>
@@ -899,7 +876,7 @@ export const ReportDetailDialog = ({
               {(residentUpdate || report.action_taken) && (
                 <DiscussionEntry
                   official
-                  author="Barangay Purisima"
+                  author={translate('Barangay Response')}
                   date={latestUpdate}
                   label={translate(officialUpdateLabel)}
                   content={residentUpdate || report.action_taken || ''}
@@ -918,7 +895,9 @@ export const ReportDetailDialog = ({
                   key={comment.id}
                   official={comment.is_official}
                   author={
-                    comment.is_official ? 'Barangay Purisima' : comment.author_name || 'Resident'
+                    comment.is_official
+                      ? translate('Barangay Response')
+                      : comment.author_name || 'Resident'
                   }
                   date={comment.created_at}
                   content={comment.content}
@@ -937,7 +916,7 @@ export const ReportDetailDialog = ({
                         <i className="h-1.5 w-1.5 rounded-full bg-[#68c79a]" />
                       </span>
                     </div>
-                    <p className="text-sm text-[#68778e]">{translate('No messages yet.')}</p>
+                    <p className="text-sm text-[#68778e] dark:text-muted-foreground">{translate('No messages yet.')}</p>
                   </div>
                 ) : (
                   <p className="py-2 text-center text-sm text-muted-foreground">
@@ -955,7 +934,7 @@ export const ReportDetailDialog = ({
           if (!deleteMutation.isPending) setDeleteDialogOpen(isOpen);
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="border-0">
           <AlertDialogHeader>
             <AlertDialogTitle>{translate('Delete this report?')}</AlertDialogTitle>
             <AlertDialogDescription>
@@ -963,7 +942,10 @@ export const ReportDetailDialog = ({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>
+            <AlertDialogCancel
+              disabled={deleteMutation.isPending}
+              className="border border-primary/70 text-primary hover:border-primary hover:bg-primary/10"
+            >
               {translate('Keep report')}
             </AlertDialogCancel>
             <AlertDialogAction
@@ -972,7 +954,7 @@ export const ReportDetailDialog = ({
                 event.preventDefault();
                 deleteMutation.mutate();
               }}
-              className="bg-red-600 text-white hover:bg-red-700"
+              className="border-0 bg-red-600 text-white !outline-none !ring-0 !ring-offset-0 hover:bg-red-700 focus-visible:border-0"
             >
               {deleteMutation.isPending ? translate('Deleting...') : translate('Delete report')}
             </AlertDialogAction>
@@ -1080,8 +1062,8 @@ const MobileInformationRow = ({
 }) => (
   <div className="grid grid-cols-[24px_minmax(66px,0.42fr)_minmax(0,1fr)] items-start gap-2 py-2.5 text-sm">
     <span className="pt-0.5 text-[#008c5b]">{icon}</span>
-    <span className="font-bold text-[#0b1838]">{label}</span>
-    <div className="min-w-0 text-[#26364d]">{children}</div>
+    <span className="font-bold text-[#0b1838] dark:text-foreground">{label}</span>
+    <div className="min-w-0 text-[#26364d] dark:text-muted-foreground">{children}</div>
   </div>
 );
 
@@ -1103,21 +1085,21 @@ const DiscussionEntry = ({
   const { translate } = useAppPreferences();
 
   return (
-  <article className="flex items-start gap-3">
+  <article className="grid grid-cols-[36px_minmax(0,1fr)] items-start gap-2.5">
     <div
       className={cn(
-        'flex h-11 w-11 shrink-0 items-center justify-center rounded-full',
+        'flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
         official
           ? 'bg-primary/10 text-primary'
           : 'bg-muted text-muted-foreground',
       )}
     >
-      {official ? <Building2 className="h-5 w-5" /> : <User className="h-5 w-5" />}
+      {official ? <Building2 className="h-4 w-4" /> : <User className="h-4 w-4" />}
     </div>
-    <div className="min-w-0 flex-1 rounded-2xl bg-muted/65 px-4 py-3">
-      <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-extrabold">{author}</span>
+    <div className="min-w-0 overflow-hidden rounded-2xl bg-muted/65 px-3 py-2.5">
+      <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <span className="max-w-full break-words text-sm font-extrabold">{author}</span>
           {official && (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
               <ShieldCheck className="h-3 w-3" /> {translate('Official')}
@@ -1128,14 +1110,13 @@ const DiscussionEntry = ({
           {format(new Date(date), 'MMM d, yyyy, h:mm a')}
         </time>
       </div>
-      {label && <p className="mt-2 text-xs font-bold text-primary">{label}</p>}
-      <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{content}</p>
+      <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed [overflow-wrap:anywhere]">{content}</p>
       {secondaryContent && (
         <div className="mt-3 rounded-xl border border-primary/20 bg-primary/[0.055] p-3">
           <div className="mb-1 flex items-center gap-1.5 text-xs font-bold text-primary">
           <CheckCircle2 className="h-3.5 w-3.5" /> {translate('Action Taken')}
           </div>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">{secondaryContent}</p>
+          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed [overflow-wrap:anywhere]">{secondaryContent}</p>
         </div>
       )}
     </div>

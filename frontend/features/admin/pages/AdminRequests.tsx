@@ -36,7 +36,6 @@ import {
   Briefcase,
   MoreHorizontal,
   Pencil,
-  X,
   ShieldCheck,
   Search,
   ClipboardList,
@@ -47,6 +46,8 @@ import {
   Map,
   ChevronRight,
   Send,
+  X,
+  Copy,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -187,6 +188,7 @@ const AdminRequests = () => {
   const [adminNotes, setAdminNotes] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [isEditingRemarks, setIsEditingRemarks] = useState(false);
+  const [editingRemarkIndex, setEditingRemarkIndex] = useState<number | null>(null);
   const [editingRemarks, setEditingRemarks] = useState('');
   const [isRemarksMenuOpen, setIsRemarksMenuOpen] = useState(false);
   const { user } = useAuth();
@@ -301,7 +303,8 @@ const AdminRequests = () => {
 
   const saveRemarksOnly = async (
     value: string,
-    action: 'send' | 'edit'
+    action: 'send' | 'edit',
+    remarkIndex?: number
   ) => {
     if (!selectedRequest) return;
     if (isResolvedReport(selectedRequest.status)) {
@@ -316,9 +319,21 @@ const AdminRequests = () => {
 
     setIsUpdating(true);
     const updatedAt = new Date().toISOString();
+    const existingRemarks = (selectedRequest.admin_review_notes || '')
+      .split(/\n\n+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const nextRemarks =
+      action === 'send'
+        ? [...existingRemarks, remarks].join('\n\n')
+        : typeof remarkIndex === 'number'
+          ? existingRemarks
+              .map((item, index) => (index === remarkIndex ? remarks : item))
+              .join('\n\n')
+          : remarks;
     const { error } = await supabase
       .from('community_reports')
-      .update({ admin_review_notes: remarks, updated_at: updatedAt })
+      .update({ admin_review_notes: nextRemarks, updated_at: updatedAt })
       .eq('id', selectedRequest.id)
       .select('id')
       .single();
@@ -326,23 +341,24 @@ const AdminRequests = () => {
     else {
       toast.success(action === 'edit' ? 'Remarks updated' : 'Remarks sent');
       setSelectedRequest((prev) =>
-        prev ? { ...prev, admin_review_notes: remarks, updated_at: updatedAt } : prev
+        prev ? { ...prev, admin_review_notes: nextRemarks, updated_at: updatedAt } : prev
       );
       setRequests((prev) =>
         prev.map((item) =>
           item.id === selectedRequest.id
-            ? { ...item, admin_review_notes: remarks, updated_at: updatedAt }
+            ? { ...item, admin_review_notes: nextRemarks, updated_at: updatedAt }
             : item
         )
       );
       if (action === 'send') setAdminNotes('');
-      setEditingRemarks(remarks);
+      setEditingRemarks(nextRemarks);
       setIsEditingRemarks(false);
+      setEditingRemarkIndex(null);
     }
     setIsUpdating(false);
   };
 
-  const deleteRemarks = async () => {
+  const deleteRemarks = async (remarkIndex?: number) => {
     if (!selectedRequest) return;
     if (isResolvedReport(selectedRequest.status)) {
       toast.error('Resolved reports can no longer be edited');
@@ -350,9 +366,20 @@ const AdminRequests = () => {
     }
 
     setIsUpdating(true);
+    const existingRemarks = (selectedRequest.admin_review_notes || '')
+      .split(/\n\n+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const nextRemarks =
+      typeof remarkIndex === 'number'
+        ? existingRemarks.filter((_, index) => index !== remarkIndex).join('\n\n')
+        : '';
     const { error } = await supabase
       .from('community_reports')
-      .update({ admin_review_notes: null, updated_at: new Date().toISOString() })
+      .update({
+        admin_review_notes: nextRemarks || null,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', selectedRequest.id)
       .select('id')
       .single();
@@ -362,17 +389,18 @@ const AdminRequests = () => {
     } else {
       toast.success('Remarks deleted');
       setSelectedRequest((prev) =>
-        prev ? { ...prev, admin_review_notes: null } : prev
+        prev ? { ...prev, admin_review_notes: nextRemarks || null } : prev
       );
       setRequests((prev) =>
         prev.map((item) =>
           item.id === selectedRequest.id
-            ? { ...item, admin_review_notes: null }
+            ? { ...item, admin_review_notes: nextRemarks || null }
             : item
         )
       );
       setEditingRemarks('');
       setIsEditingRemarks(false);
+      setEditingRemarkIndex(null);
     }
     setIsUpdating(false);
   };
@@ -398,6 +426,7 @@ const AdminRequests = () => {
     setAdminNotes(req.admin_review_notes ? '' : getLegacyStaffUpdate(req.admin_notes));
     setEditingRemarks(req.admin_review_notes || '');
     setIsEditingRemarks(false);
+    setEditingRemarkIndex(null);
     setIsRemarksMenuOpen(false);
   };
 
@@ -730,13 +759,17 @@ const AdminRequests = () => {
       >
         <DialogContent
           closeButtonClassName="hidden"
-          className="!flex h-[86dvh] max-h-[86dvh] w-[calc(100vw-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-[22px] border-0 bg-background p-0 shadow-2xl ring-0 sm:w-[calc(100vw-3rem)]"
+          className="!flex !left-0 !top-0 h-[100dvh] max-h-none w-screen max-w-none !translate-x-0 !translate-y-0 flex-col gap-0 overflow-x-hidden overflow-y-auto rounded-none border-0 bg-background p-0 shadow-2xl ring-0 [scrollbar-gutter:stable]"
         >
           {selectedRequest &&
             (() => {
               const req = selectedRequest;
               const isResolved = isResolvedReport(req.status);
               const hasSentRemarks = Boolean(req.admin_review_notes?.trim());
+              const remarkEntries = (req.admin_review_notes || '')
+                .split(/\n\n+/)
+                .map((item) => item.trim())
+                .filter(Boolean);
               const metadataName = user?.user_metadata?.full_name;
               const remarkAuthor =
                 (typeof metadataName === 'string' && metadataName.trim()) ||
@@ -809,13 +842,43 @@ const AdminRequests = () => {
               ];
               return (
                 <>
-                  <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3 [scrollbar-gutter:stable] sm:p-4 lg:p-5">
-                    <header>
+                  <div className="min-h-full flex-1 p-3 sm:p-4 lg:p-5">
+                    <header className="-mx-3 px-3 pb-3 sm:-mx-4 sm:px-4 lg:-mx-5 lg:px-5">
                       <div className="flex min-w-0 items-center justify-between gap-2">
                         <DialogTitle className="min-w-0 flex-1 truncate text-lg font-extrabold leading-tight tracking-tight sm:text-2xl">
                           {cleanTitle}
                         </DialogTitle>
                         <div className="flex shrink-0 items-center gap-2">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <AdminActionButton
+                                action="delete"
+                                icon={Trash2}
+                                aria-label="Delete report"
+                                title="Delete report"
+                                disabled={isUpdating}
+                                className="h-8 w-8 rounded-full border-0 bg-red-50 p-0 text-red-600 shadow-none hover:bg-red-100 hover:text-red-700 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20 dark:hover:text-red-200"
+                              />
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Delete this report?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteRequest(req.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                           <span
                             className={cn(
                               'inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-extrabold sm:text-sm',
@@ -826,11 +889,12 @@ const AdminRequests = () => {
                             {cfg.label}
                           </span>
                           <Button
+                            type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 shrink-0 rounded-none border-0 bg-transparent p-0 text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground focus-visible:ring-0 sm:h-8 sm:w-8"
                             aria-label="Close report details"
                             onClick={() => setSelectedRequest(null)}
+                            className="h-8 w-8 shrink-0 rounded-full border border-border/70 bg-background p-0 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground focus-visible:ring-0"
                           >
                             <X className="h-4 w-4" />
                           </Button>
@@ -840,9 +904,30 @@ const AdminRequests = () => {
                         <span className="inline-flex max-w-full truncate rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
                           {categoryLabel}
                         </span>
-                        <span className="inline-flex rounded-full bg-muted px-3 py-1 font-mono text-[11px] font-semibold text-muted-foreground">
-                          Report ID: {refNum}
-                        </span>
+                        <div className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-muted-foreground">
+                          <span className="font-mono text-[11px] font-semibold">
+                            Report ID: {refNum}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Copy report ID"
+                            title="Copy report ID"
+                            className="h-6 w-6 rounded-full p-0 text-muted-foreground hover:bg-background hover:text-primary"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(refNum);
+                                toast.success('Report ID copied');
+                              } catch (error) {
+                                console.error('Failed to copy report ID:', error);
+                                toast.error('Unable to copy the report ID.');
+                              }
+                            }}
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
                     </header>
 
@@ -932,7 +1017,7 @@ const AdminRequests = () => {
                         })}
                       </div>
 
-                      <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-3">
+                      <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
                         <span className="text-xs font-semibold text-muted-foreground">
                           Update Status
                         </span>
@@ -968,10 +1053,10 @@ const AdminRequests = () => {
                       </div>
                     </section>
 
-                    <div className="mt-2 grid items-stretch gap-1.5 lg:grid-cols-2">
+                    <div className="mt-2 grid items-start gap-1.5 lg:grid-cols-2">
                       <div className="contents">
                       {mediaItems.length > 0 && (
-                        <section className="order-1 flex h-full min-h-0 flex-col overflow-hidden rounded-[18px] border border-border/70 bg-card shadow-sm">
+                        <section className="order-1 flex h-[380px] min-h-0 flex-col overflow-hidden rounded-[18px] border border-border/70 bg-card shadow-sm">
                           {mediaItems[0].type === 'image' ? (
                             <ImagePreview
                               src={mediaItems[0].url}
@@ -992,7 +1077,7 @@ const AdminRequests = () => {
                             />
                           )}
                           {mediaItems.length > 1 && (
-                            <div className="border-t border-border/60 p-3">
+                            <div className="p-3">
                               <p className="mb-2 text-xs font-bold">
                                 Attached Media ({mediaItems.length})
                               </p>
@@ -1015,10 +1100,13 @@ const AdminRequests = () => {
                               lng: Number(req.longitude),
                             }}
                             onChange={() => undefined}
-                            height="260px"
+                            height="380px"
                             readOnly
                             hideLabel
                             hideCoordinates
+                            focusOnValue
+                            zoomControlVariant="report"
+                            markerVariant="report"
                           />
                         ) : (
                           <div className="flex min-h-36 flex-col items-center justify-center gap-2 rounded-2xl bg-muted/30 text-center text-muted-foreground">
@@ -1035,7 +1123,7 @@ const AdminRequests = () => {
 
                       <section
                         className={cn(
-                          'order-2 h-full rounded-[18px] border border-border/70 bg-card p-2.5 shadow-sm',
+                          'order-2 min-h-[380px] rounded-[18px] border border-border/70 bg-card p-2.5 shadow-sm',
                           mediaItems.length === 0 && 'lg:col-span-2'
                         )}
                       >
@@ -1080,7 +1168,7 @@ const AdminRequests = () => {
                               </div>
                             </div>
                           )}
-                          <div className="border-t border-border/60 pt-2">
+                          <div className="pt-2">
                             <h3 className="mb-1.5 flex items-center gap-2 text-base font-extrabold tracking-tight sm:text-lg">
                               <User className="h-4 w-4 text-primary" />
                               Reporter Information
@@ -1114,145 +1202,137 @@ const AdminRequests = () => {
                       </div>
                     </div>
 
-                    <section className="mt-2 rounded-[18px] border border-border/70 bg-card p-3 shadow-sm">
+                    <section className="mt-2 mb-5 rounded-[18px] border border-border/70 bg-card p-3 shadow-sm">
                       <div data-testid="report-field-action-remarks">
                         <h2 className="mb-2 flex items-center gap-2 text-base font-extrabold tracking-tight">
                           <MessageSquare className="h-5 w-5 text-primary" />
                           Field Action Remarks
                         </h2>
                         {hasSentRemarks && (
-                          <article className="mb-2 rounded-xl bg-primary/[0.05] p-2.5">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex min-w-0 items-center gap-1.5 pt-0.5 text-xs">
-                                <span className="truncate font-bold text-primary">
-                                  {remarkAuthor}
-                                </span>
-                                <span aria-hidden="true" className="text-muted-foreground">
-                                  ·
-                                </span>
-                                <span className="shrink-0 text-muted-foreground">
-                                  {formatDistanceToNow(
-                                    new Date(req.updated_at || req.created_at),
-                                    { addSuffix: true }
-                                  )}
-                                </span>
-                              </div>
-                              <Popover
-                                open={isRemarksMenuOpen}
-                                onOpenChange={setIsRemarksMenuOpen}
-                              >
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 shrink-0 rounded-lg bg-background/40 text-muted-foreground hover:bg-background hover:text-foreground"
-                                    aria-label="Remarks actions"
-                                    disabled={isUpdating || isResolved}
-                                  >
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent
-                                  align="end"
-                                  className="w-44 rounded-xl p-2"
-                                >
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    className="w-full justify-start"
-                                    onClick={() => {
-                                      setEditingRemarks(req.admin_review_notes || '');
-                                      setIsEditingRemarks(true);
-                                      setIsRemarksMenuOpen(false);
+                          <div className="mb-2 space-y-2">
+                            {remarkEntries.map((remark, remarkIndex) => (
+                              <article key={`${remarkIndex}-${remark.slice(0, 24)}`} className="rounded-xl bg-primary/[0.05] p-2.5">
+                                <div className="grid grid-cols-[minmax(0,1fr)_32px] items-start gap-2">
+                                  <div className="flex min-w-0 flex-wrap items-center gap-1.5 pt-0.5 text-xs">
+                                    <span className="max-w-full break-words font-bold text-primary">
+                                      {remarkAuthor}
+                                    </span>
+                                    <span aria-hidden="true" className="text-muted-foreground">·</span>
+                                    <span className="text-muted-foreground">
+                                      {formatDistanceToNow(
+                                        new Date(req.updated_at || req.created_at),
+                                        { addSuffix: true }
+                                      )}
+                                    </span>
+                                  </div>
+                                  <Popover
+                                    open={isRemarksMenuOpen && editingRemarkIndex === remarkIndex}
+                                    onOpenChange={(open) => {
+                                      setIsRemarksMenuOpen(open);
+                                      if (open) setEditingRemarkIndex(remarkIndex);
                                     }}
                                   >
-                                    <Pencil className="h-4 w-4" />
-                                    Edit remarks
-                                  </Button>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
+                                    <PopoverTrigger asChild>
                                       <Button
                                         type="button"
                                         variant="ghost"
-                                        className="w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                        size="icon"
+                                        className="h-8 w-8 shrink-0 rounded-lg bg-background/40 text-muted-foreground hover:bg-background hover:text-foreground"
+                                        aria-label="Remarks actions"
+                                        disabled={isUpdating || isResolved}
                                       >
-                                        <Trash2 className="h-4 w-4" />
-                                        Delete remarks
+                                        <MoreHorizontal className="h-4 w-4" />
                                       </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>
-                                          Delete these remarks?
-                                        </AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          This removes the sent remarks from the report and cannot be undone.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction
-                                          onClick={() => void deleteRemarks()}
-                                        >
-                                          Delete remarks
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </PopoverContent>
-                              </Popover>
-                            </div>
-                            {isEditingRemarks ? (
-                              <>
-                                <Textarea
-                                  aria-label="Edit sent field action remarks"
-                                  value={editingRemarks}
-                                  onChange={(event) =>
-                                    setEditingRemarks(event.target.value)
-                                  }
-                                  rows={1}
-                                  className="!mt-2 !min-h-12 resize-none rounded-lg border-primary/70 bg-background px-3 py-2 text-sm shadow-none focus-visible:ring-1 focus-visible:ring-primary/30"
-                                  disabled={isUpdating || isResolved}
-                                />
-                                <div className="mt-2 flex justify-end gap-2">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="rounded-lg"
-                                    onClick={() => {
-                                      setEditingRemarks(req.admin_review_notes || '');
-                                      setIsEditingRemarks(false);
-                                    }}
-                                    disabled={isUpdating}
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    className="rounded-lg"
-                                    onClick={() =>
-                                      void saveRemarksOnly(editingRemarks, 'edit')
-                                    }
-                                    disabled={isUpdating || !editingRemarks.trim()}
-                                  >
-                                    {isUpdating ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Check className="h-4 w-4" />
-                                    )}
-                                    {isUpdating ? 'Saving...' : 'Save'}
-                                  </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent align="end" className="w-44 rounded-xl p-2">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        className="w-full justify-start"
+                                        onClick={() => {
+                                          setEditingRemarks(remark);
+                                          setEditingRemarkIndex(remarkIndex);
+                                          setIsEditingRemarks(true);
+                                          setIsRemarksMenuOpen(false);
+                                        }}
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                        Edit remarks
+                                      </Button>
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            className="w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                            Delete remarks
+                                          </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>Delete this remarks card?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                              This removes this sent remarks card and cannot be undone.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => void deleteRemarks(remarkIndex)}>
+                                              Delete remarks
+                                            </AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </PopoverContent>
+                                  </Popover>
                                 </div>
-                              </>
-                            ) : (
-                              <div className="mt-2 whitespace-pre-wrap rounded-lg px-1 py-1 text-sm leading-5 text-foreground">
-                                {req.admin_review_notes}
-                              </div>
-                            )}
-                          </article>
+                                {isEditingRemarks && editingRemarkIndex === remarkIndex ? (
+                                  <>
+                                    <Textarea
+                                      aria-label="Edit sent field action remarks"
+                                      value={editingRemarks}
+                                      onChange={(event) => setEditingRemarks(event.target.value)}
+                                      rows={2}
+                                      className="!mt-2 !min-h-12 resize-none rounded-lg border-primary/70 bg-background px-3 py-2 text-sm shadow-none focus-visible:ring-1 focus-visible:ring-primary/30"
+                                      disabled={isUpdating || isResolved}
+                                    />
+                                    <div className="mt-2 flex justify-end gap-2">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="rounded-lg"
+                                        onClick={() => {
+                                          setEditingRemarks(remark);
+                                          setEditingRemarkIndex(null);
+                                          setIsEditingRemarks(false);
+                                        }}
+                                        disabled={isUpdating}
+                                      >
+                                        Cancel
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        className="rounded-lg"
+                                        onClick={() => void saveRemarksOnly(editingRemarks, 'edit', remarkIndex)}
+                                        disabled={isUpdating || !editingRemarks.trim()}
+                                      >
+                                        {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                                        {isUpdating ? 'Saving...' : 'Save'}
+                                      </Button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="mt-2 max-w-full whitespace-pre-wrap break-words rounded-lg px-1 py-1 text-sm leading-5 text-foreground [overflow-wrap:anywhere]">
+                                    {remark}
+                                  </div>
+                                )}
+                              </article>
+                            ))}
+                          </div>
                         )}
                         <div className="relative mt-2 overflow-hidden rounded-2xl border border-border/80 bg-background transition-colors focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10">
                           <Textarea
@@ -1294,47 +1374,7 @@ const AdminRequests = () => {
                         </div>
                       </div>
                     </section>
-                  </div>
-
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border/60 bg-background px-3 py-3 sm:px-5">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedRequest(null)}
-                      className="mr-auto rounded-lg border border-emerald-700 bg-transparent text-emerald-800 shadow-none hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-500 dark:text-emerald-300 dark:hover:bg-emerald-950 dark:hover:text-emerald-200"
-                    >
-                      <X className="mr-1 h-4 w-4" /> Close
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <AdminActionButton
-                          action="delete"
-                          icon={Trash2}
-                          aria-label="Delete report"
-                          title="Delete report"
-                          disabled={isUpdating}
-                        />
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>
-                            Delete this report?
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => deleteRequest(req.id)}
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-
+                    <div aria-hidden="true" className="h-6 shrink-0" />
                   </div>
                 </>
               );

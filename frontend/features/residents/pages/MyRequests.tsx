@@ -326,7 +326,7 @@ const createStyles = (
     },
     list: { display: 'grid', gap: 8, marginTop: 18 },
     row: {
-      minHeight: desktop ? 112 : 96,
+      minHeight: desktop ? 112 : mobile ? 104 : 96,
       overflow: 'hidden',
       border: '1px solid transparent',
       borderRadius: 16,
@@ -336,44 +336,50 @@ const createStyles = (
     },
     rowMain: {
       display: 'grid',
+      position: mobile ? 'relative' : undefined,
       gridTemplateColumns: wide
         ? '140px minmax(280px, 1fr) 126px 150px'
         : desktop
           ? '128px minmax(220px, 1fr) 120px 146px'
           : mobile
-            ? '76px minmax(0, 1fr)'
+            ? '68px minmax(0, 1fr)'
             : '104px minmax(0, 1fr) 112px 142px',
-      alignItems: 'center',
-      minHeight: desktop ? 112 : 96,
-      gap: desktop ? 14 : 10,
-      padding: desktop ? '8px 10px' : '8px',
+      alignItems: mobile ? 'start' : 'center',
+      minHeight: desktop ? 112 : mobile ? 104 : 96,
+      gap: desktop ? 14 : mobile ? 6 : 10,
+      padding: desktop ? '8px 10px' : mobile ? '6px' : '8px',
     },
     categoryBadge: {
       display: 'inline-flex',
       alignItems: 'center',
       maxWidth: '100%',
-      minHeight: 22,
-      padding: '3px 11px',
+      minHeight: mobile ? 18 : 22,
+      padding: mobile ? '2px 8px' : '3px 11px',
       borderRadius: 999,
       color: palette.primary,
       background: theme === 'dark' ? 'rgba(41, 185, 167, 0.12)' : '#e8f4f2',
-      fontSize: 11,
+      fontSize: mobile ? 10 : 11,
       fontWeight: 700,
       lineHeight: 1,
       whiteSpace: 'nowrap',
     },
     actionGroup: {
-      display: mobile ? 'flex' : 'contents',
-      gridColumn: mobile ? '1 / -1' : undefined,
+      display: mobile ? 'grid' : 'contents',
+      position: mobile ? 'absolute' : undefined,
+      left: mobile ? 80 : undefined,
+      right: mobile ? 6 : undefined,
+      bottom: mobile ? 6 : undefined,
+      gridColumn: mobile ? '2' : undefined,
+      gridTemplateColumns: mobile ? 'auto 1fr' : undefined,
       alignItems: 'center',
-      justifyContent: 'flex-end',
-      gap: 10,
+      justifyContent: 'end',
+      gap: mobile ? 4 : 10,
     },
     reportTitle: {
-      margin: '7px 0 0',
+      margin: mobile ? '4px 0 0' : '7px 0 0',
       overflow: 'hidden',
       color: palette.text,
-      fontSize: desktop ? 15 : 14,
+      fontSize: desktop ? 15 : mobile ? 13 : 14,
       fontWeight: 700,
       lineHeight: 1.25,
       textOverflow: 'ellipsis',
@@ -384,14 +390,14 @@ const createStyles = (
       alignItems: 'center',
       gap: 5,
       minWidth: 0,
-      margin: '5px 0 0',
+      margin: mobile ? '3px 0 0' : '5px 0 0',
       color: palette.muted,
-      fontSize: desktop ? 12 : 11,
+      fontSize: desktop ? 12 : mobile ? 10 : 11,
       fontWeight: 500,
       lineHeight: 1.2,
     },
     location: {
-      display: 'flex',
+      display: mobile ? 'none' : 'flex',
       alignItems: 'center',
       gap: 5,
       minWidth: 0,
@@ -708,8 +714,8 @@ const MyRequests = () => {
                   const title = report.title.replace(/^\[REPORT\]\s*/, '');
                   const categoryLabel = getApprovedCategoryLabel(report.category);
                   const imageUrl = report.photo_url || report.media_urls?.[0];
-                  const thumbnailWidth = wide ? 140 : desktop ? 128 : mobile ? 76 : 104;
-                  const thumbnailHeight = wide ? 96 : desktop ? 88 : mobile ? 72 : 78;
+                  const thumbnailWidth = wide ? 140 : desktop ? 128 : mobile ? 68 : 104;
+                  const thumbnailHeight = wide ? 96 : desktop ? 88 : mobile ? 68 : 78;
 
                   return (
                     <article
@@ -776,14 +782,14 @@ const MyRequests = () => {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              minWidth: mobile ? 104 : 112,
-                              height: desktop ? 30 : 28,
+                              minWidth: mobile ? 92 : 112,
+                              height: mobile ? 24 : desktop ? 30 : 28,
                               gap: 6,
-                              padding: `0 ${compact ? 8 : 12}px`,
+                              padding: `0 ${mobile ? 6 : compact ? 8 : 12}px`,
                               borderRadius: 999,
                               color: statusColors.color,
                               background: statusColors.background,
-                              fontSize: desktop ? 12 : 11,
+                              fontSize: mobile ? 10 : desktop ? 12 : 11,
                               fontWeight: 700,
                               lineHeight: 1,
                               whiteSpace: 'nowrap',
@@ -810,17 +816,17 @@ const MyRequests = () => {
                               alignItems: 'center',
                               justifyContent: 'center',
                               width: mobile ? 'auto' : '100%',
-                              minWidth: mobile ? 138 : undefined,
-                              height: 40,
+                              minWidth: mobile ? 112 : undefined,
+                              height: mobile ? 24 : 40,
                               flexShrink: 0,
-                              gap: 12,
-                              padding: '0 16px',
+                              gap: mobile ? 4 : 12,
+                              padding: mobile ? '0 7px' : '0 16px',
                               border: 0,
                               borderRadius: 999,
                               color: palette.primary,
                               background: theme === 'dark' ? '#22383b' : '#eaf3f2',
                               fontFamily: 'inherit',
-                              fontSize: 13,
+                              fontSize: mobile ? 11 : 13,
                               fontWeight: 700,
                               lineHeight: 1,
                               whiteSpace: 'nowrap',
