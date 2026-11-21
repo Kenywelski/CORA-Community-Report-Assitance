@@ -59,6 +59,14 @@ const RESIDENT_THEME_ROUTES = new Set<string>([
   ROUTES.emergency,
 ]);
 
+const RESIDENT_NO_PINCH_ZOOM_ROUTES = new Set<string>([
+  ROUTES.home,
+  ROUTES.dashboard,
+  ROUTES.myRequests,
+  ROUTES.updates,
+  ROUTES.profile,
+]);
+
 function ThemeScope() {
   const { pathname } = useLocation();
   const { user, isAdmin, isStaff } = useAuth();
@@ -67,10 +75,25 @@ function ThemeScope() {
   const canUseDarkTheme =
     Boolean(user) &&
     (isAdminRoute ? isAdmin : !isAdminRoute && !isStaff && RESIDENT_THEME_ROUTES.has(pathname));
+  const shouldPreventPinchZoom =
+    Boolean(user) &&
+    !isAdmin &&
+    !isStaff &&
+    RESIDENT_NO_PINCH_ZOOM_ROUTES.has(pathname);
 
   useLayoutEffect(() => {
     setThemeOverride(canUseDarkTheme ? null : 'light');
   }, [canUseDarkTheme]);
+
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const previousTouchAction = root.style.touchAction;
+    if (shouldPreventPinchZoom) root.style.touchAction = 'pan-x pan-y';
+
+    return () => {
+      root.style.touchAction = previousTouchAction;
+    };
+  }, [shouldPreventPinchZoom]);
 
   return null;
 }
