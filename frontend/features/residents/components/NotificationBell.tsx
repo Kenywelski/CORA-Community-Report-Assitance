@@ -161,7 +161,11 @@ export const NotificationBell = ({ iconClassName, buttonClassName }: Props) => {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0">
+      <PopoverContent
+        align="end"
+        collisionPadding={12}
+        className="w-[calc(100vw-2rem)] max-w-80 p-0"
+      >
         <div className="flex items-center justify-between p-3 border-b">
           <h3 className="font-semibold text-sm">{translate('Notifications')}</h3>
           {unreadCount > 0 && (

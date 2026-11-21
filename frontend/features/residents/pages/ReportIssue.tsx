@@ -61,6 +61,7 @@ import {
   Send,
   ShieldCheck,
   User,
+  X,
   Zap,
 } from 'lucide-react';
 
@@ -1137,6 +1138,18 @@ const ReportIssue = () => {
               cameraStarting || cameraError ? 'bg-[#011412]' : 'bg-black',
             )}
           >
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Close camera"
+              data-camera-controls
+              onClick={() => navigate(-1)}
+              className="absolute left-5 top-5 z-30 h-10 w-10 rounded-full border border-white/25 bg-black/35 text-white hover:bg-black/50 hover:text-white"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+
             <div className="h-full pr-[148px] 2xl:pr-[190px]">
               <div
                 className={cn(
