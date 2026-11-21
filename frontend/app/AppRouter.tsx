@@ -65,6 +65,10 @@ const RESIDENT_NO_PINCH_ZOOM_ROUTES = new Set<string>([
   ROUTES.myRequests,
   ROUTES.updates,
   ROUTES.profile,
+  ROUTES.settings,
+  ROUTES.emergency,
+  ROUTES.directory,
+  ROUTES.programs,
 ]);
 
 function ThemeScope() {
