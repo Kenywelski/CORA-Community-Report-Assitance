@@ -2,6 +2,7 @@ import {
   type ChangeEvent,
   type Dispatch,
   type SetStateAction,
+  type TouchEvent,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -502,6 +503,7 @@ const ReportIssue = () => {
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const cameraRefreshTouchRef = useRef<{ x: number; y: number } | null>(null);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -589,6 +591,40 @@ const ReportIssue = () => {
       setCameraStarting(false);
     }
   }, [stopCamera]);
+
+  const handleCameraTouchStart = useCallback(
+    (event: TouchEvent<HTMLElement>) => {
+      const target = event.target;
+      if (
+        cameraStarting ||
+        (target instanceof Element &&
+          target.closest('button, input, textarea, select, a, [data-camera-controls]'))
+      ) {
+        cameraRefreshTouchRef.current = null;
+        return;
+      }
+
+      const touch = event.touches[0];
+      cameraRefreshTouchRef.current = touch
+        ? { x: touch.clientX, y: touch.clientY }
+        : null;
+    },
+    [cameraStarting],
+  );
+
+  const handleCameraTouchEnd = useCallback(
+    (event: TouchEvent<HTMLElement>) => {
+      const start = cameraRefreshTouchRef.current;
+      cameraRefreshTouchRef.current = null;
+      const touch = event.changedTouches[0];
+      if (!start || !touch || cameraStarting) return;
+
+      const deltaY = touch.clientY - start.y;
+      const deltaX = Math.abs(touch.clientX - start.x);
+      if (deltaY >= 80 && deltaX < 80) void startCamera();
+    },
+    [cameraStarting, startCamera],
+  );
 
   const requestFreshGps = useCallback((): Promise<CapturedGpsReading | null> => {
     return new Promise((resolve) => {
@@ -946,7 +982,11 @@ const ReportIssue = () => {
         </div>
 
         {stage === 'capture' && (
-          <section className="relative h-full min-h-0 w-full overflow-hidden bg-[#102E2B] text-white lg:hidden">
+          <section
+            onTouchStart={handleCameraTouchStart}
+            onTouchEnd={handleCameraTouchEnd}
+            className="relative h-full min-h-0 w-full overflow-hidden bg-[#102E2B] text-white lg:hidden"
+          >
             <video
               ref={mobileVideoRef}
               muted
@@ -958,7 +998,10 @@ const ReportIssue = () => {
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/75" />
             <div className="pointer-events-none absolute inset-0 bg-black/10" />
 
-            <header className="absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-3 px-4 pb-8 pt-[max(1rem,env(safe-area-inset-top))]">
+            <header
+              data-camera-controls
+              className="absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-3 px-4 pb-8 pt-[max(1rem,env(safe-area-inset-top))]"
+            >
               <Button
                 type="button"
                 variant="ghost"
@@ -1018,7 +1061,10 @@ const ReportIssue = () => {
               </div>
             )}
 
-            <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-[28px] bg-black/75 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-md">
+            <div
+              data-camera-controls
+              className="absolute inset-x-0 bottom-0 z-30 rounded-t-[28px] bg-black/75 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-md"
+            >
               <input
                 ref={uploadInputRef}
                 type="file"
@@ -1064,6 +1110,8 @@ const ReportIssue = () => {
 
         {stage === 'capture' && (
           <section
+            onTouchStart={handleCameraTouchStart}
+            onTouchEnd={handleCameraTouchEnd}
             className={cn(
               'relative hidden h-dvh overflow-hidden border-0 text-white lg:block',
               cameraStarting || cameraError ? 'bg-[#011412]' : 'bg-black',
@@ -1092,7 +1140,10 @@ const ReportIssue = () => {
                   <div className="absolute inset-0 z-10 bg-[#011412]/95" />
                 )}
 
-                <div className="absolute left-1/2 top-5 z-30 flex h-10 w-[144px] -translate-x-1/2 items-center gap-2 rounded-full bg-[#008979] px-3 shadow-lg">
+                <div
+                  data-camera-controls
+                  className="absolute left-1/2 top-5 z-30 flex h-10 w-[144px] -translate-x-1/2 items-center gap-2 rounded-full bg-[#008979] px-3 shadow-lg"
+                >
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center text-white">
                     <MapPin className="h-4 w-4" strokeWidth={2} />
                   </span>
@@ -1142,7 +1193,10 @@ const ReportIssue = () => {
               </div>
             </div>
 
-            <aside className="absolute inset-y-0 right-0 z-30 w-[148px] rounded-bl-[40px] rounded-tl-[40px] bg-black shadow-2xl 2xl:w-[191px] 2xl:rounded-bl-[52px] 2xl:rounded-tl-[52px]">
+            <aside
+              data-camera-controls
+              className="absolute inset-y-0 right-0 z-30 w-[148px] rounded-bl-[40px] rounded-tl-[40px] bg-black shadow-2xl 2xl:w-[191px] 2xl:rounded-bl-[52px] 2xl:rounded-tl-[52px]"
+            >
               <button
                 type="button"
                 onClick={() => uploadInputRef.current?.click()}
