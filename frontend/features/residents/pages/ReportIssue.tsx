@@ -1,9 +1,12 @@
 import {
   type ChangeEvent,
+  type Dispatch,
+  type SetStateAction,
   useCallback,
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BottomNav } from '@/features/residents/components/BottomNav';
@@ -60,6 +63,52 @@ import {
 } from 'lucide-react';
 
 type ReportStage = 'capture' | 'review' | 'submitted';
+
+const reportDraftValues = new Map<string, unknown>();
+const reportDraftListeners = new Set<() => void>();
+
+function subscribeToReportDraft(listener: () => void) {
+  reportDraftListeners.add(listener);
+  return () => {
+    reportDraftListeners.delete(listener);
+  };
+}
+
+function useReportDraftState<T>(
+  scope: string,
+  key: string,
+  initialValue: T,
+): [T, Dispatch<SetStateAction<T>>] {
+  const storageKey = `${scope}:${key}`;
+  const getSnapshot = useCallback(
+    () => reportDraftValues.has(storageKey)
+      ? reportDraftValues.get(storageKey) as T
+      : initialValue,
+    [initialValue, storageKey],
+  );
+  const value = useSyncExternalStore(
+    subscribeToReportDraft,
+    getSnapshot,
+    getSnapshot,
+  );
+  const setValue = useCallback<Dispatch<SetStateAction<T>>>(
+    (action) => {
+      const previousValue = reportDraftValues.has(storageKey)
+        ? reportDraftValues.get(storageKey) as T
+        : initialValue;
+      const nextValue = typeof action === 'function'
+        ? (action as (previousValue: T) => T)(previousValue)
+        : action;
+      if (Object.is(previousValue, nextValue)) return;
+
+      reportDraftValues.set(storageKey, nextValue);
+      reportDraftListeners.forEach((listener) => listener());
+    },
+    [initialValue, storageKey],
+  );
+
+  return [value, setValue];
+}
 
 interface ReportPalette {
   page: string;
@@ -351,6 +400,7 @@ const ReportIssue = () => {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const isGuestMode = searchParams.get('mode') === 'guest';
+  const reportDraftScope = `resident:${user?.id ?? 'anonymous'}`;
   const { theme } = useAppPreferences();
   const palette = REPORT_PALETTES[theme];
 
@@ -368,33 +418,64 @@ const ReportIssue = () => {
     };
   }, [palette.page]);
 
-  const [stage, setStage] = useState<ReportStage>('capture');
+  const [stage, setStage] = useReportDraftState<ReportStage>(reportDraftScope, 'stage', 'capture');
   const [cameraStarting, setCameraStarting] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
-  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
-  const [capturedAt, setCapturedAt] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] =
-    useState<ApprovedConcernCategoryKey | ''>('');
-  const [reportTitle, setReportTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [reporterName, setReporterName] = useState('');
-  const [reporterContact, setReporterContact] = useState('');
-  const [purok, setPurok] = useState('');
-  const [gpsReading, setGpsReading] = useState<CapturedGpsReading | null>(null);
+  const [photoBlob, setPhotoBlob] = useReportDraftState<Blob | null>(reportDraftScope, 'photoBlob', null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useReportDraftState<string | null>(reportDraftScope, 'photoPreviewUrl', null);
+  const [capturedAt, setCapturedAt] = useReportDraftState<string | null>(reportDraftScope, 'capturedAt', null);
+  const [selectedCategory, setSelectedCategory] = useReportDraftState<ApprovedConcernCategoryKey | ''>(
+    reportDraftScope,
+    'selectedCategory',
+    '',
+  );
+  const [reportTitle, setReportTitle] = useReportDraftState(reportDraftScope, 'reportTitle', '');
+  const [description, setDescription] = useReportDraftState(reportDraftScope, 'description', '');
+  const [reporterName, setReporterName] = useReportDraftState(reportDraftScope, 'reporterName', '');
+  const [reporterContact, setReporterContact] = useReportDraftState(reportDraftScope, 'reporterContact', '');
+  const [purok, setPurok] = useReportDraftState(reportDraftScope, 'purok', '');
+  const [gpsReading, setGpsReading] = useReportDraftState<CapturedGpsReading | null>(
+    reportDraftScope,
+    'gpsReading',
+    null,
+  );
   const [gpsValidation, setGpsValidation] =
-    useState<GpsValidationResult | null>(null);
-  const [gpsLoading, setGpsLoading] = useState(false);
-  const [gpsError, setGpsError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submittedReportId, setSubmittedReportId] = useState<string | null>(null);
+    useReportDraftState<GpsValidationResult | null>(reportDraftScope, 'gpsValidation', null);
+  const [gpsLoading, setGpsLoading] = useReportDraftState(reportDraftScope, 'gpsLoading', false);
+  const [gpsError, setGpsError] = useReportDraftState<string | null>(reportDraftScope, 'gpsError', null);
+  const [isSubmitting, setIsSubmitting] = useReportDraftState(reportDraftScope, 'isSubmitting', false);
+  const [submittedReportId, setSubmittedReportId] = useReportDraftState<string | null>(
+    reportDraftScope,
+    'submittedReportId',
+    null,
+  );
   const [isTestAccount, setIsTestAccount] = useState(false);
-  const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>('idle');
-  const [analysisMessage, setAnalysisMessage] = useState('');
-  const [analysisId, setAnalysisId] = useState<string | null>(null);
-  const [possibleDuplicate, setPossibleDuplicate] = useState(false);
-  const [captureMode, setCaptureMode] = useState<'camera' | 'upload'>('camera');
-  const [submissionFailed, setSubmissionFailed] = useState(false);
+  const [analysisStatus, setAnalysisStatus] = useReportDraftState<AnalysisStatus>(
+    reportDraftScope,
+    'analysisStatus',
+    'idle',
+  );
+  const [analysisMessage, setAnalysisMessage] = useReportDraftState(reportDraftScope, 'analysisMessage', '');
+  const [analysisId, setAnalysisId] = useReportDraftState<string | null>(
+    reportDraftScope,
+    'analysisId',
+    null,
+  );
+  const [possibleDuplicate, setPossibleDuplicate] = useReportDraftState(
+    reportDraftScope,
+    'possibleDuplicate',
+    false,
+  );
+  const [captureMode, setCaptureMode] = useReportDraftState<'camera' | 'upload'>(
+    reportDraftScope,
+    'captureMode',
+    'camera',
+  );
+  const [submissionFailed, setSubmissionFailed] = useReportDraftState(
+    reportDraftScope,
+    'submissionFailed',
+    false,
+  );
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const analysisInFlight = useRef(false);
@@ -405,7 +486,6 @@ const ReportIssue = () => {
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const previewUrlRef = useRef<string | null>(null);
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -536,7 +616,7 @@ const ReportIssue = () => {
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
       );
     });
-  }, []);
+  }, [setGpsError, setGpsLoading, setGpsReading, setGpsValidation]);
 
   useEffect(() => {
     if (stage === 'capture') void startCamera();
@@ -580,7 +660,6 @@ const ReportIssue = () => {
   useEffect(() => {
     return () => {
       stopCamera();
-      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     };
   }, [stopCamera]);
 
@@ -657,7 +736,19 @@ const ReportIssue = () => {
       analysisInFlight.current = false;
     }
     },
-    [captureMode, photoBlob, requestFreshGps],
+    [
+      captureMode,
+      photoBlob,
+      requestFreshGps,
+      setAnalysisId,
+      setAnalysisMessage,
+      setAnalysisStatus,
+      setDescription,
+      setGpsValidation,
+      setPossibleDuplicate,
+      setReportTitle,
+      setSelectedCategory,
+    ],
   );
 
   const preparePhoto = useCallback(
@@ -665,9 +756,8 @@ const ReportIssue = () => {
       stopCamera();
       setPhotoBlob(blob);
       setCaptureMode(mode);
-      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
       const previewUrl = URL.createObjectURL(blob);
-      previewUrlRef.current = previewUrl;
       setPhotoPreviewUrl(previewUrl);
       setCapturedAt(new Date().toISOString());
       setStage('review');
@@ -676,7 +766,19 @@ const ReportIssue = () => {
       setDescription('');
       await analyzePhoto(blob, mode);
     },
-    [analyzePhoto, stopCamera],
+    [
+      analyzePhoto,
+      photoPreviewUrl,
+      setCaptureMode,
+      setCapturedAt,
+      setDescription,
+      setPhotoBlob,
+      setPhotoPreviewUrl,
+      setReportTitle,
+      setSelectedCategory,
+      setStage,
+      stopCamera,
+    ],
   );
 
   const captureFromCamera = async () => {
@@ -715,6 +817,7 @@ const ReportIssue = () => {
   };
 
   const resetForRetake = () => {
+    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
     setStage('capture');
     setPhotoBlob(null);
     setPhotoPreviewUrl(null);
@@ -732,10 +835,6 @@ const ReportIssue = () => {
     setCaptureMode('camera');
     setSubmissionFailed(false);
     analysisInFlight.current = false;
-    if (previewUrlRef.current) {
-      URL.revokeObjectURL(previewUrlRef.current);
-      previewUrlRef.current = null;
-    }
   };
 
   const submitReport = async () => {
