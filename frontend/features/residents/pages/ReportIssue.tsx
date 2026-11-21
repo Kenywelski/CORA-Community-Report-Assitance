@@ -404,20 +404,6 @@ const ReportIssue = () => {
   const { theme } = useAppPreferences();
   const palette = REPORT_PALETTES[theme];
 
-  useEffect(() => {
-    const root = document.getElementById('root');
-    const previousRootBackground = root?.style.backgroundColor ?? '';
-    const previousBodyBackground = document.body.style.backgroundColor;
-
-    if (root) root.style.backgroundColor = palette.page;
-    document.body.style.backgroundColor = palette.page;
-
-    return () => {
-      if (root) root.style.backgroundColor = previousRootBackground;
-      document.body.style.backgroundColor = previousBodyBackground;
-    };
-  }, [palette.page]);
-
   const [stage, setStage] = useReportDraftState<ReportStage>(reportDraftScope, 'stage', 'capture');
   const [cameraStarting, setCameraStarting] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -479,6 +465,35 @@ const ReportIssue = () => {
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
   const analysisInFlight = useRef(false);
+
+  useEffect(() => {
+    const root = document.getElementById('root');
+    const previousRootBackground = root?.style.backgroundColor ?? '';
+    const previousBodyBackground = document.body.style.backgroundColor;
+    const previousRootOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousRootOverscroll = document.documentElement.style.overscrollBehavior;
+    const previousBodyOverscroll = document.body.style.overscrollBehavior;
+    const pageBackground = stage === 'capture' ? palette.camera : palette.page;
+
+    if (root) root.style.backgroundColor = pageBackground;
+    document.body.style.backgroundColor = pageBackground;
+    if (stage === 'capture') {
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overscrollBehavior = 'none';
+      document.body.style.overscrollBehavior = 'none';
+    }
+
+    return () => {
+      if (root) root.style.backgroundColor = previousRootBackground;
+      document.body.style.backgroundColor = previousBodyBackground;
+      document.documentElement.style.overflow = previousRootOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overscrollBehavior = previousRootOverscroll;
+      document.body.style.overscrollBehavior = previousBodyOverscroll;
+    };
+  }, [palette.camera, palette.page, stage]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const mobileVideoRef = useRef<HTMLVideoElement>(null);
@@ -906,7 +921,10 @@ const ReportIssue = () => {
             ? 'pb-20 lg:pb-6'
             : 'pb-6',
       )}
-      style={{ backgroundColor: palette.page, color: palette.text }}
+      style={{
+        backgroundColor: stage === 'capture' ? palette.camera : palette.page,
+        color: palette.text,
+      }}
     >
       <main
         className={cn(
