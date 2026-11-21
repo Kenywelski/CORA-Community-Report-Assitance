@@ -1031,6 +1031,20 @@ const ReportIssue = () => {
                 <span className="mt-1.5 text-xs font-semibold text-white">Upload</span>
               </button>
 
+              <button
+                type="button"
+                aria-label={torchEnabled ? 'Turn flashlight off' : 'Turn flashlight on'}
+                aria-pressed={torchEnabled}
+                onClick={() => void toggleTorch()}
+                className={cn(
+                  'absolute left-1/2 top-[27%] flex -translate-x-1/2 flex-col items-center rounded-lg p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white',
+                  torchEnabled ? 'text-emerald-300' : 'text-white',
+                )}
+              >
+                <Zap className="h-5 w-5" fill={torchEnabled ? 'currentColor' : 'none'} />
+                <span className="mt-1.5 text-xs font-semibold">Flashlight</span>
+              </button>
+
               <div className="absolute inset-x-2 top-[40%] flex flex-col items-center text-center">
                 <button
                   type="button"
