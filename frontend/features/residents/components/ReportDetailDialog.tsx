@@ -331,6 +331,11 @@ export const ReportDetailDialog = ({
   const isOwner = Boolean(user && report.user_id === user.id);
   const officialUpdateLabel = getOfficialUpdateLabel(report.status);
   const residentUpdate = getResidentReportUpdate(report);
+  const residentUpdates = residentUpdate
+    .split(/\n\n+/)
+    .map((update) => update.trim())
+    .filter(Boolean);
+  const actionTaken = report.action_taken?.trim() || '';
   const cleanTitle = report.title.replace(/^\[REPORT\]\s*/, '');
   const cleanCategory = getApprovedCategoryLabel(report.category);
   const cleanDescription = getCleanDescription(report.description);
@@ -873,20 +878,24 @@ export const ReportDetailDialog = ({
             </div>
 
             <div className="mt-2.5 space-y-2">
-              {(residentUpdate || report.action_taken) && (
+              {residentUpdates.map((update, index) => (
+                <DiscussionEntry
+                  key={`admin-update-${index}`}
+                  official
+                  author={translate('Barangay Response')}
+                  date={latestUpdate}
+                  label={translate(officialUpdateLabel)}
+                  content={update}
+                />
+              ))}
+
+              {actionTaken && !residentUpdates.includes(actionTaken) && (
                 <DiscussionEntry
                   official
                   author={translate('Barangay Response')}
                   date={latestUpdate}
                   label={translate(officialUpdateLabel)}
-                  content={residentUpdate || report.action_taken || ''}
-                  secondaryContent={
-                    residentUpdate &&
-                    report.action_taken &&
-                    residentUpdate !== report.action_taken
-                      ? report.action_taken
-                      : undefined
-                  }
+                  content={actionTaken}
                 />
               )}
 
@@ -904,7 +913,7 @@ export const ReportDetailDialog = ({
                 />
               ))}
 
-              {comments.length === 0 && !residentUpdate && !report.action_taken && (
+              {comments.length === 0 && residentUpdates.length === 0 && !actionTaken && (
                 showMyReportsMobileView ? (
                   <div className="flex min-h-[112px] flex-col items-center justify-center py-3 text-center">
                     <div className="relative mb-1 h-14 w-20 text-[#b8ead3]">
