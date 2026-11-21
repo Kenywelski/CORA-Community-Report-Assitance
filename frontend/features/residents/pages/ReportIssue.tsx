@@ -1097,7 +1097,7 @@ const ReportIssue = () => {
                           Classifying your photo...
                         </h2>
                         <p className="mt-2 max-w-[250px] text-xs leading-relaxed text-[#526477] dark:text-slate-300">
-                          Verifying your photo...
+                          {analysisMessage || 'Verifying your photo...'}
                         </p>
                       </>
                     ) : (
@@ -1444,7 +1444,7 @@ const ReportIssue = () => {
                     </h2>
                     <p className="mt-2 max-w-xl text-sm text-[#526176] dark:text-slate-300">
                       {analysisStatus === 'checking'
-                        ? 'Verifying your photo...'
+                        ? analysisMessage || 'Verifying your photo...'
                         : analysisMessage}
                     </p>
                     {analysisStatus !== 'checking' && (

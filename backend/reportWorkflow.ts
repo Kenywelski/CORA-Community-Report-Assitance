@@ -458,9 +458,9 @@ router.post('/analyze', upload.single('file'), async (request, response) => {
 
     const modelImage = await prepareModelImage(file.buffer);
     const modelImageType = 'image/jpeg';
-    sendReportProgress(response, 'Classifying your photo with MobileNet...');
+    sendReportProgress(response, 'Classifying your photo with MobileNetV3-Small...');
     const prediction = await classifyImage(modelImage, modelImageType);
-    sendReportProgress(response, 'Verifying your photo with OpenCLIP...');
+    sendReportProgress(response, 'Verifying your photo if related to community concerns...');
     const openClipPayload = await verifyWithOpenClip(
       modelImage,
       modelImageType,
