@@ -914,8 +914,8 @@ const ReportIssue = () => {
           stage !== 'capture' && 'lg:py-5',
           stage === 'review' && 'max-lg:pb-2',
           stage === 'capture' && 'lg:fixed lg:inset-0 lg:z-[70] lg:h-dvh lg:max-w-none lg:overflow-hidden lg:p-0',
-          stage === 'capture' && 'max-lg:h-dvh',
-          stage === 'capture' && 'max-lg:px-0 max-lg:py-0',
+          stage === 'capture' &&
+            'max-lg:fixed max-lg:inset-0 max-lg:z-[70] max-lg:h-[100dvh] max-lg:min-h-0 max-lg:w-full max-lg:max-w-none max-lg:overflow-hidden max-lg:p-0',
         )}
       >
         <div className={cn('hidden lg:block', stage === 'capture' && 'lg:hidden')}>
@@ -927,7 +927,7 @@ const ReportIssue = () => {
         </div>
 
         {stage === 'capture' && (
-          <section className="relative mx-auto h-full min-h-[520px] w-full overflow-hidden bg-[#102E2B] text-white lg:hidden">
+          <section className="relative h-full min-h-0 w-full overflow-hidden bg-[#102E2B] text-white lg:hidden">
             <video
               ref={mobileVideoRef}
               muted
@@ -966,12 +966,14 @@ const ReportIssue = () => {
               </Button>
             </header>
 
-            <div className="pointer-events-none absolute inset-x-9 top-[22%] bottom-[29%]">
-              <span className="absolute left-0 top-0 h-9 w-9 rounded-tl-xl border-l-[3px] border-t-[3px] border-white/90" />
-              <span className="absolute right-0 top-0 h-9 w-9 rounded-tr-xl border-r-[3px] border-t-[3px] border-white/90" />
-              <span className="absolute bottom-0 left-0 h-9 w-9 rounded-bl-xl border-b-[3px] border-l-[3px] border-white/90" />
-              <span className="absolute bottom-0 right-0 h-9 w-9 rounded-br-xl border-b-[3px] border-r-[3px] border-white/90" />
-            </div>
+            {!cameraStarting && !cameraError && (
+              <div className="pointer-events-none absolute inset-x-[clamp(1.25rem,8vw,2.25rem)] top-[clamp(6.5rem,18vh,10rem)] bottom-[clamp(10rem,28vh,14rem)]">
+                <span className="absolute left-0 top-0 h-9 w-9 rounded-tl-xl border-l-[3px] border-t-[3px] border-white/90" />
+                <span className="absolute right-0 top-0 h-9 w-9 rounded-tr-xl border-r-[3px] border-t-[3px] border-white/90" />
+                <span className="absolute bottom-0 left-0 h-9 w-9 rounded-bl-xl border-b-[3px] border-l-[3px] border-white/90" />
+                <span className="absolute bottom-0 right-0 h-9 w-9 rounded-br-xl border-b-[3px] border-r-[3px] border-white/90" />
+              </div>
+            )}
 
             {(cameraStarting || cameraError) && (
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/55 px-8 text-center">
@@ -997,7 +999,7 @@ const ReportIssue = () => {
               </div>
             )}
 
-            <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-[28px] bg-black/75 px-5 pb-4 pt-4 backdrop-blur-md">
+            <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-[28px] bg-black/75 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-md">
               <input
                 ref={uploadInputRef}
                 type="file"
@@ -1025,9 +1027,9 @@ const ReportIssue = () => {
                   onClick={captureFromCamera}
                   disabled={cameraStarting || !!cameraError}
                   aria-label="Take a photo of the issue"
-                  className="flex h-[76px] w-[76px] items-center justify-center rounded-full border-[4px] border-white bg-white/15 shadow-lg disabled:opacity-40"
+                  className="flex h-[clamp(3.5rem,16dvh,4.75rem)] w-[clamp(3.5rem,16dvh,4.75rem)] items-center justify-center rounded-full border-[4px] border-white bg-white/15 shadow-lg disabled:opacity-40"
                 >
-                  <span className="h-[58px] w-[58px] rounded-full bg-white" />
+                  <span className="h-[clamp(2.75rem,12dvh,3.625rem)] w-[clamp(2.75rem,12dvh,3.625rem)] rounded-full bg-white" />
                 </button>
                 <span className="h-14 w-16" />
               </div>
@@ -1081,12 +1083,14 @@ const ReportIssue = () => {
                   </div>
                 </div>
 
-                <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-[280px] w-[440px] max-h-[50vh] max-w-[46vw] -translate-x-1/2 -translate-y-1/2 2xl:h-[445px] 2xl:w-[560px] 2xl:max-h-[54vh] 2xl:max-w-[48vw]">
-                  <span className="absolute left-0 top-0 h-10 w-10 rounded-tl-2xl border-l-4 border-t-4 border-white 2xl:h-[58px] 2xl:w-[58px] 2xl:rounded-tl-[24px] 2xl:border-l-[7px] 2xl:border-t-[7px]" />
-                  <span className="absolute right-0 top-0 h-10 w-10 rounded-tr-2xl border-r-4 border-t-4 border-white 2xl:h-[58px] 2xl:w-[58px] 2xl:rounded-tr-[24px] 2xl:border-r-[7px] 2xl:border-t-[7px]" />
-                  <span className="absolute bottom-0 left-0 h-10 w-10 rounded-bl-2xl border-b-4 border-l-4 border-white 2xl:h-[58px] 2xl:w-[58px] 2xl:rounded-bl-[24px] 2xl:border-b-[7px] 2xl:border-l-[7px]" />
-                  <span className="absolute bottom-0 right-0 h-10 w-10 rounded-br-2xl border-b-4 border-r-4 border-white 2xl:h-[58px] 2xl:w-[58px] 2xl:rounded-br-[24px] 2xl:border-b-[7px] 2xl:border-r-[7px]" />
-                </div>
+                {!cameraStarting && !cameraError && (
+                  <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-[280px] w-[440px] max-h-[50vh] max-w-[46vw] -translate-x-1/2 -translate-y-1/2 2xl:h-[445px] 2xl:w-[560px] 2xl:max-h-[54vh] 2xl:max-w-[48vw]">
+                    <span className="absolute left-0 top-0 h-10 w-10 rounded-tl-2xl border-l-4 border-t-4 border-white 2xl:h-[58px] 2xl:w-[58px] 2xl:rounded-tl-[24px] 2xl:border-l-[7px] 2xl:border-t-[7px]" />
+                    <span className="absolute right-0 top-0 h-10 w-10 rounded-tr-2xl border-r-4 border-t-4 border-white 2xl:h-[58px] 2xl:w-[58px] 2xl:rounded-tr-[24px] 2xl:border-r-[7px] 2xl:border-t-[7px]" />
+                    <span className="absolute bottom-0 left-0 h-10 w-10 rounded-bl-2xl border-b-4 border-l-4 border-white 2xl:h-[58px] 2xl:w-[58px] 2xl:rounded-bl-[24px] 2xl:border-b-[7px] 2xl:border-l-[7px]" />
+                    <span className="absolute bottom-0 right-0 h-10 w-10 rounded-br-2xl border-b-4 border-r-4 border-white 2xl:h-[58px] 2xl:w-[58px] 2xl:rounded-br-[24px] 2xl:border-b-[7px] 2xl:border-r-[7px]" />
+                  </div>
+                )}
 
                 {(cameraStarting || cameraError) && (
                   <div className="absolute left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center text-white">
