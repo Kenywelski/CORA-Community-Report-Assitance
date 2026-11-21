@@ -472,30 +472,46 @@ const ReportIssue = () => {
     const root = document.getElementById('root');
     const previousRootBackground = root?.style.backgroundColor ?? '';
     const previousBodyBackground = document.body.style.backgroundColor;
+    const previousDocumentBackground = document.documentElement.style.backgroundColor;
     const previousRootOverflow = document.documentElement.style.overflow;
     const previousBodyOverflow = document.body.style.overflow;
     const previousRootOverscroll = document.documentElement.style.overscrollBehavior;
     const previousBodyOverscroll = document.body.style.overscrollBehavior;
-    const pageBackground = stage === 'capture' ? palette.camera : palette.page;
+    const existingThemeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    const previousThemeColor = existingThemeColor?.content;
+    const createdThemeColor = stage === 'capture' && !existingThemeColor;
+    const themeColor = existingThemeColor ?? (createdThemeColor ? document.createElement('meta') : null);
+    const pageBackground = stage === 'capture' ? '#ffffff' : palette.page;
 
     if (root) root.style.backgroundColor = pageBackground;
     document.body.style.backgroundColor = pageBackground;
+    document.documentElement.style.backgroundColor = pageBackground;
     if (stage === 'capture') {
       document.documentElement.style.overflow = 'hidden';
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overscrollBehavior = 'none';
       document.body.style.overscrollBehavior = 'none';
+      if (themeColor) {
+        themeColor.name = 'theme-color';
+        themeColor.content = '#ffffff';
+        if (createdThemeColor) document.head.append(themeColor);
+      }
     }
 
     return () => {
       if (root) root.style.backgroundColor = previousRootBackground;
       document.body.style.backgroundColor = previousBodyBackground;
+      document.documentElement.style.backgroundColor = previousDocumentBackground;
       document.documentElement.style.overflow = previousRootOverflow;
       document.body.style.overflow = previousBodyOverflow;
       document.documentElement.style.overscrollBehavior = previousRootOverscroll;
       document.body.style.overscrollBehavior = previousBodyOverscroll;
+      if (themeColor && stage === 'capture') {
+        if (createdThemeColor) themeColor.remove();
+        else if (previousThemeColor !== undefined) themeColor.content = previousThemeColor;
+      }
     };
-  }, [palette.camera, palette.page, stage]);
+  }, [palette.page, stage]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const mobileVideoRef = useRef<HTMLVideoElement>(null);
@@ -959,7 +975,7 @@ const ReportIssue = () => {
             : 'pb-6',
       )}
       style={{
-        backgroundColor: stage === 'capture' ? palette.camera : palette.page,
+        backgroundColor: stage === 'capture' ? '#ffffff' : palette.page,
         color: palette.text,
       }}
     >
