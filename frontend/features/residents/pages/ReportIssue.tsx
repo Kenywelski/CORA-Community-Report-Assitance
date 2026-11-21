@@ -877,6 +877,10 @@ const ReportIssue = () => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    if (!isTestAccount || isGuestMode) {
+      toast.error('Image upload is only available to Test Residents enabled by an admin.');
+      return;
+    }
     if (!file.type.startsWith('image/')) {
       toast.error('Please choose an image file.');
       return;
@@ -1081,14 +1085,16 @@ const ReportIssue = () => {
               data-camera-controls
               className="absolute inset-x-0 bottom-0 z-30 rounded-t-[28px] bg-black/75 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-md"
             >
-              <input
-                ref={uploadInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                aria-label="Upload a report image"
-                onChange={(event) => void handleTestPhotoUpload(event)}
-                className="sr-only"
-              />
+              {isTestAccount && !isGuestMode && (
+                <input
+                  ref={uploadInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  aria-label="Upload a report image"
+                  onChange={(event) => void handleTestPhotoUpload(event)}
+                  className="sr-only"
+                />
+              )}
               <div className="flex items-center justify-between">
                 {isTestAccount && !isGuestMode ? (
                   <Button
@@ -1213,15 +1219,17 @@ const ReportIssue = () => {
               data-camera-controls
               className="absolute inset-y-0 right-0 z-30 w-[148px] rounded-bl-[40px] rounded-tl-[40px] bg-black shadow-2xl 2xl:w-[191px] 2xl:rounded-bl-[52px] 2xl:rounded-tl-[52px]"
             >
-              <button
-                type="button"
-                onClick={() => uploadInputRef.current?.click()}
-                aria-label="Upload a report image"
-                className="absolute left-1/2 top-[15%] flex -translate-x-1/2 flex-col items-center rounded-lg p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-              >
-                <ImagePlus className="h-5 w-5 text-white" strokeWidth={1.8} />
-                <span className="mt-1.5 text-xs font-semibold text-white">Upload</span>
-              </button>
+              {isTestAccount && !isGuestMode && (
+                <button
+                  type="button"
+                  onClick={() => uploadInputRef.current?.click()}
+                  aria-label="Upload a report image"
+                  className="absolute left-1/2 top-[15%] flex -translate-x-1/2 flex-col items-center rounded-lg p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                >
+                  <ImagePlus className="h-5 w-5 text-white" strokeWidth={1.8} />
+                  <span className="mt-1.5 text-xs font-semibold text-white">Upload</span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -1270,14 +1278,16 @@ const ReportIssue = () => {
 
             </aside>
 
-            <input
-              ref={uploadInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              aria-label="Upload a report image"
-              onChange={(event) => void handleTestPhotoUpload(event)}
-              className="sr-only"
-            />
+            {isTestAccount && !isGuestMode && (
+              <input
+                ref={uploadInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                aria-label="Upload a report image"
+                onChange={(event) => void handleTestPhotoUpload(event)}
+                className="sr-only"
+              />
+            )}
             <canvas ref={canvasRef} className="hidden" />
           </section>
         )}
