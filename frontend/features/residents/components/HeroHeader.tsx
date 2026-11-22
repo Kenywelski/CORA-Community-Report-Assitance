@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, User } from "lucide-react";
+import { useQuery } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/useAuth";
 import { NotificationBell } from "@/features/residents/components/NotificationBell";
+import { supabase } from '@/integrations/supabase/client';
 import { useAppPreferences } from "@/lib/preferences";
 import purisimaSunrise from "@/features/residents/assets/purisima-sunrise.jpg";
 
@@ -10,10 +12,30 @@ export const HeroHeader = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t, translate } = useAppPreferences();
+  const { data: savedAvatarUrl } = useQuery({
+    queryKey: ['profile-avatar', user?.id],
+    enabled: Boolean(user?.id),
+    queryFn: async () => {
+      if (!user) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.avatar_url ?? null;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
   const residentName =
     (user?.user_metadata?.full_name as string | undefined) ||
     (user?.user_metadata?.name as string | undefined) ||
     user?.email?.split('@')[0];
+  const googleAvatarUrl = [
+    user?.user_metadata?.avatar_url,
+    user?.user_metadata?.picture,
+  ].find((value): value is string => typeof value === 'string' && value.length > 0);
+  const profileAvatarUrl = savedAvatarUrl || googleAvatarUrl;
 
   return (
     <header className="pb-4 pt-5 lg:pb-6 lg:pt-6">
@@ -42,7 +64,11 @@ export const HeroHeader = () => {
             className="h-10 w-10 rounded-full border border-border bg-card p-0 text-foreground shadow-sm hover:bg-muted"
             onClick={() => navigate(user ? '/profile' : '/auth')}
           >
-            <User className="h-5 w-5" />
+            {profileAvatarUrl ? (
+              <img src={profileAvatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+            ) : (
+              <User className="h-5 w-5" />
+            )}
           </Button>
         </div>
       </div>

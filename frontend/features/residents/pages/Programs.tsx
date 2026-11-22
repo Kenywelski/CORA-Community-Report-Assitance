@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ChevronDown,
   ChevronRight,
@@ -9,6 +10,7 @@ import {
 } from 'lucide-react';
 import { getProgramAppearance } from '@/features/barangay-programs/programAppearance';
 import { BottomNav } from '@/features/residents/components/BottomNav';
+import { ResidentMobileBackHeader } from '@/features/residents/components/ResidentMobileBackHeader';
 import { ResidentPageHeader } from '@/features/residents/components/ResidentPageHeader';
 import {
   Dialog,
@@ -50,6 +52,7 @@ const statusClass = (status: BarangayProgramItem['status']) => {
 };
 
 const Programs = () => {
+  const navigate = useNavigate();
   const [programs, setPrograms] = useState<BarangayProgramItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -124,10 +127,13 @@ const Programs = () => {
   return (
     <div className="relative min-h-screen overflow-hidden bg-background pb-24 lg:pb-10">
       <main className="app-container relative px-4 pb-6 pt-5 lg:pt-6">
-        <ResidentPageHeader
-          title="Barangay Programs"
-          subtitle="Official programs and community initiatives of Barangay Purisima."
-        />
+        <ResidentMobileBackHeader title="Barangay Programs" onBack={() => navigate(-1)} />
+        <div className="hidden lg:block">
+          <ResidentPageHeader
+            title="Barangay Programs"
+            subtitle="Official programs and community initiatives of Barangay Purisima."
+          />
+        </div>
 
         <div className="relative mt-4">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

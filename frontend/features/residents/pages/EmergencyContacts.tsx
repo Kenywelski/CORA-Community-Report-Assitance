@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ChevronDown,
@@ -8,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BottomNav } from '@/features/residents/components/BottomNav';
+import { ResidentMobileBackHeader } from '@/features/residents/components/ResidentMobileBackHeader';
 import { ResidentPageHeader } from '@/features/residents/components/ResidentPageHeader';
 import { getEmergencyContactAppearance } from '@/features/emergency-contacts/contactAppearance';
 import { emergencyContactQueryKeys } from '@/features/emergency-contacts/queryKeys';
@@ -18,6 +20,7 @@ import type { Tables } from '@/integrations/supabase/types';
 type Contact = Tables<'emergency_contacts'>;
 
 const EmergencyContacts = () => {
+  const navigate = useNavigate();
   const { data: contacts, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: emergencyContactQueryKeys.resident,
     queryFn: async () => {
@@ -38,11 +41,14 @@ const EmergencyContacts = () => {
   return (
     <div className="min-h-screen bg-background pb-24 lg:pb-10">
       <main className="app-container px-4 pb-6 pt-5 lg:pt-6">
-        <ResidentPageHeader
-          title="Emergency Contacts"
-          subtitle="Reach local emergency and public services in Tago."
-          className="mb-5"
-        />
+        <ResidentMobileBackHeader title="Emergency Contacts" onBack={() => navigate(-1)} />
+        <div className="hidden lg:block">
+          <ResidentPageHeader
+            title="Emergency Contacts"
+            subtitle="Reach local emergency and public services in Tago."
+            className="mb-5"
+          />
+        </div>
 
         {isLoading ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" aria-label="Loading emergency contacts">

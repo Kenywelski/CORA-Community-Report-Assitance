@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeft,
   Building2,
   CalendarDays,
   ChevronRight,
@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { BottomNav } from '@/features/residents/components/BottomNav';
+import { ResidentMobileBackHeader } from '@/features/residents/components/ResidentMobileBackHeader';
 import { ResidentPageHeader } from '@/features/residents/components/ResidentPageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -101,6 +102,7 @@ const Profile = () => {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, isLoading: authLoading, isAdmin, signOut } = useAuth();
   const mobileView =
     location.state !== null &&
@@ -211,6 +213,7 @@ const Profile = () => {
 
       setProfile(data);
       setEditedProfile(data);
+      queryClient.setQueryData(['profile-avatar', user.id], avatarUrl);
       toast.success('Profile picture updated.');
     } catch (error) {
       console.error('Profile picture upload failed:', error);
@@ -325,19 +328,7 @@ const Profile = () => {
 
         {mobileView === 'information' && (
           <section className="mx-auto max-w-[430px] px-1 pb-6 lg:hidden">
-            <header className="relative flex h-10 items-center justify-center">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate(-1)}
-                aria-label="Back to My Profile"
-                className="absolute left-0 h-9 w-9 rounded-full"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <h1 className="text-base font-bold tracking-tight text-[#17212b]">Profile Information</h1>
-            </header>
+            <ResidentMobileBackHeader title="Profile Information" onBack={() => navigate(-1)} />
 
             <div className="mx-auto max-w-[360px]">
               <div className="flex justify-center py-5">

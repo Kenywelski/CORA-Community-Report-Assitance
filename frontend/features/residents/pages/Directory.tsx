@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Building2,
   ChevronDown,
@@ -6,6 +7,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { BottomNav } from '@/features/residents/components/BottomNav';
+import { ResidentMobileBackHeader } from '@/features/residents/components/ResidentMobileBackHeader';
 import { getOfficeAppearance } from '@/features/barangay-offices/officeAppearance';
 import {
   type BarangayOfficeItem,
@@ -40,6 +42,7 @@ const getInitials = (name: string) =>
     .join('');
 
 const Directory = () => {
+  const navigate = useNavigate();
   const [offices, setOffices] = useState<BarangayOfficeItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -79,7 +82,8 @@ const Directory = () => {
   return (
     <div className="min-h-screen bg-background pb-24 lg:pb-10">
       <main className="app-container relative px-4 pb-6 pt-5 lg:pt-6">
-        <header className="mb-4 flex items-start gap-3">
+        <ResidentMobileBackHeader title="Barangay Directory" onBack={() => navigate(-1)} className="mb-4" />
+        <header className="mb-4 hidden items-start gap-3 lg:flex">
           <span aria-hidden="true" className="mt-0.5 h-10 w-1.5 shrink-0 rounded-full bg-emerald-600" />
           <div className="min-w-0">
             <h1 className="text-xl font-extrabold leading-tight tracking-[-0.025em] text-foreground sm:text-2xl">
