@@ -457,22 +457,6 @@ export const BarangayPurisimaMap = ({
               </MapContainer>
             )}
 
-            {/* Map Legend Overlay (Displays boundary legend when verified polygon is active) */}
-            {hasVerifiedBoundary && boundaryData && (
-              <div
-                aria-label="Map legend"
-                className="pointer-events-auto absolute bottom-3 left-3 z-[400] rounded-lg border border-border bg-card/95 px-3 py-2 text-xs shadow-sm backdrop-blur-sm"
-              >
-                <div className="flex items-center gap-2 font-medium text-foreground">
-                  <span
-                    className="inline-block h-3 w-4 rounded-sm border-2 border-primary bg-transparent"
-                    aria-hidden="true"
-                  />
-                  <span>Barangay boundary</span>
-                </div>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">Outlined area shown on the map</p>
-              </div>
-            )}
           </div>
 
           {/* Simple map instructions and larger-map link */}
