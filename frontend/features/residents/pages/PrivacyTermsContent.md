@@ -1,9 +1,3 @@
-**Effective Date:** November 22, 2026
-**Last Updated:** November 22, 2026
-**Version:** 1.0
-
----
-
 # PART I — PRIVACY POLICY
 
 ## 1. Introduction

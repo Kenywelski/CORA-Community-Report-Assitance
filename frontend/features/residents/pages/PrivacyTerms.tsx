@@ -34,12 +34,6 @@ const PrivacyTerms = () => {
         </header>
 
         <div className="flex-1 overflow-y-auto px-5 pb-3 pt-5 sm:px-6">
-          <div className="mb-4 text-center">
-            <p className="mx-auto mt-2 max-w-[330px] text-xs leading-5 text-[#4f5b66]">
-              Please read the Privacy Policy and Terms &amp; Conditions carefully before using CORA. By continuing, you agree to both.
-            </p>
-          </div>
-
           <div className="rounded-xl border border-[#dfe7e5] bg-[#edf7f5] px-4 py-4 text-[#26313a]">
             <ReactMarkdown
               components={{
