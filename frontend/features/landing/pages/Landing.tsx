@@ -674,7 +674,7 @@ export const Landing = () => {
                               src={a.image_url}
                               alt={a.title}
                               referrerPolicy="no-referrer"
-                              className="h-36 w-full bg-slate-50 object-contain"
+                              className="h-36 w-full bg-slate-50 object-cover"
                             />
                           </div>
                         )}

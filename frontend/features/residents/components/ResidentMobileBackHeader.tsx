@@ -28,7 +28,7 @@ export const ResidentMobileBackHeader = ({
       >
         <ArrowLeft className="h-5 w-5" />
       </Button>
-      <h1 className="text-base font-bold tracking-tight text-[#17212b]">{translate(title)}</h1>
+      <h1 className="text-base font-bold tracking-tight text-foreground">{translate(title)}</h1>
     </header>
   );
 };

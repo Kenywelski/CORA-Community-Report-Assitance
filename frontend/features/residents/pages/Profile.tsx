@@ -337,14 +337,14 @@ const Profile = () => {
                   onClick={() => avatarInputRef.current?.click()}
                   disabled={isUploadingAvatar}
                   aria-label="Change profile picture"
-                  className="relative flex h-[82px] w-[82px] items-center justify-center rounded-full bg-[#e5f6f1] text-[#137c68] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#087b64] focus-visible:ring-offset-2 disabled:opacity-70"
+                  className="relative flex h-[82px] w-[82px] items-center justify-center rounded-full bg-primary/10 text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-70"
                 >
                   {profileAvatarUrl ? (
                     <img src={profileAvatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
                   ) : (
                     <UserRound className="h-12 w-12" strokeWidth={1.5} />
                   )}
-                  <span className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#087b64] text-white">
+                  <span className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground">
                     {isUploadingAvatar ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
@@ -361,7 +361,7 @@ const Profile = () => {
                   void handleSave();
                 }}
               >
-                <label className="block text-[11px] font-medium text-[#52616d]" htmlFor="profile-full-name">
+                <label className="block text-[11px] font-medium text-muted-foreground" htmlFor="profile-full-name">
                   Full Name
                   <Input
                     id="profile-full-name"
@@ -369,22 +369,22 @@ const Profile = () => {
                     onChange={(event) => updateEditedField('full_name', event.target.value)}
                     placeholder="Enter your full name"
                     autoComplete="name"
-                    className="mt-1 h-11 rounded-xl border-[#d6dde2] bg-white px-3 text-sm text-[#17212b] shadow-none focus-visible:ring-[#087b64]/25"
+                    className="mt-1 h-11 rounded-xl border-border bg-card px-3 text-sm text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-primary/25"
                   />
                 </label>
 
-                <label className="block text-[11px] font-medium text-[#52616d]" htmlFor="profile-email">
+                <label className="block text-[11px] font-medium text-muted-foreground" htmlFor="profile-email">
                   Email Address
                   <Input
                     id="profile-email"
                     type="email"
                     value={user.email ?? ''}
                     readOnly
-                    className="mt-1 h-11 rounded-xl border-[#d6dde2] bg-white px-3 text-sm text-[#17212b] shadow-none focus-visible:ring-[#087b64]/25"
+                    className="mt-1 h-11 rounded-xl border-border bg-card px-3 text-sm text-foreground shadow-none focus-visible:ring-primary/25"
                   />
                 </label>
 
-                <label className="block text-[11px] font-medium text-[#52616d]" htmlFor="profile-phone">
+                <label className="block text-[11px] font-medium text-muted-foreground" htmlFor="profile-phone">
                   Contact Number
                   <Input
                     id="profile-phone"
@@ -393,18 +393,18 @@ const Profile = () => {
                     onChange={(event) => updateEditedField('phone', event.target.value)}
                     placeholder="Enter your contact number"
                     autoComplete="tel"
-                    className="mt-1 h-11 rounded-xl border-[#d6dde2] bg-white px-3 text-sm text-[#17212b] shadow-none focus-visible:ring-[#087b64]/25"
+                    className="mt-1 h-11 rounded-xl border-border bg-card px-3 text-sm text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-primary/25"
                   />
                 </label>
 
-                <label className="block text-[11px] font-medium text-[#52616d]" htmlFor="profile-barangay">
+                <label className="block text-[11px] font-medium text-muted-foreground" htmlFor="profile-barangay">
                   Barangay
                   <Input
                     id="profile-barangay"
                     value={editedProfile?.barangay ?? ''}
                     onChange={(event) => updateEditedField('barangay', event.target.value)}
                     placeholder="Enter your barangay"
-                    className="mt-1 h-11 rounded-xl border-[#d6dde2] bg-white px-3 text-sm text-[#17212b] shadow-none focus-visible:ring-[#087b64]/25"
+                    className="mt-1 h-11 rounded-xl border-border bg-card px-3 text-sm text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-primary/25"
                   />
                 </label>
 
