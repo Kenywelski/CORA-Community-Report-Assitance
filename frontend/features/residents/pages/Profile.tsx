@@ -258,20 +258,111 @@ const Profile = () => {
           </div>
         )}
 
-        <div className={cn(mobileView === 'menu' ? 'hidden lg:block' : 'block')}>
-
         {mobileView === 'information' && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate(-1)}
-            className="mb-3 h-9 rounded-full px-3 text-xs font-semibold lg:hidden"
-          >
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
-            Back to My Profile
-          </Button>
+          <section className="mx-auto max-w-[430px] px-1 pb-6 lg:hidden">
+            <header className="relative flex h-10 items-center justify-center">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(-1)}
+                aria-label="Back to My Profile"
+                className="absolute left-0 h-9 w-9 rounded-full"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <h1 className="text-base font-bold tracking-tight text-[#17212b]">Profile Information</h1>
+            </header>
+
+            <div className="mx-auto max-w-[360px]">
+              <div className="flex justify-center py-5">
+                <div className="relative flex h-[82px] w-[82px] items-center justify-center overflow-visible rounded-full bg-[#e5f6f1] text-[#137c68]">
+                  {profile?.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt="Profile"
+                      className="h-full w-full rounded-full object-cover"
+                    />
+                  ) : (
+                    <UserRound className="h-12 w-12" strokeWidth={1.5} />
+                  )}
+                  <span
+                    aria-hidden="true"
+                    className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#087b64] text-white"
+                  >
+                    <Edit2 className="h-3.5 w-3.5" />
+                  </span>
+                </div>
+              </div>
+
+              <form
+                className="space-y-2.5"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void handleSave();
+                }}
+              >
+                <label className="block text-[11px] font-medium text-[#52616d]" htmlFor="profile-full-name">
+                  Full Name
+                  <Input
+                    id="profile-full-name"
+                    value={editedProfile?.full_name ?? ''}
+                    onChange={(event) => updateEditedField('full_name', event.target.value)}
+                    placeholder="Enter your full name"
+                    autoComplete="name"
+                    className="mt-1 h-11 rounded-xl border-[#d6dde2] bg-white px-3 text-sm text-[#17212b] shadow-none focus-visible:ring-[#087b64]/25"
+                  />
+                </label>
+
+                <label className="block text-[11px] font-medium text-[#52616d]" htmlFor="profile-email">
+                  Email Address
+                  <Input
+                    id="profile-email"
+                    type="email"
+                    value={user.email ?? ''}
+                    readOnly
+                    className="mt-1 h-11 rounded-xl border-[#d6dde2] bg-white px-3 text-sm text-[#17212b] shadow-none focus-visible:ring-[#087b64]/25"
+                  />
+                </label>
+
+                <label className="block text-[11px] font-medium text-[#52616d]" htmlFor="profile-phone">
+                  Contact Number
+                  <Input
+                    id="profile-phone"
+                    type="tel"
+                    value={editedProfile?.phone ?? ''}
+                    onChange={(event) => updateEditedField('phone', event.target.value)}
+                    placeholder="Enter your contact number"
+                    autoComplete="tel"
+                    className="mt-1 h-11 rounded-xl border-[#d6dde2] bg-white px-3 text-sm text-[#17212b] shadow-none focus-visible:ring-[#087b64]/25"
+                  />
+                </label>
+
+                <label className="block text-[11px] font-medium text-[#52616d]" htmlFor="profile-barangay">
+                  Barangay
+                  <Input
+                    id="profile-barangay"
+                    value={editedProfile?.barangay ?? ''}
+                    onChange={(event) => updateEditedField('barangay', event.target.value)}
+                    placeholder="Enter your barangay"
+                    className="mt-1 h-11 rounded-xl border-[#d6dde2] bg-white px-3 text-sm text-[#17212b] shadow-none focus-visible:ring-[#087b64]/25"
+                  />
+                </label>
+
+                <Button
+                  type="submit"
+                  disabled={isSaving || !editedProfile}
+                  className="mt-3 h-11 w-full rounded-xl bg-[#087b64] text-sm font-bold text-white hover:bg-[#076b57]"
+                >
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Save Changes
+                </Button>
+              </form>
+            </div>
+          </section>
         )}
+
+        <div className="hidden lg:block">
 
         <ResidentPageHeader
           title="My Profile"
