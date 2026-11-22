@@ -56,6 +56,7 @@ interface ProfileRowProps {
   placeholder?: string;
   type?: 'text' | 'tel';
   required?: boolean;
+  readOnly?: boolean;
   onChange?: (value: string) => void;
 }
 
@@ -67,6 +68,7 @@ const ProfileRow = ({
   placeholder,
   type = 'text',
   required = false,
+  readOnly = false,
   onChange,
 }: ProfileRowProps) => (
   <div className="flex min-h-[68px] items-center gap-3 px-4 py-3 sm:px-5">
@@ -75,14 +77,18 @@ const ProfileRow = ({
     </span>
     <div className="min-w-0 flex-1">
       <p className="text-[10px] font-semibold leading-none text-muted-foreground">{label}</p>
-      {editing ? (
+      {editing || readOnly ? (
         <Input
           type={type}
           value={value || ''}
           onChange={(event) => onChange?.(event.target.value)}
           placeholder={placeholder}
           required={required}
-          className="mt-1.5 h-8 rounded-lg px-2.5 text-xs"
+          readOnly={readOnly}
+          className={cn(
+            'mt-1.5 h-8 rounded-lg px-2.5 text-xs',
+            readOnly && 'cursor-not-allowed bg-muted text-muted-foreground',
+          )}
         />
       ) : (
         <p className="mt-1 truncate text-[13px] font-semibold leading-snug text-foreground">
@@ -169,7 +175,7 @@ const Profile = () => {
 
     const phone = normalizePhilippinePhone(editedProfile.phone ?? '');
     if (!phone) {
-      toast.error('Enter a complete Philippine mobile number (09XXXXXXXXX or +639XXXXXXXXX).');
+      toast.error('Enter a complete Philippine mobile number, e.g. 0917-123-4567.');
       return;
     }
 
@@ -401,7 +407,7 @@ const Profile = () => {
                     type="email"
                     value={user.email ?? ''}
                     readOnly
-                    className="mt-1 h-11 rounded-xl border-border bg-card px-3 text-sm text-foreground shadow-none focus-visible:ring-primary/25"
+                    className="mt-1 h-11 cursor-not-allowed rounded-xl border-border bg-muted px-3 text-sm text-muted-foreground shadow-none focus-visible:ring-primary/25"
                   />
                 </label>
 
@@ -412,7 +418,7 @@ const Profile = () => {
                     type="tel"
                     value={editedProfile?.phone ?? ''}
                     onChange={(event) => updateEditedField('phone', event.target.value)}
-                    placeholder="09XXXXXXXXX or +639XXXXXXXXX"
+                    placeholder="0917-123-4567"
                     autoComplete="tel"
                     required
                     className="mt-1 h-11 rounded-xl border-border bg-card px-3 text-sm text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-primary/25"
@@ -531,13 +537,13 @@ const Profile = () => {
               placeholder="Enter your full name"
               onChange={(value) => updateEditedField('full_name', value)}
             />
-            <ProfileRow icon={Mail} label="Email" value={user.email} />
+            <ProfileRow icon={Mail} label="Email" value={user.email} readOnly />
             <ProfileRow
               icon={Phone}
               label="Phone"
               value={editedProfile?.phone}
               editing={isEditing}
-              placeholder="09XXXXXXXXX or +639XXXXXXXXX"
+              placeholder="0917-123-4567"
               type="tel"
               required
               onChange={(value) => updateEditedField('phone', value)}
