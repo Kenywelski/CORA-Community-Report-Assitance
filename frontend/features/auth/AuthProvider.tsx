@@ -16,12 +16,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [staffDepartmentId, setStaffDepartmentId] = useState<string | null>(null);
 
   const ensureUserProfile = async (currentUser: User) => {
+    const metadataAvatar =
+      currentUser.user_metadata?.avatar_url ?? currentUser.user_metadata?.picture;
+    const avatarUrl = typeof metadataAvatar === 'string' ? metadataAvatar : null;
     const { data: existingProfile } = await supabase
       .from('profiles')
-      .select('id')
+      .select('id, avatar_url')
       .eq('user_id', currentUser.id)
       .maybeSingle();
-    if (existingProfile) return;
+    if (existingProfile) {
+      if (!existingProfile.avatar_url && avatarUrl) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ avatar_url: avatarUrl })
+          .eq('user_id', currentUser.id);
+        if (error) console.error('Profile picture initialization failed:', error);
+      }
+      return;
+    }
 
     const fullName =
       (currentUser.user_metadata?.full_name as string | undefined) ||
@@ -32,8 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { error } = await supabase.from('profiles').insert({
       user_id: currentUser.id,
       full_name: fullName,
-      avatar_url:
-        (currentUser.user_metadata?.avatar_url as string | undefined) || null,
+      avatar_url: avatarUrl,
     });
     if (error && error.code !== '23505') {
       console.error('Profile initialization failed:', error);

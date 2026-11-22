@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -35,6 +35,8 @@ interface ProfileData {
   barangay: string | null;
   avatar_url: string | null;
 }
+
+const AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 type EditableProfileField = 'full_name' | 'phone' | 'address' | 'barangay';
 
@@ -96,6 +98,7 @@ const MobileProfileMenuRow = ({ icon: Icon, label, onClick }: MobileProfileMenuR
 );
 
 const Profile = () => {
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isLoading: authLoading, isAdmin, signOut } = useAuth();
@@ -110,6 +113,7 @@ const Profile = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [editedProfile, setEditedProfile] = useState<ProfileData | null>(null);
 
   const fetchProfile = useCallback(async () => {
@@ -169,6 +173,53 @@ const Profile = () => {
     setIsSaving(false);
   };
 
+  const handleAvatarChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file || !user) return;
+
+    if (!AVATAR_MIME_TYPES.has(file.type)) {
+      toast.error('Choose a JPG, PNG, WEBP, or GIF image.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Profile pictures must be 5 MB or smaller.');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const path = `avatars/${user.id}/profile`;
+      const { error: uploadError } = await supabase.storage
+        .from('public-media')
+        .upload(path, file, {
+          cacheControl: '0',
+          contentType: file.type,
+          upsert: true,
+        });
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('public-media').getPublicUrl(path);
+      const avatarUrl = `${publicUrl}?v=${Date.now()}`;
+      const { data, error: profileError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('user_id', user.id)
+        .select('*')
+        .single();
+      if (profileError) throw profileError;
+
+      setProfile(data);
+      setEditedProfile(data);
+      toast.success('Profile picture updated.');
+    } catch (error) {
+      console.error('Profile picture upload failed:', error);
+      toast.error('Could not update your profile picture. Please try again.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
   if (authLoading || isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -184,6 +235,11 @@ const Profile = () => {
     (user.user_metadata?.full_name as string | undefined) ||
     user.email?.split('@')[0] ||
     'CORA Resident';
+  const googleAvatarUrl = [
+    user.user_metadata?.avatar_url,
+    user.user_metadata?.picture,
+  ].find((value): value is string => typeof value === 'string' && value.length > 0);
+  const profileAvatarUrl = profile?.avatar_url || googleAvatarUrl;
   const residentBarangay = profile?.barangay || 'Barangay Purisima';
 
   const handleProfileLogout = async () => {
@@ -194,6 +250,15 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-background pb-24 lg:pb-10">
       <main className="app-container px-4 pb-4 pt-5 lg:pt-6">
+        <input
+          ref={avatarInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          className="hidden"
+          onChange={handleAvatarChange}
+          aria-label="Upload profile picture"
+        />
+
         {mobileView === 'menu' && (
           <div className="lg:hidden">
             <h1 className="text-center text-lg font-extrabold tracking-tight text-foreground">My Profile</h1>
@@ -204,8 +269,8 @@ const Profile = () => {
 
               <div className="relative flex items-center gap-3">
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/15 text-primary ring-1 ring-primary/20">
-                  {profile?.avatar_url ? (
-                    <img src={profile.avatar_url} alt="Profile" className="h-full w-full object-cover" />
+                  {profileAvatarUrl ? (
+                    <img src={profileAvatarUrl} alt="Profile" className="h-full w-full object-cover" />
                   ) : (
                     <UserRound className="h-7 w-7" strokeWidth={1.7} />
                   )}
@@ -276,23 +341,26 @@ const Profile = () => {
 
             <div className="mx-auto max-w-[360px]">
               <div className="flex justify-center py-5">
-                <div className="relative flex h-[82px] w-[82px] items-center justify-center overflow-visible rounded-full bg-[#e5f6f1] text-[#137c68]">
-                  {profile?.avatar_url ? (
-                    <img
-                      src={profile.avatar_url}
-                      alt="Profile"
-                      className="h-full w-full rounded-full object-cover"
-                    />
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={isUploadingAvatar}
+                  aria-label="Change profile picture"
+                  className="relative flex h-[82px] w-[82px] items-center justify-center rounded-full bg-[#e5f6f1] text-[#137c68] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#087b64] focus-visible:ring-offset-2 disabled:opacity-70"
+                >
+                  {profileAvatarUrl ? (
+                    <img src={profileAvatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
                   ) : (
                     <UserRound className="h-12 w-12" strokeWidth={1.5} />
                   )}
-                  <span
-                    aria-hidden="true"
-                    className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#087b64] text-white"
-                  >
-                    <Edit2 className="h-3.5 w-3.5" />
+                  <span className="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#087b64] text-white">
+                    {isUploadingAvatar ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Edit2 className="h-3.5 w-3.5" />
+                    )}
                   </span>
-                </div>
+                </button>
               </div>
 
               <form
@@ -369,6 +437,33 @@ const Profile = () => {
           subtitle="View and manage your personal information."
           className="mb-5 lg:mb-6"
         />
+
+        <section className="mb-4 flex items-center gap-4 rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
+          <button
+            type="button"
+            onClick={() => avatarInputRef.current?.click()}
+            disabled={isUploadingAvatar}
+            aria-label="Change profile picture"
+            className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#e5f6f1] text-[#137c68] ring-1 ring-[#087b64]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#087b64] disabled:opacity-70"
+          >
+            {profileAvatarUrl ? (
+              <img src={profileAvatarUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <UserRound className="h-9 w-9" strokeWidth={1.5} />
+            )}
+            <span className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full border-2 border-card bg-[#087b64] text-white">
+              {isUploadingAvatar ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Edit2 className="h-3 w-3" />
+              )}
+            </span>
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold text-foreground">{displayName}</p>
+            <p className="mt-1 truncate text-xs text-muted-foreground">{user.email}</p>
+          </div>
+        </section>
 
         <section className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-[0_8px_24px_rgba(15,23,42,0.07)]">
           <div className="flex min-h-14 items-center justify-end border-b border-border/50 px-4 sm:px-5">
