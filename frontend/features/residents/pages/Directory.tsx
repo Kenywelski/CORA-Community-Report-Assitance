@@ -82,7 +82,7 @@ const Directory = () => {
   return (
     <div className="min-h-screen bg-background pb-24 lg:pb-10">
       <main className="app-container relative px-4 pb-6 pt-5 lg:pt-6">
-        <ResidentMobileBackHeader title="Barangay Directory" onBack={() => navigate(-1)} className="mb-4" />
+        <ResidentMobileBackHeader title="Barangay Directory" onBack={() => navigate(-1)} />
         <header className="mb-4 hidden items-start gap-3 lg:flex">
           <span aria-hidden="true" className="mt-0.5 h-10 w-1.5 shrink-0 rounded-full bg-emerald-600" />
           <div className="min-w-0">

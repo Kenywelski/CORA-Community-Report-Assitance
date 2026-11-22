@@ -331,7 +331,7 @@ const Profile = () => {
             <ResidentMobileBackHeader title="Profile Information" onBack={() => navigate(-1)} />
 
             <div className="mx-auto max-w-[360px]">
-              <div className="flex justify-center py-5">
+              <div className="flex justify-center pb-5 pt-0">
                 <button
                   type="button"
                   onClick={() => avatarInputRef.current?.click()}

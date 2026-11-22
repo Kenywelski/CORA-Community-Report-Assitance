@@ -17,7 +17,7 @@ export const ResidentMobileBackHeader = ({
   const { translate } = useAppPreferences();
 
   return (
-    <header className={cn('relative flex h-10 items-center justify-center lg:hidden', className)}>
+    <header className={cn('relative mb-5 flex h-10 items-center justify-center lg:hidden', className)}>
       <Button
         type="button"
         variant="ghost"
