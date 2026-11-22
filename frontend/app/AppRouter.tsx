@@ -9,6 +9,7 @@ import { ROUTES } from './routePaths';
 
 const Landing = lazy(() => import('@/features/landing/pages/Landing'));
 const Auth = lazy(() => import('@/features/residents/pages/Auth'));
+const PrivacyTerms = lazy(() => import('@/features/residents/pages/PrivacyTerms'));
 const GuestMode = lazy(() => import('@/features/residents/pages/GuestMode'));
 const Services = lazy(() => import('@/features/residents/pages/Services'));
 const Updates = lazy(() => import('@/features/residents/pages/Updates'));
@@ -135,6 +136,7 @@ function AppRouteContent() {
           <Route path={ROUTES.landing} element={<Landing />} />
           <Route path={ROUTES.dashboard} element={<HomeGate />} />
           <Route path={ROUTES.auth} element={<Auth />} />
+          <Route path={ROUTES.privacyTerms} element={<PrivacyTerms />} />
           <Route path={ROUTES.guest} element={<GuestMode />} />
           <Route path={ROUTES.services} element={<Services />} />
           <Route path={ROUTES.updates} element={<Updates />} />
@@ -165,7 +167,9 @@ function AppRouteContent() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
-      <Suspense fallback={null}><ChatbotLauncher /></Suspense>
+      {pathname !== ROUTES.privacyTerms && (
+        <Suspense fallback={null}><ChatbotLauncher /></Suspense>
+      )}
     </>
   );
 }

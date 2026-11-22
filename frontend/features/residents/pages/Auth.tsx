@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -22,12 +22,14 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{
     email?: string;
     password?: string;
     confirmPassword?: string;
     fullName?: string;
+    terms?: string;
   }>({});
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showResetEmailSent, setShowResetEmailSent] = useState(false);
@@ -48,6 +50,15 @@ const Auth = () => {
     isLoading,
   } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  useEffect(() => {
+    const state = location.state as { termsAccepted?: boolean } | null;
+    if (state?.termsAccepted) {
+      setAcceptedTerms(true);
+      setErrors((current) => ({ ...current, terms: undefined }));
+      navigate(location.pathname + location.search, { replace: true, state: null });
+    }
+  }, [location, navigate]);
   const navigateRef = useRef(navigate);
   useEffect(() => {
     navigateRef.current = navigate;
@@ -117,6 +128,10 @@ const Auth = () => {
 
     if (!isLogin && !fullName.trim()) {
       newErrors.fullName = 'Full name is required';
+    }
+
+    if (!isLogin && !acceptedTerms) {
+      newErrors.terms = 'Please agree to the Terms & Conditions and Privacy Act';
     }
 
     setErrors(newErrors);
@@ -598,6 +613,45 @@ const Auth = () => {
                         </div>
                       )}
 
+                      {!isLogin && (
+                        <div className="space-y-1.5">
+                          <div className="flex items-start gap-3 text-sm leading-5 text-[#616775] lg:text-sm lg:text-muted-foreground">
+                            <input
+                              type="checkbox"
+                              checked={acceptedTerms}
+                              id="accepted-terms"
+                              onChange={(event) => {
+                                setAcceptedTerms(event.target.checked);
+                                if (event.target.checked) {
+                                  setErrors((current) => ({ ...current, terms: undefined }));
+                                }
+                              }}
+                              aria-invalid={Boolean(errors.terms)}
+                              className="mt-0.5 h-4 w-4 shrink-0 accent-[#1f7f73]"
+                            />
+                            <span>
+                              <label htmlFor="accepted-terms" className="cursor-pointer">I agree to the </label>
+                              <button
+                                type="button"
+                                onClick={() => navigate(ROUTES.privacyTerms, { state: { from: ROUTES.auth } })}
+                                className="font-semibold text-[#1f7f73] underline underline-offset-2 lg:text-primary"
+                              >
+                                Terms &amp; Conditions
+                              </button>{' '}
+                              and{' '}
+                              <button
+                                type="button"
+                                onClick={() => navigate(ROUTES.privacyTerms, { state: { from: ROUTES.auth } })}
+                                className="font-semibold text-[#1f7f73] underline underline-offset-2 lg:text-primary"
+                              >
+                                Privacy Act
+                              </button>
+                            </span>
+                          </div>
+                          {errors.terms && <p className="text-xs text-destructive">{errors.terms}</p>}
+                        </div>
+                      )}
+
                       <Button type="submit" size="lg" className={primaryAuthButtonClassName} disabled={isSubmitting}>
                         {isSubmitting ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -629,6 +683,7 @@ const Auth = () => {
                         type="button"
                         onClick={() => {
                           setIsLogin(!isLogin);
+                          setAcceptedTerms(false);
                           setErrors({});
                         }}
                         className="touch-manipulation font-bold text-[#1f7f73] hover:underline lg:font-medium lg:text-primary"

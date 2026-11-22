@@ -1,5 +1,6 @@
 export const ROUTES = {
   home: '/', landing: '/landing', dashboard: '/dashboard', auth: '/auth', guest: '/guest',
+  privacyTerms: '/privacy-policy-and-terms',
   services: '/services', updates: '/updates', profile: '/profile', settings: '/settings',
   reportIssue: '/report-issue', myRequests: '/my-requests', feedback: '/feedback',
   community: '/community', programs: '/programs', directory: '/directory',
