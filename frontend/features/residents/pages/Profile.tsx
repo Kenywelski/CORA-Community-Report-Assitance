@@ -41,12 +41,21 @@ const AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'ima
 
 type EditableProfileField = 'full_name' | 'phone' | 'address' | 'barangay';
 
+const normalizePhilippinePhone = (value: string): string | null => {
+  const compact = value.trim().replace(/[\s().-]/g, '');
+  if (/^09\d{9}$/.test(compact)) return compact;
+  if (/^\+?639\d{9}$/.test(compact)) return compact.replace(/^\+?63/, '0');
+  return null;
+};
+
 interface ProfileRowProps {
   icon: LucideIcon;
   label: string;
   value: string | null | undefined;
   editing?: boolean;
   placeholder?: string;
+  type?: 'text' | 'tel';
+  required?: boolean;
   onChange?: (value: string) => void;
 }
 
@@ -56,6 +65,8 @@ const ProfileRow = ({
   value,
   editing = false,
   placeholder,
+  type = 'text',
+  required = false,
   onChange,
 }: ProfileRowProps) => (
   <div className="flex min-h-[68px] items-center gap-3 px-4 py-3 sm:px-5">
@@ -66,9 +77,11 @@ const ProfileRow = ({
       <p className="text-[10px] font-semibold leading-none text-muted-foreground">{label}</p>
       {editing ? (
         <Input
+          type={type}
           value={value || ''}
           onChange={(event) => onChange?.(event.target.value)}
           placeholder={placeholder}
+          required={required}
           className="mt-1.5 h-8 rounded-lg px-2.5 text-xs"
         />
       ) : (
@@ -154,12 +167,18 @@ const Profile = () => {
   const handleSave = async () => {
     if (!user || !editedProfile) return;
 
+    const phone = normalizePhilippinePhone(editedProfile.phone ?? '');
+    if (!phone) {
+      toast.error('Enter a complete Philippine mobile number (09XXXXXXXXX or +639XXXXXXXXX).');
+      return;
+    }
+
     setIsSaving(true);
     const { error } = await supabase
       .from('profiles')
       .update({
         full_name: editedProfile.full_name,
-        phone: editedProfile.phone,
+        phone,
         address: editedProfile.address,
         barangay: editedProfile.barangay,
       })
@@ -168,7 +187,9 @@ const Profile = () => {
     if (error) {
       toast.error('Failed to update profile');
     } else {
-      setProfile(editedProfile);
+      const updatedProfile = { ...editedProfile, phone };
+      setProfile(updatedProfile);
+      setEditedProfile(updatedProfile);
       setIsEditing(false);
       toast.success('Profile updated successfully');
     }
@@ -385,14 +406,15 @@ const Profile = () => {
                 </label>
 
                 <label className="block text-[11px] font-medium text-muted-foreground" htmlFor="profile-phone">
-                  Contact Number
+                  Contact Number (required)
                   <Input
                     id="profile-phone"
                     type="tel"
                     value={editedProfile?.phone ?? ''}
                     onChange={(event) => updateEditedField('phone', event.target.value)}
-                    placeholder="Enter your contact number"
+                    placeholder="09XXXXXXXXX or +639XXXXXXXXX"
                     autoComplete="tel"
+                    required
                     className="mt-1 h-11 rounded-xl border-border bg-card px-3 text-sm text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-primary/25"
                   />
                 </label>
@@ -435,14 +457,14 @@ const Profile = () => {
             onClick={() => avatarInputRef.current?.click()}
             disabled={isUploadingAvatar}
             aria-label="Change profile picture"
-            className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#e5f6f1] text-[#137c68] ring-1 ring-[#087b64]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#087b64] disabled:opacity-70"
+            className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-70"
           >
             {profileAvatarUrl ? (
-              <img src={profileAvatarUrl} alt="" className="h-full w-full object-cover" />
+              <img src={profileAvatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
             ) : (
               <UserRound className="h-9 w-9" strokeWidth={1.5} />
             )}
-            <span className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full border-2 border-card bg-[#087b64] text-white">
+            <span className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground">
               {isUploadingAvatar ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
               ) : (
@@ -515,7 +537,9 @@ const Profile = () => {
               label="Phone"
               value={editedProfile?.phone}
               editing={isEditing}
-              placeholder="Enter your phone number"
+              placeholder="09XXXXXXXXX or +639XXXXXXXXX"
+              type="tel"
+              required
               onChange={(value) => updateEditedField('phone', value)}
             />
             <ProfileRow
