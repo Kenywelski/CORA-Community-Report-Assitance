@@ -1,5 +1,5 @@
-**Effective Date:** [Insert approved date]
-**Last Updated:** [Insert date]
+**Effective Date:** November 22, 2026
+**Last Updated:** November 22, 2026
 **Version:** 1.0
 
 ---
