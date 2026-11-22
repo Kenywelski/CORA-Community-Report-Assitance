@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/app/routePaths';
+import legalContent from './PrivacyTermsContent.md?raw';
 
 const PrivacyTerms = () => {
   const navigate = useNavigate();
@@ -46,45 +48,33 @@ const PrivacyTerms = () => {
             </p>
           </div>
 
-          <div className="space-y-4 rounded-xl border border-[#dfe7e5] bg-[#edf7f5] px-4 py-4 text-[#26313a]">
-            <article>
-              <p className="mb-1 text-xs font-semibold text-[#167568]">Last updated: January 15, 2025</p>
-              <h3 className="text-base font-bold">Privacy Policy</h3>
-              <p className="mt-1 text-xs leading-[1.35]">
-                Learn how CORA collects, uses, and protects your personal information when you use our app.
-              </p>
-              <h4 className="mt-2 text-sm font-bold">1. Introduction</h4>
-              <p className="text-xs leading-[1.35]">
-                This Privacy Policy explains how CORA (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) collects, uses, discloses, and protects your information when you use the CORA mobile application (&quot;the App&quot;).
-              </p>
-              <h4 className="mt-2 text-sm font-bold">2. Information We Collect</h4>
-              <p className="text-xs leading-[1.35]">
-                We may collect information you provide directly to us, such as your account details (e.g., name, email address), and information we collect automatically, such as app usage data, device information, and log data.
-              </p>
-              <h4 className="mt-2 text-sm font-bold">3. How We Use Your Information</h4>
-              <p className="text-xs leading-[1.35]">
-                We use your information to provide and improve the App, manage your account, personalize your experience, and ensure the security and proper functioning of our services.
-              </p>
-            </article>
-
-            <article className="border-t border-[#d5dfdd] pt-3">
-              <h3 className="text-base font-bold">Terms &amp; Conditions</h3>
-              <p className="mt-1 text-xs leading-[1.35]">
-                Please read the terms and conditions carefully before using CORA.
-              </p>
-              <h4 className="mt-2 text-sm font-bold">1. Acceptance of Terms</h4>
-              <p className="text-xs leading-[1.35]">
-                These Terms and Conditions (&quot;Terms&quot;) govern your use of the CORA mobile application (&quot;the App&quot;). By accessing or using the App, you agree to be bound by these Terms.
-              </p>
-              <h4 className="mt-2 text-sm font-bold">2. Use of the App</h4>
-              <p className="text-xs leading-[1.35]">
-                You may use CORA only for lawful purposes and in accordance with these Terms. You agree not to misuse the App, interfere with its operation, or attempt to gain unauthorized access to our systems or other users&apos; accounts.
-              </p>
-              <h4 className="mt-2 text-sm font-bold">3. Account and Security</h4>
-              <p className="text-xs leading-[1.35]">
-                To access certain features, you may need to create an account. You are responsible for keeping your account information accurate and for all activities that occur under your account.
-              </p>
-            </article>
+          <div className="rounded-xl border border-[#dfe7e5] bg-[#edf7f5] px-4 py-4 text-[#26313a]">
+            <ReactMarkdown
+              components={{
+                h1: ({ children }) => (
+                  <h3 className="mb-3 mt-4 border-t border-[#d5dfdd] pt-3 text-base font-bold text-[#167568] first:mt-0 first:border-0 first:pt-0">
+                    {children}
+                  </h3>
+                ),
+                h2: ({ children }) => (
+                  <h4 className="mb-1 mt-3 text-sm font-bold text-[#167568]">{children}</h4>
+                ),
+                p: ({ children }) => (
+                  <p className="my-1.5 text-xs leading-[1.4]">{children}</p>
+                ),
+                ul: ({ children }) => (
+                  <ul className="my-1.5 list-disc space-y-0.5 pl-4 text-xs leading-[1.4]">{children}</ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="my-1.5 list-decimal space-y-0.5 pl-4 text-xs leading-[1.4]">{children}</ol>
+                ),
+                li: ({ children }) => <li className="pl-0.5">{children}</li>,
+                hr: () => <hr className="my-3 border-[#d5dfdd]" />,
+                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+              }}
+            >
+              {legalContent}
+            </ReactMarkdown>
           </div>
         </div>
 
