@@ -1,9 +1,12 @@
 import { ArrowLeft, Camera, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import heroCoastal from '@/features/residents/assets/hero-coastal.jpg';
+import { useViewportZoomLock } from '@/hooks/useViewportZoomLock';
 import { useAppPreferences } from '@/lib/preferences';
 
 const GuestMode = () => {
+  useViewportZoomLock();
+
   const navigate = useNavigate();
   const { translate } = useAppPreferences();
 

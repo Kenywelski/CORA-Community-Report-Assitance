@@ -10,6 +10,7 @@ import { Mail, Lock, User, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { ROUTES } from '@/app/routePaths';
+import { useViewportZoomLock } from '@/hooks/useViewportZoomLock';
 import heroImage from '@/features/residents/assets/hero-coastal.jpg';
 import sunriseImage from '@/features/residents/assets/purisima-sunrise.jpg';
 
@@ -17,6 +18,8 @@ const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 
 const Auth = () => {
+  useViewportZoomLock();
+
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

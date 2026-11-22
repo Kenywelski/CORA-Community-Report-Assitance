@@ -34,6 +34,7 @@ import { getEmergencyContactAppearance } from '@/features/emergency-contacts/con
 import { emergencyContactQueryKeys } from '@/features/emergency-contacts/queryKeys';
 import { emergencyContactTelHref, parseEmergencyContactNumbers } from '@/features/emergency-contacts/contactNumbers';
 import { supabase } from "@/integrations/supabase/client";
+import { useViewportZoomLock } from '@/hooks/useViewportZoomLock';
 import { BarangayPurisimaMap } from "@/features/residents/components/BarangayPurisimaMap";
 import { AnnouncementDetailDialog } from "@/features/residents/components/AnnouncementDetailDialog";
 import { LandingFaqChatbot } from "@/features/landing/components/LandingFaqChatbot";
@@ -143,6 +144,8 @@ const LANDING_NAV_ITEMS = [
 type LandingNavId = (typeof LANDING_NAV_ITEMS)[number]["id"];
 
 export const Landing = () => {
+  useViewportZoomLock();
+
   const navigate = useNavigate();
   const { user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

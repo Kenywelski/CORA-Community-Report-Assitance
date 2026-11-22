@@ -3,9 +3,12 @@ import { ArrowLeft } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/app/routePaths';
+import { useViewportZoomLock } from '@/hooks/useViewportZoomLock';
 import legalContent from './PrivacyTermsContent.md?raw';
 
 const PrivacyTerms = () => {
+  useViewportZoomLock();
+
   const navigate = useNavigate();
   const location = useLocation();
   const [accepted, setAccepted] = useState(false);
