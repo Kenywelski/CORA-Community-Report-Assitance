@@ -430,9 +430,8 @@ const Profile = () => {
                   <Input
                     id="profile-barangay"
                     value={editedProfile?.barangay ?? ''}
-                    onChange={(event) => updateEditedField('barangay', event.target.value)}
-                    placeholder="Enter your barangay"
-                    className="mt-1 h-11 rounded-xl border-border bg-card px-3 text-sm text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-primary/25"
+                    readOnly
+                    className="mt-1 h-11 cursor-not-allowed rounded-xl border-border bg-muted px-3 text-sm text-muted-foreground shadow-none focus-visible:ring-primary/25"
                   />
                 </label>
 
@@ -560,9 +559,7 @@ const Profile = () => {
               icon={Building2}
               label="Barangay"
               value={editedProfile?.barangay}
-              editing={isEditing}
-              placeholder="Enter your barangay"
-              onChange={(value) => updateEditedField('barangay', value)}
+              readOnly
             />
           </div>
         </section>
